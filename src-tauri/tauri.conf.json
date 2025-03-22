@@ -1,0 +1,70 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "shui",
+  "version": "0.1.0",
+  "identifier": "com.shui.app",
+  "build": {
+    "beforeDevCommand": "yarn dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "yarn build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "EcoPaste",
+        "url": "http://localhost:1420/",
+        "width": 360,
+        "height": 600,
+        "minWidth": 360,
+        "minHeight": 600,
+        "maximizable": false,
+        "decorations": false,
+        "visible": true,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "acceptFirstMouse": true,
+        "skipTaskbar": true,
+        "visibleOnAllWorkspaces": true
+      },
+      {
+        "label": "preference",
+        "url": "http://localhost:1420/404",
+        "width": 700,
+        "height": 480,
+        "minWidth": 700,
+        "minHeight": 480,
+        "center": true,
+        "visible": false,
+        "transparent": true,
+        "maximizable": false,
+        "hiddenTitle": true,
+        "skipTaskbar": true,
+        "titleBarStyle": "Overlay",
+        "dragDropEnabled": false,
+        "windowEffects": {
+          "effects": [
+            "sidebar"
+          ],
+          "state": "active"
+        }
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
