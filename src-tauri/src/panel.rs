@@ -36,47 +36,47 @@ pub fn platform(app: &mut App, main_window: WebviewWindow) {
             | NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary,
     );
 
-    // 定义面板的委托 (delegate)，用于监听面板窗口的事件
-    let delegate = panel_delegate!(EcoPanelDelegate {
-        window_did_become_key,
-        window_did_resign_key,
-        window_did_resize,
-        window_did_move
-    });
+    // // 定义面板的委托 (delegate)，用于监听面板窗口的事件
+    // let delegate = panel_delegate!(EcoPanelDelegate {
+    //     window_did_become_key,
+    //     window_did_resign_key,
+    //     window_did_resize,
+    //     window_did_move
+    // });
 
-    // 为 delegate 设置事件监听器
-    delegate.set_listener(Box::new(move |delegate_name: String| {
-        let target = EventTarget::labeled("main");
+    // // 为 delegate 设置事件监听器
+    // delegate.set_listener(Box::new(move |delegate_name: String| {
+    //     let target = EventTarget::labeled("main");
 
-        let window_move_event = || {
-            if let Ok(position) = main_window.outer_position() {
-                let _ = main_window.emit_to(target.clone(), WINDOW_MOVED_EVENT, position);
-            }
-        };
+    //     let window_move_event = || {
+    //         if let Ok(position) = main_window.outer_position() {
+    //             let _ = main_window.emit_to(target.clone(), WINDOW_MOVED_EVENT, position);
+    //         }
+    //     };
 
-        match delegate_name.as_str() {
-            // 当窗口获得键盘焦点时调用
-            "window_did_become_key" => {
-                let _ = main_window.emit_to(target, WINDOW_FOCUS_EVENT, true);
-            }
-            // 当窗口失去键盘焦点时调用
-            "window_did_resign_key" => {
-                let _ = main_window.emit_to(target, WINDOW_BLUR_EVENT, true);
-            }
-            // 当窗口大小改变时调用
-            "window_did_resize" => {
-                window_move_event();
+    //     match delegate_name.as_str() {
+    //         // 当窗口获得键盘焦点时调用
+    //         "window_did_become_key" => {
+    //             let _ = main_window.emit_to(target, WINDOW_FOCUS_EVENT, true);
+    //         }
+    //         // 当窗口失去键盘焦点时调用
+    //         "window_did_resign_key" => {
+    //             let _ = main_window.emit_to(target, WINDOW_BLUR_EVENT, true);
+    //         }
+    //         // 当窗口大小改变时调用
+    //         "window_did_resize" => {
+    //             window_move_event();
 
-                if let Ok(size) = main_window.inner_size() {
-                    let _ = main_window.emit_to(target, WINDOW_RESIZED_EVENT, size);
-                }
-            }
-            // 当窗口位置改变时调用
-            "window_did_move" => window_move_event(),
-            _ => (),
-        }
-    }));
+    //             if let Ok(size) = main_window.inner_size() {
+    //                 let _ = main_window.emit_to(target, WINDOW_RESIZED_EVENT, size);
+    //             }
+    //         }
+    //         // 当窗口位置改变时调用
+    //         "window_did_move" => window_move_event(),
+    //         _ => (),
+    //     }
+    // }));
 
-    // 设置窗口的委托对象，用于处理窗口的事件。
-    panel.set_delegate(delegate);
+    // // 设置窗口的委托对象，用于处理窗口的事件。
+    // panel.set_delegate(delegate);
 }
