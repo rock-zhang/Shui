@@ -11,18 +11,6 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
-// #[cfg_attr(mobile, tauri::mobile_entry_point)]
-// pub fn run() {
-//     let app = Builder::default().setup(|app| {
-//         let main_window = app.get_webview_window("main").unwrap();
-
-//         panel::platform(app, main_window.clone());
-//         // setup::default(app, main_window.clone(), preference_window.clone());
-
-//         Ok(())
-//     });
-// }
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
