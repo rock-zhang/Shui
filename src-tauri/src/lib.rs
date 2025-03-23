@@ -1,4 +1,5 @@
-mod panel;
+mod core;
+use core::panel;
 use tauri::Manager;
 
 // use tauri_plugin_autostart::MacosLauncher;
