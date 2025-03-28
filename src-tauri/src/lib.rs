@@ -18,7 +18,7 @@ pub fn run() {
         .setup(|app| {
             let main_window = app.get_webview_window("main").unwrap();
             #[cfg(target_os = "macos")]
-            // panel::platform(app, main_window.clone());
+            panel::platform(app, main_window.clone());
             Ok(())
         })
         // .plugin()

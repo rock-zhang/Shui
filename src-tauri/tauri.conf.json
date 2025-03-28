@@ -5,7 +5,7 @@
   "identifier": "com.shui.app",
   "build": {
     "beforeDevCommand": "yarn dev",
-    "devUrl": "http://localhost:1420",
+    "devUrl": "http://localhost:3000",
     "beforeBuildCommand": "yarn build",
     "frontendDist": "../dist"
   },
@@ -15,7 +15,7 @@
       {
         "label": "main",
         "title": "EcoPaste",
-        "url": "http://localhost:1420/",
+        "url": "http://localhost:3000/",
         "width": 360,
         "height": 600,
         "minWidth": 360,

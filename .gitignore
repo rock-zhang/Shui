@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 /target/
+/.next/
 
 # Editor directories and files
 .vscode/*
