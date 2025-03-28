@@ -24,32 +24,10 @@
         "decorations": false,
         "visible": true,
         "transparent": true,
-        "alwaysOnTop": true,
+        "alwaysOnTop": false,
         "acceptFirstMouse": true,
         "skipTaskbar": true,
         "visibleOnAllWorkspaces": true
-      },
-      {
-        "label": "preference",
-        "url": "http://localhost:1420/404",
-        "width": 700,
-        "height": 480,
-        "minWidth": 700,
-        "minHeight": 480,
-        "center": true,
-        "visible": false,
-        "transparent": true,
-        "maximizable": false,
-        "hiddenTitle": true,
-        "skipTaskbar": true,
-        "titleBarStyle": "Overlay",
-        "dragDropEnabled": false,
-        "windowEffects": {
-          "effects": [
-            "sidebar"
-          ],
-          "state": "active"
-        }
       }
     ],
     "security": {
@@ -65,6 +43,10 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "resources": [
+      "assets/**/*",
+      "icons/**/*"
     ]
   }
 }

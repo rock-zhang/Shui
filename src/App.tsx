@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
-import { TrayIcon, TrayIconOptions } from "@tauri-apps/api/tray";
+import { TrayIcon } from "@tauri-apps/api/tray";
 
 const TRAY_ID = "app-tray";
+
 function App() {
   const [greetMsg, setGreetMsg] = useState("");
   const [name, setName] = useState("");
@@ -15,73 +16,82 @@ function App() {
     setGreetMsg(await invoke("greet", { name }));
   }
 
-  // useEffect(() => {
-  //   createTrayIcon();
-  //   // async function getGreet() {
-  //   //   const tray = await TrayIcon.new({ tooltip: "awesome tray tooltip" });
-  //   //   tray.setTooltip("new tooltip");
-  //   // }
+  useEffect(() => {
+    let trayInstance: TrayIcon | null = null;
 
-  //   // getGreet();
-  // }, []);
+    const initTray = async () => {
+      try {
+        // 检查是否已存在托盘实例
+        trayInstance = await TrayIcon.getById(TRAY_ID);
+        console.log("trayInstance", trayInstance);
 
-  // // 通过 id 获取托盘图标
-  // const getTrayById = () => {
-  //   return TrayIcon.getById(TRAY_ID);
-  // };
+        if (trayInstance) {
+          return;
+        }
 
-  // // 创建托盘图标
-  // const createTrayIcon = async () => {
-  //   // if (!globalStore.app.showMenubarIcon) return;
+        const menu = await Menu.new();
 
-  //   // const tray = await getTrayById();
+        // 添加菜单项
+        await menu.append(
+          await MenuItem.new({
+            text: "设置",
+            action: () => {
+              TrayIcon.removeById(TRAY_ID);
+              console.log("打开设置");
+            },
+          })
+        );
 
-  //   // if (tray) return;
+        // await menu.append(PredefinedMenuItem.new({ item: "Separator" }));
 
-  //   const menu = await getTrayMenu();
+        await menu.append(
+          await MenuItem.new({
+            text: "检查更新",
+            action: () => {
+              console.log("检查更新");
+            },
+          })
+        );
 
-  //   const iconPath = "assets/tray-mac.ico";
-  //   const icon = await resolveResource(iconPath);
+        // await menu.append(await PredefinedMenuItem.new("separator"));
 
-  //   const options: TrayIconOptions = {
-  //     menu,
-  //     icon,
-  //     id: TRAY_ID,
-  //     tooltip: "appname appversion",
-  //     iconAsTemplate: true,
-  //     menuOnLeftClick: true,
-  //     action: (event) => {
-  //       console.log(event);
-  //     },
-  //   };
+        await menu.append(
+          await MenuItem.new({
+            text: "退出",
+            action: () => {
+              console.log("退出应用");
+            },
+          })
+        );
 
-  //   return TrayIcon.new(options);
-  // };
+        // 创建托盘图标
+        const iconPath = "./icons/tray-mac.ico";
+        const icon = await resolveResource(iconPath);
 
-  // // 获取托盘菜单
-  // const getTrayMenu = async () => {
-  //   const items = await Promise.all([
-  //     MenuItem.new({
-  //       text: "component.tray.label.preference",
-  //       // accelerator: isMac() ? "Cmd+," : void 0,
-  //       action: () => {
-  //         console.log("preference");
-  //       },
-  //     }),
+        console.log("icon", icon);
 
-  //     PredefinedMenuItem.new({ item: "Separator" }),
-  //     MenuItem.new({
-  //       text: "component.tray.label.check_update",
-  //       action: () => {
-  //         console.log("check_update");
-  //       },
-  //     }),
-  //   ]);
+        trayInstance = await TrayIcon.new({
+          menu,
+          icon,
+          id: TRAY_ID,
+          tooltip: "我的应用",
+          iconAsTemplate: true,
+          menuOnLeftClick: true,
+        });
+      } catch (error) {
+        console.error("创建托盘失败:", error);
+      }
+    };
 
-  //   console.log("getTrayMenu");
+    initTray();
 
-  //   return Menu.new({ items });
-  // };
+    // 清理函数
+    return () => {
+      if (trayInstance) {
+        TrayIcon.removeById(TRAY_ID);
+      }
+    };
+  }, []);
 
   return (
     <main className="container">
