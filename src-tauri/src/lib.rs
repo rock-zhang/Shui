@@ -28,36 +28,60 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::Instant;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             #[cfg(target_os = "macos")]
             {
+                let is_running = Arc::new(AtomicBool::new(true));
+                let is_running_clone = is_running.clone();
+
+                // 计时器线程
+                thread::spawn(move || loop {
+                    if is_running_clone.load(Ordering::SeqCst) {
+                        let mut start_time = Instant::now();
+                        while is_running_clone.load(Ordering::SeqCst) {
+                            let elapsed = start_time.elapsed();
+                            println!("计时：{:?}", elapsed);
+                            thread::sleep(Duration::from_secs(1));
+                        }
+                    }
+                    thread::sleep(Duration::from_millis(100));
+                });
+
+                // 锁屏监听线程
                 thread::spawn(move || {
-                    println!("Start new thread...");
                     let mut flg = false;
+                    let lock_key = CFString::new("CGSSessionScreenIsLocked");
                     loop {
                         unsafe {
                             let session_dictionary_ref = CGSessionCopyCurrentDictionary();
                             let session_dictionary: CFDictionary =
                                 CFDictionary::wrap_under_create_rule(session_dictionary_ref);
-                            let mut current_session_property = false;
+                            let current_session_property =
+                                session_dictionary.find(lock_key.to_void()).is_some();
 
-                            match session_dictionary
-                                .find(CFString::new("CGSSessionScreenIsLocked").to_void())
-                            {
-                                None => current_session_property = false,
-                                Some(_) => current_session_property = true,
-                            }
                             if flg != current_session_property {
                                 flg = current_session_property;
-
-                                if current_session_property == true {
-                                    println!("Locked");
-                                } else {
-                                    println!("Unlocked");
-                                }
+                                is_running.store(!current_session_property, Ordering::SeqCst);
+                                println!(
+                                    "系统{}，{}计时",
+                                    if current_session_property {
+                                        "锁屏"
+                                    } else {
+                                        "解锁"
+                                    },
+                                    if current_session_property {
+                                        "停止"
+                                    } else {
+                                        "开始"
+                                    }
+                                );
                             }
                             thread::sleep(Duration::from_millis(1000));
                         }
