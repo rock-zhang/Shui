@@ -11,6 +11,9 @@
   },
   "app": {
     "macOSPrivateApi": true,
+    "security": {
+      "csp": null
+    },
     "windows": [
       {
         "label": "main",
@@ -29,10 +32,7 @@
         "skipTaskbar": true,
         "visibleOnAllWorkspaces": true
       }
-    ],
-    "security": {
-      "csp": null
-    }
+    ]
   },
   "bundle": {
     "active": true,
