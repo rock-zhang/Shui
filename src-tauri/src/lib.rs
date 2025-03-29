@@ -56,19 +56,19 @@ pub fn run() {
                             println!("计时：{:?}", elapsed);
 
                             if elapsed.as_secs() >= 4 {
-                                tauri::WebviewWindowBuilder::new(
-                                    &app_handle2.clone(),
-                                    "reminder1111",
-                                    tauri::WebviewUrl::App("http://localhost:3000".into()),
-                                )
-                                .title("休息提醒")
-                                .decorations(false)
-                                // .always_on_top(true)
-                                .transparent(true)
-                                .visible_on_all_workspaces(true)
-                                .inner_size(800.0, 900.0)
-                                .build()
-                                .expect("failed to create reminder window");
+                                // tauri::WebviewWindowBuilder::new(
+                                //     &app_handle2.clone(),
+                                //     "reminder1111",
+                                //     tauri::WebviewUrl::App("http://localhost:3000".into()),
+                                // )
+                                // .title("休息提醒")
+                                // .decorations(false)
+                                // // .always_on_top(true)
+                                // .transparent(true)
+                                // .visible_on_all_workspaces(true)
+                                // .inner_size(800.0, 900.0)
+                                // .build()
+                                // .expect("failed to create reminder window");
 
                                 break;
                             }
@@ -114,29 +114,7 @@ pub fn run() {
                 });
             }
 
-            // let main_window = app.get_webview_window("main").unwrap();
-            // #[cfg(target_os = "macos")]
-            // panel::platform(app.handle().clone(), main_window.clone());
-
-            // #[cfg(target_os = "macos")]
-            // panel::platform(app, app.get_webview_window("reminder").unwrap());
             panel::platform(app, app.get_webview_window("main").unwrap());
-
-            // tauri::WebviewWindowBuilder::new(
-            //     &app.handle().clone(),
-            //     "reminder1111",
-            //     tauri::WebviewUrl::App("http://localhost:3000".into()),
-            // )
-            // .title("休息提醒")
-            // .decorations(false)
-            // .always_on_top(true)
-            // .transparent(true)
-            // .visible_on_all_workspaces(true)
-            // .inner_size(800.0, 900.0)
-            // .build()
-            // .expect("failed to create reminder window");
-            // sleep(Duration::from_secs(3));
-            // panel::platform(app, app.get_webview_window("reminder1111").unwrap());
 
             Ok(())
         })

@@ -13,14 +13,8 @@ export default function Home() {
 
     const initTray = async () => {
       try {
-        // 检查是否已存在托盘实例
-        trayInstance = await TrayIcon.getById(TRAY_ID);
-        console.log("trayInstance", trayInstance);
-
-        if (trayInstance) {
-          return;
-        }
-
+        console.log("initTray");
+        // Remove the getById check
         const menu = await Menu.new();
 
         // 添加菜单项
@@ -62,6 +56,7 @@ export default function Home() {
 
         console.log("icon", icon);
 
+        // Create tray directly
         trayInstance = await TrayIcon.new({
           menu,
           icon,
@@ -71,7 +66,7 @@ export default function Home() {
           menuOnLeftClick: true,
         });
       } catch (error) {
-        console.error("创建托盘失败:", error);
+        console.log("创建托盘失败:", error);
       }
     };
 
@@ -80,7 +75,7 @@ export default function Home() {
     // 清理函数
     return () => {
       if (trayInstance) {
-        TrayIcon.removeById(TRAY_ID);
+        // TrayIcon.removeById(TRAY_ID);
       }
     };
   }, []);

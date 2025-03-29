@@ -6,6 +6,7 @@
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "core:tray:allow-get-by-id"
   ]
 }
