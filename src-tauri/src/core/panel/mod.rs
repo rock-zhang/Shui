@@ -11,14 +11,14 @@ const WINDOW_MOVED_EVENT: &str = "tauri://move";
 const WINDOW_RESIZED_EVENT: &str = "tauri://resize";
 
 pub fn platform(app: &mut App, main_window: WebviewWindow) {
-    let app_handle = app.app_handle().clone();
+    // let app_handle = app.app_handle().clone();
     main_window.open_devtools();
 
     // macos window 转 ns_panel 插件
-    let _ = app_handle.plugin(tauri_nspanel::init());
+    // let _ = app_handle.plugin(tauri_nspanel::init());
 
     // // 隐藏 mac 的程序坞图标：https://github.com/tauri-apps/tauri/issues/4852#issuecomment-1312716378
-    app.set_activation_policy(ActivationPolicy::Accessory);
+    // app.set_activation_policy(ActivationPolicy::Accessory);
 
     // // 把 ns_window 转换为 ns_panel
     let panel = main_window.to_panel().unwrap();

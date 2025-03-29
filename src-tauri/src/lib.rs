@@ -7,7 +7,7 @@ extern crate core_foundation;
 #[cfg(target_os = "macos")]
 extern crate core_graphics;
 
-use std::thread;
+use std::thread::{self, sleep};
 use std::time::Duration;
 
 #[cfg(target_os = "macos")]
@@ -30,24 +30,49 @@ fn greet(name: &str) -> String {
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::time::Instant;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_nspanel::init())
         .setup(|app| {
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
             #[cfg(target_os = "macos")]
             {
                 let is_running = Arc::new(AtomicBool::new(true));
                 let is_running_clone = is_running.clone();
+                let app_handle = app.handle().clone();
+                let app_handle2 = app.app_handle().clone();
 
                 // 计时器线程
                 thread::spawn(move || loop {
                     if is_running_clone.load(Ordering::SeqCst) {
-                        let mut start_time = Instant::now();
+                        let start_time = Instant::now();
                         while is_running_clone.load(Ordering::SeqCst) {
                             let elapsed = start_time.elapsed();
                             println!("计时：{:?}", elapsed);
+
+                            if elapsed.as_secs() >= 4 {
+                                tauri::WebviewWindowBuilder::new(
+                                    &app_handle2.clone(),
+                                    "reminder1111",
+                                    tauri::WebviewUrl::App("http://localhost:3000".into()),
+                                )
+                                .title("休息提醒")
+                                .decorations(false)
+                                // .always_on_top(true)
+                                .transparent(true)
+                                .visible_on_all_workspaces(true)
+                                .inner_size(800.0, 900.0)
+                                .build()
+                                .expect("failed to create reminder window");
+
+                                break;
+                            }
+
                             thread::sleep(Duration::from_secs(1));
                         }
                     }
@@ -89,13 +114,32 @@ pub fn run() {
                 });
             }
 
-            let main_window = app.get_webview_window("main").unwrap();
-            #[cfg(target_os = "macos")]
-            panel::platform(app, main_window.clone());
+            // let main_window = app.get_webview_window("main").unwrap();
+            // #[cfg(target_os = "macos")]
+            // panel::platform(app.handle().clone(), main_window.clone());
+
+            // #[cfg(target_os = "macos")]
+            // panel::platform(app, app.get_webview_window("reminder").unwrap());
+            panel::platform(app, app.get_webview_window("main").unwrap());
+
+            // tauri::WebviewWindowBuilder::new(
+            //     &app.handle().clone(),
+            //     "reminder1111",
+            //     tauri::WebviewUrl::App("http://localhost:3000".into()),
+            // )
+            // .title("休息提醒")
+            // .decorations(false)
+            // .always_on_top(true)
+            // .transparent(true)
+            // .visible_on_all_workspaces(true)
+            // .inner_size(800.0, 900.0)
+            // .build()
+            // .expect("failed to create reminder window");
+            // sleep(Duration::from_secs(3));
+            // panel::platform(app, app.get_webview_window("reminder1111").unwrap());
 
             Ok(())
         })
-        // .plugin()
         .invoke_handler(tauri::generate_handler![greet])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
