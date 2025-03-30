@@ -12,6 +12,9 @@
     "core:window:allow-start-dragging",
     "core:window:deny-internal-toggle-maximize",
     "core:window:allow-get-all-windows",
-    "core:window:allow-close"
+    "core:window:allow-close",
+    "core:window:allow-set-focus",
+    "core:webview:allow-set-webview-focus",
+    "core:window:allow-set-decorations"
   ]
 }

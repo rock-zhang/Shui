@@ -26,7 +26,7 @@
         "maximizable": false,
         "decorations": false,
         "resizable": false,
-        "transparent": true,
+        "transparent": false,
         "visible": false
       }
     ]

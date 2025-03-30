@@ -42,9 +42,10 @@ export default function Home() {
             text: "设置",
             action: async () => {
               console.log("打开设置");
-              (await WebviewWindow.getByLabel("main"))?.show();
-              // const result = await invoke("setting");
-              // console.log("result", result, typeof result);
+              const mainWindow = await WebviewWindow.getByLabel("main");
+              mainWindow?.setDecorations(true);
+              mainWindow?.show();
+              mainWindow?.setFocus();
             },
           })
         );
