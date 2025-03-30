@@ -114,7 +114,7 @@ pub fn run() {
                 });
             }
 
-            panel::platform(app, app.get_webview_window("main").unwrap());
+            // panel::platform(app, app.get_webview_window("main").unwrap());
 
             Ok(())
         })
@@ -122,7 +122,9 @@ pub fn run() {
             greet,
             commands::call_reminder,
             commands::setting,
-            commands::close_window
+            commands::close_window,
+            commands::hide_reminder_windows,
+            commands::close_reminder_windows
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

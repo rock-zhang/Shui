@@ -24,7 +24,7 @@ pub fn platform(app: &mut App, main_window: WebviewWindow) {
     let panel = main_window.to_panel().unwrap();
 
     // // 让窗口在程序坞之上
-    panel.set_level(20);
+    panel.set_level(27);
 
     // // 不抢占其它窗口的焦点和支持缩放
     panel.set_style_mask(NSWindowStyleMaskNonActivatingPanel | NSResizableWindowMask);

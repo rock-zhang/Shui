@@ -3,12 +3,16 @@ import Image from "next/image";
 import { invoke } from "@tauri-apps/api/core";
 
 export default function Home() {
+  const hideWindow = async () => {
+    await invoke("hide_reminder_windows");
+  };
   const closeWindow = async () => {
-    invoke("close_window", { label: "reminder1111" });
+    await invoke("close_reminder_windows");
   };
 
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
+      <button onClick={hideWindow}>隐藏窗口</button>
       <button onClick={closeWindow}>关闭窗口</button>
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
         <Image
