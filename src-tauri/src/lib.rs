@@ -1,6 +1,9 @@
+mod commands;
 mod core;
+mod timer;
 use core::panel;
 use tauri::Manager;
+use timer::{IS_RUNNING, TIMER_STATE};
 
 #[cfg(target_os = "macos")]
 extern crate core_foundation;
@@ -42,35 +45,32 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             {
-                let is_running = Arc::new(AtomicBool::new(true));
-                let is_running_clone = is_running.clone();
+                // let is_running = Arc::new(AtomicBool::new(true));
+                let is_running_clone = IS_RUNNING.clone();
                 let app_handle = app.handle().clone();
                 let app_handle2 = app.app_handle().clone();
 
                 // 计时器线程
                 thread::spawn(move || loop {
                     if is_running_clone.load(Ordering::SeqCst) {
-                        let start_time = Instant::now();
+                        let mut timer = TIMER_STATE.lock();
+                        println!("开始计时");
+                        println!("{:?}", timer);
+                        *timer = Instant::now();
+
                         while is_running_clone.load(Ordering::SeqCst) {
-                            let elapsed = start_time.elapsed();
+                            let elapsed = timer.elapsed();
                             println!("计时：{:?}", elapsed);
 
-                            if elapsed.as_secs() >= 4 {
-                                // tauri::WebviewWindowBuilder::new(
-                                //     &app_handle2.clone(),
-                                //     "reminder1111",
-                                //     tauri::WebviewUrl::App("http://localhost:3000".into()),
-                                // )
-                                // .title("休息提醒")
-                                // .decorations(false)
-                                // // .always_on_top(true)
-                                // .transparent(true)
-                                // .visible_on_all_workspaces(true)
-                                // .inner_size(800.0, 900.0)
-                                // .build()
-                                // .expect("failed to create reminder window");
+                            if elapsed.as_secs() >= 5 {
+                                // println!("计时结束, 满足12秒，退出程序");
+                                // break;
 
-                                break;
+                                unsafe {
+                                    TIMER_STATE.force_unlock();
+
+                                    // 这里拉起喝水提醒页面
+                                }
                             }
 
                             thread::sleep(Duration::from_secs(1));
@@ -93,7 +93,7 @@ pub fn run() {
 
                             if flg != current_session_property {
                                 flg = current_session_property;
-                                is_running.store(!current_session_property, Ordering::SeqCst);
+                                IS_RUNNING.store(!current_session_property, Ordering::SeqCst);
                                 println!(
                                     "系统{}，{}计时",
                                     if current_session_property {
@@ -118,7 +118,12 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            commands::call_reminder,
+            commands::setting,
+            commands::close_window
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -17,7 +17,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "EcoPaste",
+        "title": "Shui",
         "url": "http://localhost:3000/",
         "width": 360,
         "height": 600,
@@ -25,12 +25,7 @@
         "minHeight": 600,
         "maximizable": false,
         "decorations": false,
-        "visible": true,
-        "transparent": true,
-        "alwaysOnTop": false,
-        "acceptFirstMouse": true,
-        "skipTaskbar": true,
-        "visibleOnAllWorkspaces": true
+        "visible": false
       }
     ]
   },

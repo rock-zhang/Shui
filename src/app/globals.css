@@ -24,3 +24,13 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.DragArea {
+  padding: 10px;
+  text-align: center;
+  background-color: #f1f1f1;
+  border-radius: 12px;
+  margin: 5px;
+  cursor: default;
+  user-select: none;
+}

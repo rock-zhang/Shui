@@ -18,6 +18,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+lazy_static = "1.4.0"
+parking_lot = "0.12"
 tauri = { version = "2", features = [ "tray-icon", "macos-private-api", "image-ico" ] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true

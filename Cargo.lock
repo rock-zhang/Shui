@@ -4254,6 +4254,8 @@ version = "0.1.0"
 dependencies = [
  "core-foundation 0.9.4",
  "core-graphics 0.23.2",
+ "lazy_static",
+ "parking_lot",
  "serde",
  "serde_json",
  "tauri",
