@@ -116,13 +116,26 @@ pub fn run() {
 
             // panel::platform(app, app.get_webview_window("main").unwrap());
 
+            let main_window = app.get_webview_window("main").unwrap();
+
+            // 监听窗口关闭请求事件
+            let window_handle = main_window.clone();
+            main_window.on_window_event(move |event| {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    // 隐藏窗口而不是关闭
+                    window_handle.hide().unwrap();
+                    println!("窗口关闭请求被拦截");
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             greet,
             commands::call_reminder,
             commands::setting,
-            commands::close_window,
+            commands::close_window, // TODO: del
             commands::hide_reminder_windows,
             commands::close_reminder_windows
         ])
