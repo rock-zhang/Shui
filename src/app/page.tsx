@@ -43,6 +43,8 @@ export default function Home() {
             action: async () => {
               console.log("打开设置");
               const mainWindow = await WebviewWindow.getByLabel("main");
+              console.log("mainWindow", mainWindow);
+
               mainWindow?.setDecorations(true);
               mainWindow?.show();
               mainWindow?.setFocus();

@@ -4,10 +4,14 @@ import { invoke } from "@tauri-apps/api/core";
 
 export default function Home() {
   const hideWindow = async () => {
+    console.log("hideWindow");
+
+    alert("hideWindow");
+
     await invoke("hide_reminder_windows");
   };
   const closeWindow = async () => {
-    await invoke("close_reminder_windows");
+    await invoke("close_reminder_windows", { label: "reminder_0" });
   };
 
   return (

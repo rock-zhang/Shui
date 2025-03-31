@@ -1,11 +1,16 @@
 use crate::{core::panel, timer};
 use serde::Serialize;
+// use std::thread::{self, sleep};
+// use std::time::Duration;
+
 use tauri::Manager;
 use tauri_nspanel::{cocoa::appkit::NSWindowCollectionBehavior, panel_delegate};
 use tauri_nspanel::{ManagerExt, WebviewWindowExt};
 use timer::{IS_RUNNING, TIMER_STATE};
+use tokio::time::{sleep, Duration};
 
 const NSWindowStyleMaskNonActivatingPanel: i32 = 1 << 7;
+const NSWindowStyleMaskUtilityWindow: i32 = 1 << 7;
 #[allow(non_upper_case_globals)]
 const NSResizableWindowMask: i32 = 1 << 3;
 
@@ -37,24 +42,35 @@ fn show_reminder_page(app_handle: &tauri::AppHandle) {
             .transparent(true)
             .always_on_top(true)
             .visible_on_all_workspaces(true)
+            .focus()
             .inner_size(size.width as f64, size.height as f64)
             .position(position.x as f64, position.y as f64)
             .build()
             .expect(&format!("failed to create reminder window {}", index));
 
             let panel = window.to_panel().unwrap();
-            panel.set_level(25);
+            panel.set_level(26);
 
             // // 不抢占其它窗口的焦点和支持缩放
-            panel.set_style_mask(NSWindowStyleMaskNonActivatingPanel | NSResizableWindowMask);
+            // panel.set_style_mask(NSWindowStyleMaskNonActivatingPanel | NSResizableWindowMask);
+            panel.set_style_mask(NSWindowStyleMaskUtilityWindow);
 
+            // | NSWindowCollectionBehavior::NSWindowCollectionBehaviorStationary
             // // 在各个桌面空间、全屏中共享窗口
             panel.set_collection_behaviour(
                 NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces
-                    | NSWindowCollectionBehavior::NSWindowCollectionBehaviorStationary
                     | NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary
                     | NSWindowCollectionBehavior::NSWindowCollectionBehaviorIgnoresCycle,
             );
+
+            let window_clone = window.clone();
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    // 保证在切换 space 之后获取焦点，可以响应键盘、鼠标事件
+                    sleep(Duration::from_millis(100)).await;
+                    let _ = window_clone.set_focus();
+                }
+            });
         }
     }
 }
@@ -69,7 +85,7 @@ pub fn call_reminder(app_handle: tauri::AppHandle) -> bool {
     let is_running = IS_RUNNING.load(std::sync::atomic::Ordering::SeqCst);
     println!("IS_RUNNING: {}", is_running);
 
-    if (is_running && elapsed.as_secs() >= 5) {
+    if is_running && elapsed.as_secs() >= 5 {
         println!("Timer is running and has been running for 20 minutes");
         show_reminder_page(&app_handle);
     }
@@ -137,7 +153,8 @@ pub fn hide_reminder_windows(app_handle: tauri::AppHandle) {
 pub fn close_reminder_windows(app_handle: tauri::AppHandle, label: &str) {
     let panel = app_handle.get_webview_panel(label).unwrap();
 
-    panel.set_released_when_closed(true);
+    // 需设置 isReleasedWhenClosed = false，否则关闭窗口后对象可能被释放导致崩溃。
+    panel.set_released_when_closed(false);
 
     panel.close();
 }

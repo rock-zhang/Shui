@@ -6,5 +6,7 @@
   <string>Chinese</string>
   <key>LSUIElement</key>
   <true/>
+  <!-- <key>NSAppleEventsUsageDescription</key>
+  <string>需要权限以在切换 Space 时激活窗口</string> -->
 </dict>
 </plist>
