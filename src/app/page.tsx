@@ -6,9 +6,6 @@ import { Menu, MenuItem } from "@tauri-apps/api/menu";
 import { resolveResource } from "@tauri-apps/api/path";
 import { invoke } from "@tauri-apps/api/core";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { Button } from "@/components/ui/button";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
 
 const TRAY_ID = "app-tray";
 
@@ -106,10 +103,5 @@ export default function Home({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  return (
-    <SidebarProvider open defaultOpen>
-      <AppSidebar />
-      <main className="flex-1">{children}</main>
-    </SidebarProvider>
-  );
+  return <div>欢迎</div>;
 }

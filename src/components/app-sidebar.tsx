@@ -14,12 +14,12 @@ import {
 // Menu items.
 const items = [
   {
-    title: "Home",
+    title: "通用",
     url: "#",
     icon: Home,
   },
   {
-    title: "Inbox",
+    title: "提醒",
     url: "#",
     icon: Inbox,
   },
