@@ -5,7 +5,7 @@
   "identifier": "com.shui.app",
   "build": {
     "beforeDevCommand": "yarn dev",
-    "devUrl": "http://localhost:3000",
+    "devUrl": "http://localhost:3000/setting/",
     "beforeBuildCommand": "yarn build",
     "frontendDist": "../dist"
   },
@@ -18,7 +18,7 @@
       {
         "label": "main",
         "title": "Shui",
-        "url": "http://localhost:3000/",
+        "url": "http://localhost:3000/setting/",
         "width": 680,
         "height": 460,
         "maximizable": false,

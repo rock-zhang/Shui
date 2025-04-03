@@ -809,6 +809,13 @@
   dependencies:
     "@tauri-apps/api" "^2.0.0"
 
+"@tauri-apps/plugin-store@~2":
+  version "2.2.0"
+  resolved "https://registry.npmmirror.com/@tauri-apps/plugin-store/-/plugin-store-2.2.0.tgz#e7cddd3692bdb3e8625b77d70dbede76b31d0986"
+  integrity sha512-hJTRtuJis4w5fW1dkcgftsYxKXK0+DbAqurZ3CURHG5WkAyyZgbxpeYctw12bbzF9ZbZREXZklPq8mocCC3Sgg==
+  dependencies:
+    "@tauri-apps/api" "^2.0.0"
+
 "@tybys/wasm-util@^0.9.0":
   version "0.9.0"
   resolved "https://registry.npmmirror.com/@tybys/wasm-util/-/wasm-util-0.9.0.tgz#3e75eb00604c8d6db470bf18c37b7d984a0e3355"

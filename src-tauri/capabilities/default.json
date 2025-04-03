@@ -15,6 +15,7 @@
     "core:window:allow-close",
     "core:window:allow-set-focus",
     "core:webview:allow-set-webview-focus",
-    "core:window:allow-set-decorations"
+    "core:window:allow-set-decorations",
+    "store:default"
   ]
 }
