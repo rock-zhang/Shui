@@ -53,10 +53,7 @@ export default function Home() {
 
       <div className="space-y-2 flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mb-4">
         <div>
-          <label
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            // for=":r233:-form-item"
-          >
+          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             开机自启动
           </label>
           <p
@@ -74,10 +71,7 @@ export default function Home() {
 
       <div className="space-y-2 flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
         <div>
-          <label
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            // for=":r233:-form-item"
-          >
+          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             倒计时
           </label>
           <p
