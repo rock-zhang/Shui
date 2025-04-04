@@ -1,8 +1,26 @@
 "use client";
 import Image from "next/image";
 import { invoke } from "@tauri-apps/api/core";
+import { register, unregisterAll } from "@tauri-apps/plugin-global-shortcut";
+import { useEffect } from "react";
+import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 
 export default function Home() {
+  useEffect(() => {
+    getAllWebviewWindows().then((windows) => {
+      console.log("windows", windows);
+    });
+
+    register("Esc", () => {
+      console.log("Esc pressed");
+      invoke("hide_reminder_windows");
+    });
+
+    return () => {
+      unregisterAll();
+    };
+  }, []);
+
   const hideWindow = async () => {
     console.log("hideWindow");
 

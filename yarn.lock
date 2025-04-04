@@ -802,6 +802,13 @@
     "@tauri-apps/cli-win32-ia32-msvc" "2.4.0"
     "@tauri-apps/cli-win32-x64-msvc" "2.4.0"
 
+"@tauri-apps/plugin-global-shortcut@~2":
+  version "2.2.0"
+  resolved "https://registry.npmmirror.com/@tauri-apps/plugin-global-shortcut/-/plugin-global-shortcut-2.2.0.tgz#5ab12218ab2d1863ff1aa823aed72daed7cded85"
+  integrity sha512-clI9Bg/BcxWXNDK+ij601o1qC2WxMEy8ovhGgEW5Ai17oPy0KK8uwzmc59KiVnOYKpBWHCUPqBxG+KBNUFXgzw==
+  dependencies:
+    "@tauri-apps/api" "^2.0.0"
+
 "@tauri-apps/plugin-opener@^2":
   version "2.2.6"
   resolved "https://registry.npmmirror.com/@tauri-apps/plugin-opener/-/plugin-opener-2.2.6.tgz#a4dc328541708d40e3bb969231974353a4ad6983"

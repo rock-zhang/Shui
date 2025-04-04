@@ -53,5 +53,8 @@ tauri-nspanel.workspace = true
 core-foundation = "0.9.4"
 core-graphics = "0.23.1"
 
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-global-shortcut = "2"
+
 [features]
 cargo-clippy = []
