@@ -32,13 +32,13 @@ const items = [
     icon: Calendar,
   },
   {
-    title: "Search",
-    url: "#",
+    title: "快捷键",
+    url: "/setting/shortcut",
     icon: Search,
   },
   {
-    title: "Settings",
-    url: "#",
+    title: "关于",
+    url: "/setting/about",
     icon: Settings,
   },
 ];
