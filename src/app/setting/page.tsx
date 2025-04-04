@@ -51,7 +51,7 @@ export default function Home() {
     <div>
       <h3 className="mb-4 text-lg font-medium">通用</h3>
 
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mb-4">
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             开机自启动
@@ -69,7 +69,7 @@ export default function Home() {
         />
       </div>
 
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             倒计时

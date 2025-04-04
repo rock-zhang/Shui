@@ -12,6 +12,8 @@ import {
 import { useEffect, useState } from "react";
 import { load } from "@tauri-apps/plugin-store";
 import { useTray } from "@/hooks/use-tray";
+import { Button } from "@/components/ui/button";
+import { invoke } from "@tauri-apps/api/core";
 
 const goldList = ["1000", "1500", "2000", "2500", "3000", "3500", "4000"];
 const gapList = ["20", "30", "45", "60"];
@@ -36,7 +38,6 @@ export default function Home() {
         timeStart: string;
         timeEnd: string;
       }>("alert");
-      console.log("loadConfig:", val); // { value: 5 }
       setConfig({
         ...config,
         ...val,
@@ -47,9 +48,6 @@ export default function Home() {
   }, []);
 
   const saveConfig = async (filed: string, value: string | number[]) => {
-    console.log("oldConfig", config);
-    console.log("value", value);
-
     setConfig({
       ...config,
       [filed]: value,
@@ -67,7 +65,7 @@ export default function Home() {
     <div>
       <h3 className="mb-4 text-lg font-medium">提醒</h3>
 
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mb-4">
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             每日目标
@@ -101,7 +99,7 @@ export default function Home() {
           </SelectContent>
         </Select>
       </div>
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mb-4">
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             提醒间隔
@@ -134,7 +132,7 @@ export default function Home() {
         </Select>
       </div>
 
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mb-4">
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             重复
@@ -157,8 +155,6 @@ export default function Home() {
                   ? weekdays.filter((d) => d !== index)
                   : [...weekdays, index];
 
-                console.log("newWeekdays", newWeekdays);
-
                 saveConfig("weekdays", newWeekdays);
               }}
             >
@@ -168,7 +164,7 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mb-4">
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             时间范围
@@ -181,6 +177,11 @@ export default function Home() {
           <Select
             value={config.timeStart}
             onValueChange={(value) => {
+              if (value >= config.timeEnd && config.timeEnd !== "00:00") {
+                const nextTimeIndex = timeList.indexOf(value) + 1;
+                const newEndTime = timeList[nextTimeIndex] || "00:00";
+                saveConfig("timeEnd", newEndTime);
+              }
               saveConfig("timeStart", value);
             }}
             defaultValue={config.timeStart}
@@ -190,7 +191,7 @@ export default function Home() {
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                {timeList.map((time) => (
+                {timeList.slice(0, -1).map((time) => (
                   <SelectItem key={time} value={time}>
                     {time}
                   </SelectItem>
@@ -211,7 +212,10 @@ export default function Home() {
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                {timeList.map((time) => (
+                {[
+                  ...timeList.filter((time) => time > config.timeStart),
+                  "00:00",
+                ].map((time) => (
                   <SelectItem key={time} value={time}>
                     {time}
                   </SelectItem>
@@ -221,12 +225,26 @@ export default function Home() {
           </Select>
         </div>
       </div>
+
+      <div className="flex justify-end">
+        <Button
+          onClick={() => {
+            invoke("call_reminder");
+          }}
+        >
+          预览
+        </Button>
+      </div>
     </div>
   );
 }
 
 // 在文件顶部添加时间列表
-const timeList = Array.from({ length: 24 }, (_, i) => {
-  const hour = i.toString().padStart(2, "0");
-  return [`${hour}:00`, `${hour}:30`];
-}).flat();
+// 修改时间列表生成逻辑
+const timeList = [
+  ...Array.from({ length: 24 }, (_, i) => {
+    const hour = i.toString().padStart(2, "0");
+    return [`${hour}:00`, `${hour}:30`];
+  }).flat(),
+  "00:00", // 添加 0 点选项
+];

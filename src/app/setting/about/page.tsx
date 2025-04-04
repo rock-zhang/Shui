@@ -5,7 +5,7 @@ export default function About() {
     <div>
       <h3 className="mb-4 text-lg font-medium">关于</h3>
 
-      <div className="relative overflow-hidden rounded-lg border bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-3 shadow-sm mb-4">
+      <div className="relative overflow-hidden rounded-lg border bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-3 shadow-xs mb-4">
         <div className="relative z-10 p-2">
           <div className="flex items-center gap-2 mb-2">
             <svg
@@ -31,11 +31,11 @@ export default function About() {
         </div>
       </div>
 
-      <div className="rounded-lg border p-3 shadow-sm space-y-4 mb-4">
+      <div className="rounded-lg border p-3 shadow-xs space-y-4 mb-4">
         <label className="block text-sm font-medium">联系我们</label>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50">
+        <div className="flex gap-4">
+          <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 w-2/6">
             <div className="flex-shrink-0">
               <svg
                 className="h-5 w-5 text-muted-foreground"
@@ -48,12 +48,10 @@ export default function About() {
               </svg>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-muted-foreground">
-                微信号：your_wechat
-              </p>
+              <p className="text-sm text-muted-foreground">微信号：slash__z</p>
             </div>
           </div>
-          <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50">
+          <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 w-4/6">
             <div className="flex-shrink-0">
               <svg
                 className="h-5 w-5 text-muted-foreground"
@@ -66,7 +64,9 @@ export default function About() {
               </svg>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-muted-foreground">your@email.com</p>
+              <p className="text-sm text-muted-foreground">
+                hey47_zhang@163.com
+              </p>
             </div>
           </div>
         </div>
@@ -85,7 +85,7 @@ export default function About() {
         </div>
       </div>
 
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mb-4">
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             版本
