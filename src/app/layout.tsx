@@ -1,6 +1,4 @@
 import { Metadata } from "next";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -39,10 +37,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <SidebarProvider open defaultOpen className="h-screen overflow-hidden">
-          <AppSidebar />
-          <main className="flex-1 p-10 overflow-y-auto">{children}</main>
-        </SidebarProvider>
+        {children}
       </body>
     </html>
   );
