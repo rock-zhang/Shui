@@ -22,6 +22,7 @@
     "core:window:allow-set-decorations",
     "store:default",
     "core:webview:allow-get-all-webviews",
-    "global-shortcut:allow-register"
+    "global-shortcut:allow-register",
+    "opener:default"
   ]
 }

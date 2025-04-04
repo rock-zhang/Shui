@@ -2,6 +2,7 @@ use crate::{core::panel, timer};
 use serde::Serialize;
 // use std::thread::{self, sleep};
 // use std::time::Duration;
+use std::sync::atomic::Ordering;
 
 use tauri::Manager;
 use tauri_nspanel::{cocoa::appkit::NSWindowCollectionBehavior, panel_delegate};
@@ -78,17 +79,17 @@ fn show_reminder_page(app_handle: &tauri::AppHandle) {
 #[tauri::command]
 pub fn call_reminder(app_handle: tauri::AppHandle) -> bool {
     println!("call_reminder");
-    let timer = TIMER_STATE.lock();
-    println!("Timer: {:?}", timer);
-    let elapsed = timer.elapsed();
-    println!("Timer has been running for {} seconds", elapsed.as_secs());
-    let is_running = IS_RUNNING.load(std::sync::atomic::Ordering::SeqCst);
-    println!("IS_RUNNING: {}", is_running);
+    // let timer = TIMER_STATE.lock();
+    // println!("Timer: {:?}", timer);
+    // let elapsed = timer.elapsed();
+    // println!("Timer has been running for {} seconds", elapsed.as_secs());
+    // let is_running = IS_RUNNING.load(std::sync::atomic::Ordering::SeqCst);
+    // println!("IS_RUNNING: {}", is_running);
 
-    if is_running && elapsed.as_secs() >= 5 {
-        println!("Timer is running and has been running for 20 minutes");
-        show_reminder_page(&app_handle);
-    }
+    // if is_running && elapsed.as_secs() >= 5 {
+    //     println!("Timer is running and has been running for 20 minutes");
+    show_reminder_page(&app_handle);
+    // }
 
     println!("call_reminder end");
     return true;
@@ -157,4 +158,11 @@ pub fn close_reminder_windows(app_handle: tauri::AppHandle, label: &str) {
     panel.set_released_when_closed(false);
 
     panel.close();
+}
+
+#[tauri::command]
+pub fn reset_timer() {
+    println!("reset_timer {:?}", IS_RUNNING.load(Ordering::SeqCst));
+    IS_RUNNING.store(true, Ordering::SeqCst);
+    println!("reset_timer {:?}", IS_RUNNING.load(Ordering::SeqCst));
 }

@@ -11,9 +11,10 @@ export default function Home() {
       console.log("windows", windows);
     });
 
-    register("Esc", () => {
+    register("Esc", async () => {
       console.log("Esc pressed");
-      invoke("hide_reminder_windows");
+      await invoke("hide_reminder_windows");
+      invoke("reset_timer");
     });
 
     return () => {

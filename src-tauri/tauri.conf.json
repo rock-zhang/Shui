@@ -14,6 +14,13 @@
     "security": {
       "csp": null
     },
+    "trayIcon": {
+      "iconPath": "icons/32x32.png",
+      "iconAsTemplate": true,
+      "title": "Shui",
+      "id": "main-tray",
+      "showMenuOnLeftClick": true
+    },
     "windows": [
       {
         "label": "main",
@@ -22,7 +29,7 @@
         "width": 680,
         "height": 460,
         "maximizable": false,
-        "decorations": false,
+        "decorations": true,
         "resizable": false,
         "transparent": false,
         "visible": false
