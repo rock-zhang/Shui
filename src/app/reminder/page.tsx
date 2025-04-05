@@ -4,17 +4,31 @@ import { invoke } from "@tauri-apps/api/core";
 import { register, unregisterAll } from "@tauri-apps/plugin-global-shortcut";
 import { useEffect } from "react";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
+import { listen, TauriEvent } from "@tauri-apps/api/event";
+
+function registerEscShortcut() {
+  console.log("registerEscShortcut");
+  register("Esc", async () => {
+    await invoke("hide_reminder_windows");
+    invoke("reset_timer");
+  });
+}
 
 export default function Home() {
   useEffect(() => {
-    getAllWebviewWindows().then((windows) => {
-      console.log("windows", windows);
+    // 首次打开，注册快捷键
+    registerEscShortcut();
+
+    // 监听窗口显示事件
+    listen(TauriEvent.WINDOW_FOCUS, () => {
+      registerEscShortcut();
+    });
+    listen(TauriEvent.WINDOW_BLUR, () => {
+      unregisterAll();
     });
 
-    register("Esc", async () => {
-      console.log("Esc pressed");
-      await invoke("hide_reminder_windows");
-      invoke("reset_timer");
+    getAllWebviewWindows().then((windows) => {
+      console.log("windows", windows);
     });
 
     return () => {
