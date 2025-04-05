@@ -1,0 +1,21 @@
+body {
+  background: transparent;
+}
+.reminder-page {
+  background: radial-gradient(circle at 60% 90%, #ff7eb3, #0000 10%),
+    radial-gradient(circle at 20px 20px, #7afcff, #0000 15%),
+    radial-gradient(circle at 80% 30%, #ffd65f, #0000 12%),
+    radial-gradient(circle at 40% 20%, #2ecc71, #0000 8%),
+    radial-gradient(circle at 85% 60%, #ff9966, #0000 14%),
+    radial-gradient(circle at 30% 70%, #99ccff, #0000 18%),
+    radial-gradient(circle at 70% 50%, #ff99cc, #0000 16%),
+    radial-gradient(circle at 15% 25%, #ffcc99, #0000 13%),
+    radial-gradient(circle at 75% 80%, #99ffcc, #0000 11%),
+    radial-gradient(circle at 95% 20%, #ff99ff, #0000 17%),
+    radial-gradient(circle at 50% 40%, #ffff99, #0000 9%),
+    radial-gradient(circle at 10% 90%, #99ff99, #0000 15%),
+    radial-gradient(circle at 90% 10%, #ff9999, #0000 12%),
+    radial-gradient(circle at 45% 60%, #9999ff, #0000 14%),
+    radial-gradient(circle at 65% 15%, #ffb366, #0000 10%),
+    rgba(255, 255, 255, 0.8);
+}

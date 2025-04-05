@@ -43,16 +43,6 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-.DragArea {
-  padding: 10px;
-  text-align: center;
-  background-color: #f1f1f1;
-  border-radius: 12px;
-  margin: 5px;
-  cursor: default;
-  user-select: none;
-}
-
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -129,4 +119,12 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+* {
+  outline: none;
+}
+
+button:focus {
+  outline: none;
 }
