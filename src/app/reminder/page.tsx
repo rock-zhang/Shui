@@ -14,11 +14,15 @@ import {
 } from "@tauri-apps/plugin-notification";
 import "./index.css";
 
+function hideWindowAction() {
+  invoke("hide_reminder_windows");
+  invoke("reset_timer");
+}
+
 function registerEscShortcut() {
   console.log("registerEscShortcut");
   register("Esc", async () => {
-    await invoke("hide_reminder_windows");
-    invoke("reset_timer");
+    hideWindowAction();
   });
 }
 
@@ -92,7 +96,7 @@ export default function Home() {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          invoke("hide_reminder_windows");
+          hideWindowAction();
           return 0;
         }
         return prev - 1;
@@ -140,7 +144,7 @@ export default function Home() {
       sendNativeNotification();
     }
 
-    await invoke("hide_reminder_windows");
+    hideWindowAction();
   };
 
   const progress = (water.drink / water.gold) * 100;
@@ -181,7 +185,7 @@ export default function Home() {
 
         <div className="mt-6 text-center">
           <button
-            onClick={() => invoke("hide_reminder_windows")}
+            onClick={hideWindowAction}
             className="text-gray-500 hover:text-gray-700 text-sm inline-flex items-center gap-1.5 transition-colors duration-200 cursor-pointer"
           >
             跳过
