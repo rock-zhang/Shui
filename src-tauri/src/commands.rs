@@ -37,7 +37,7 @@ fn show_reminder_page(app_handle: &tauri::AppHandle) {
             let window = tauri::WebviewWindowBuilder::new(
                 app_handle,
                 format!("reminder_{}", index),
-                tauri::WebviewUrl::App("http://localhost:3000/reminder/".into()),
+                tauri::WebviewUrl::App("reminder/".into()),
             )
             .decorations(false)
             .transparent(true)
@@ -165,4 +165,9 @@ pub fn reset_timer() {
     println!("reset_timer {:?}", IS_RUNNING.load(Ordering::SeqCst));
     IS_RUNNING.store(true, Ordering::SeqCst);
     println!("reset_timer {:?}", IS_RUNNING.load(Ordering::SeqCst));
+}
+
+#[tauri::command]
+pub async fn quit(app_handle: tauri::AppHandle) {
+    app_handle.exit(0);
 }

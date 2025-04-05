@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { TrayIcon } from "@tauri-apps/api/tray";
 import { Menu, MenuItem } from "@tauri-apps/api/menu";
-import { resolveResource } from "@tauri-apps/api/path";
 import { invoke } from "@tauri-apps/api/core";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getVersion } from "@tauri-apps/api/app";
@@ -40,22 +39,22 @@ const menu = async () => {
 
   // await menu.append(PredefinedMenuItem.new({ item: "Separator" }));
 
-  await menu.append(
-    await MenuItem.new({
-      text: "检查更新",
-      action: () => {
-        console.log("检查更新");
-      },
-    })
-  );
+  // await menu.append(
+  //   await MenuItem.new({
+  //     text: "检查更新",
+  //     action: () => {
+  //       console.log("检查更新");
+  //     },
+  //   })
+  // );
 
   // await menu.append(await PredefinedMenuItem.new("separator"));
 
   await menu.append(
     await MenuItem.new({
       text: "退出",
-      action: () => {
-        console.log("退出应用");
+      action: async () => {
+        await invoke("quit");
       },
     })
   );
@@ -87,25 +86,6 @@ export function useTray() {
 
         trayInstance?.setMenu(await menu());
         trayInstance?.setIconAsTemplate(true);
-
-        // if (trayInstance) {
-        //   return;
-        // }
-
-        // 创建托盘图标
-        // const iconPath = "./icons/tray-mac.ico";
-        // const icon = await resolveResource(iconPath);
-
-        // console.log("icon", icon);
-
-        // trayInstance = await TrayIcon.new({
-        //   menu: await menu(),
-        //   icon,
-        //   id: TRAY_ID,
-        //   tooltip: "我的应用",
-        //   iconAsTemplate: true,
-        //   menuOnLeftClick: true,
-        // });
       } catch (error) {
         console.error("创建托盘失败:", error);
       }

@@ -183,7 +183,8 @@ pub fn run() {
             commands::close_window, // TODO: del
             commands::hide_reminder_windows,
             commands::close_reminder_windows,
-            commands::reset_timer
+            commands::reset_timer,
+            commands::quit
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

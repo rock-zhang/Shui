@@ -61,13 +61,44 @@ const waterOptions = [
   { ml: 50, label: "小杯" },
 ];
 
-export default function Home() {
+const reminderTexts = [
+  "补充一下能量吧，让身体充满活力 ✨",
+  "每一口水都是对健康的投资 💧",
+  "喝水时刻，让生活更有滋味 🌊",
+  "来杯水，让身体清爽一下 ⚡️",
+  "保持水分，保持好心情 🎵",
+  "给细胞们补充点能量吧 💪",
+  "每天八杯水，健康不用愁 🎯",
+  "喝水时间到，让身体充电啦 🔋",
+  "水是生命之源，别让身体缺水哦 💎",
+  "来一杯清凉，让大脑更清醒 🧊",
+  "喝水小憩，让工作更高效 ⭐️",
+  "每一口水都是对自己的关爱 💝",
+  "保持水分，保持美丽 ✨",
+  "让水分滋润你的一天 🌈",
+  "喝水时刻，让身体更轻松 🎐",
+  "补充能量的最佳时机 ⚡️",
+  "来杯水，让心情更舒畅 🎵",
+  "每一口水都是健康的积累 🌱",
+  "保持水分，保持活力 💫",
+  "让水分为你的健康加分 🎯",
+];
+
+export default function ReminderPage() {
+  const [reminderText, setReminderText] = useState("");
   const [water, setWater] = useState({
     gold: 0,
     drink: 0,
   });
   const [countdown, setCountdown] = useState(30);
   const shouldResetTimer = countdown === 30;
+
+  // 根据饮水量随机选择提醒文案
+  useEffect(() => {
+    setReminderText(
+      reminderTexts[Math.floor(Math.random() * reminderTexts.length)]
+    );
+  }, [water.drink]);
 
   useEffect(() => {
     async function loadConfig() {
@@ -150,17 +181,15 @@ export default function Home() {
   const progress = (water.drink / water.gold) * 100;
 
   return (
-    <div className="reminder-page min-h-screen flex items-center justify-center">
-      <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-white/30 backdrop-blur-sm px-4 py-2 rounded-full text-gray-700 text-base font-medium shadow-sm border border-white/20">
+    <div className="reminder-page min-h-screen flex items-center justify-center relative">
+      <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/30 backdrop-blur-sm px-4 py-2 rounded-full text-gray-700 text-base font-medium shadow-sm border border-white/20">
         {countdown}s 后自动关闭
       </div>
       <div className="bg-white/30 backdrop-blur-sm p-8 rounded-2xl shadow-lg max-w-md w-full z-10 border border-white/20">
         <h2 className="text-2xl font-bold text-center mb-6 text-blue-600">
           喝了么
         </h2>
-        <p className="text-gray-600 text-center mb-8">
-          请选择这次要喝多少水 💧
-        </p>
+        <p className="text-gray-600 text-center mb-8">{reminderText}</p>
 
         <div className="mb-8">
           <div className="flex justify-between text-sm text-gray-600 mb-2">

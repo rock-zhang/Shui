@@ -7,7 +7,7 @@
     "dev": "next dev --turbo",
     "dev:prod": "NODE_ENV=production next dev --turbo",
     "build": "next build",
-    "build:tauri": "tauri build",
+    "build:dmg": "tauri build",
     "start": "next start",
     "lint": "next lint"
   },

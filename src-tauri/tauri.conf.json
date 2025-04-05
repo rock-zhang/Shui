@@ -5,7 +5,7 @@
   "identifier": "com.shui.app",
   "build": {
     "beforeDevCommand": "yarn dev",
-    "devUrl": "http://localhost:3000/setting/",
+    "devUrl": "http://localhost:3000/",
     "beforeBuildCommand": "yarn build",
     "frontendDist": "../dist"
   },
@@ -15,7 +15,7 @@
       "csp": null
     },
     "trayIcon": {
-      "iconPath": "icons/shui.ico",
+      "iconPath": "icons/icon.ico",
       "iconAsTemplate": true,
       "title": "Shui",
       "id": "main-tray",
@@ -25,7 +25,7 @@
       {
         "label": "main",
         "title": "Shui",
-        "url": "http://localhost:3000/setting/",
+        "url": "setting/",
         "width": 680,
         "height": 460,
         "maximizable": false,
@@ -40,7 +40,6 @@
     "active": true,
     "targets": "all",
     "icon": [
-      "icons/shui.ico",
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
