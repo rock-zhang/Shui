@@ -59,7 +59,7 @@ const waterOptions = [
 
 export default function Home() {
   const [water, setWater] = useState({
-    gold: 1500,
+    gold: 0,
     drink: 0,
   });
   const [countdown, setCountdown] = useState(30);
@@ -68,19 +68,18 @@ export default function Home() {
   useEffect(() => {
     async function loadConfig() {
       const store = await load("config_store.json", { autoSave: false });
-      const goldSetting = await store.get<{
-        gold: number;
-      }>("alert");
+      const [goldSetting, drinkHistory] = await Promise.all([
+        store.get<{
+          gold: number;
+        }>("alert"),
+        store.get<{
+          [todayDate]: number;
+        }>("drink_history"),
+      ]);
+
       setWater({
         ...water,
         gold: Number(goldSetting?.gold),
-      });
-      const drinkHistory = await store.get<{
-        [todayDate]: number;
-      }>("drink_history");
-      console.log("drinkHistory", drinkHistory);
-      setWater({
-        ...water,
         drink: drinkHistory?.[todayDate] || 0,
       });
     }
