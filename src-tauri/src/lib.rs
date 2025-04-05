@@ -20,6 +20,8 @@ extern "C" {
 #[cfg(target_os = "macos")]
 use core_foundation::{base::TCFType, base::ToVoid, dictionary::CFDictionary, string::CFString};
 
+use tauri_plugin_autostart::MacosLauncher;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -33,6 +35,10 @@ use std::time::Instant;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--test_args=1"]),
+        ))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())

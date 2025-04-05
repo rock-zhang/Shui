@@ -12,7 +12,7 @@ const WINDOW_RESIZED_EVENT: &str = "tauri://resize";
 
 pub fn platform(app: &mut App, main_window: WebviewWindow) {
     // let app_handle = app.app_handle().clone();
-    main_window.open_devtools();
+    // main_window.open_devtools();
 
     // macos window 转 ns_panel 插件
     // let _ = app_handle.plugin(tauri_nspanel::init());

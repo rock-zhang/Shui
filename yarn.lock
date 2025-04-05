@@ -815,6 +815,13 @@
     "@tauri-apps/cli-win32-ia32-msvc" "2.4.0"
     "@tauri-apps/cli-win32-x64-msvc" "2.4.0"
 
+"@tauri-apps/plugin-autostart@~2":
+  version "2.3.0"
+  resolved "https://registry.npmmirror.com/@tauri-apps/plugin-autostart/-/plugin-autostart-2.3.0.tgz#145f3372c09ff5e99d9a76242641ef7c8a252835"
+  integrity sha512-yxQTpc4NolT1r317yjKVhrG+YwCWPBOj7p+70m/q0w1JHc53pGcHmTboAbA3kGY6PQ+9y9oE7cdmHq7PH9z/SQ==
+  dependencies:
+    "@tauri-apps/api" "^2.0.0"
+
 "@tauri-apps/plugin-global-shortcut@~2":
   version "2.2.0"
   resolved "https://registry.npmmirror.com/@tauri-apps/plugin-global-shortcut/-/plugin-global-shortcut-2.2.0.tgz#5ab12218ab2d1863ff1aa823aed72daed7cded85"
