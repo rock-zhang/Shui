@@ -7,6 +7,11 @@ import { listen, TauriEvent } from "@tauri-apps/api/event";
 import { Progress } from "@/components/ui/progress";
 import { ArrowRightIcon } from "@heroicons/react/24/outline";
 import { load } from "@tauri-apps/plugin-store";
+import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+} from "@tauri-apps/plugin-notification";
 import "./index.css";
 
 function registerEscShortcut() {
@@ -16,6 +21,23 @@ function registerEscShortcut() {
     invoke("reset_timer");
   });
 }
+
+const sendNativeNotification = async () => {
+  let permissionGranted = await isPermissionGranted();
+
+  if (!permissionGranted) {
+    const permission = await requestPermission();
+    permissionGranted = permission === "granted";
+  }
+
+  // Once permission has been granted we can send the notification
+  if (permissionGranted) {
+    sendNotification({
+      title: "🎉 太棒了！完成今日喝水目标",
+      body: "再接再厉，继续保持健康好习惯！",
+    });
+  }
+};
 
 function getTodayDate() {
   const today = new Date();
@@ -53,17 +75,18 @@ export default function Home() {
         ...water,
         gold: Number(goldSetting?.gold),
       });
-      const val = await store.get<{
-        todayDate: number;
-      }>("reminder_drink");
+      const drinkHistory = await store.get<{
+        [todayDate]: number;
+      }>("drink_history");
+      console.log("drinkHistory", drinkHistory);
       setWater({
         ...water,
-        drink: val?.todayDate || 0,
+        drink: drinkHistory?.[todayDate] || 0,
       });
     }
 
     loadConfig();
-  });
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -109,15 +132,19 @@ export default function Home() {
       drink: totalDrink,
     });
     const store = await load("config_store.json", { autoSave: false });
-    await store.set("reminder_drink", {
-      todayDate: totalDrink,
+    await store.set("drink_history", {
+      [todayDate]: totalDrink,
     });
     await store.save();
 
     if (totalDrink >= water.gold) {
+      sendNativeNotification();
     }
+
     await invoke("hide_reminder_windows");
   };
+
+  const progress = (water.drink / water.gold) * 100;
 
   return (
     <div className="reminder-page min-h-screen flex items-center justify-center">
@@ -137,7 +164,7 @@ export default function Home() {
             <span>今日已喝: {water.drink}ml</span>
             <span>目标: {water.gold}ml</span>
           </div>
-          <Progress value={(water.drink / water.gold) * 100} className="h-2" />
+          <Progress value={progress <= 100 ? progress : 100} className="h-2" />
         </div>
 
         <div className="grid grid-cols-2 gap-4">

@@ -24,6 +24,7 @@
     "core:webview:allow-get-all-webviews",
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister-all",
-    "opener:default"
+    "opener:default",
+    "notification:default"
   ]
 }
