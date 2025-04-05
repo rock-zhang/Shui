@@ -6,7 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getVersion } from "@tauri-apps/api/app";
 
-const TRAY_ID = "app-tray";
+const TRAY_ID = "main-tray";
 
 const menu = async () => {
   const menu = await Menu.new();
@@ -85,24 +85,27 @@ export function useTray() {
         trayInstance = await TrayIcon.getById(TRAY_ID);
         console.log("trayInstance", trayInstance);
 
-        if (trayInstance) {
-          return;
-        }
+        trayInstance?.setMenu(await menu());
+        trayInstance?.setIconAsTemplate(true);
+
+        // if (trayInstance) {
+        //   return;
+        // }
 
         // 创建托盘图标
-        const iconPath = "./icons/tray-mac.ico";
-        const icon = await resolveResource(iconPath);
+        // const iconPath = "./icons/tray-mac.ico";
+        // const icon = await resolveResource(iconPath);
 
-        console.log("icon", icon);
+        // console.log("icon", icon);
 
-        trayInstance = await TrayIcon.new({
-          menu: await menu(),
-          icon,
-          id: TRAY_ID,
-          tooltip: "我的应用",
-          iconAsTemplate: true,
-          menuOnLeftClick: true,
-        });
+        // trayInstance = await TrayIcon.new({
+        //   menu: await menu(),
+        //   icon,
+        //   id: TRAY_ID,
+        //   tooltip: "我的应用",
+        //   iconAsTemplate: true,
+        //   menuOnLeftClick: true,
+        // });
       } catch (error) {
         console.error("创建托盘失败:", error);
       }
