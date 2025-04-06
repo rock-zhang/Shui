@@ -1,7 +1,15 @@
 "use client";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { getVersion } from "@tauri-apps/api/app";
+import { useState, useEffect } from "react";
 
 export default function About() {
+  const [version, setVersion] = useState("");
+
+  useEffect(() => {
+    getVersion().then(setVersion);
+  }, []);
+
   const openGithub = async () => {
     await openUrl("https://github.com/rock-zhang/Shui");
   };
@@ -118,9 +126,7 @@ export default function About() {
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             版本
           </label>
-          <p className="text-[0.8rem] text-muted-foreground">
-            {process.env.APP_VERSION}
-          </p>
+          <p className="text-[0.8rem] text-muted-foreground">{version}</p>
         </div>
       </div>
     </div>
