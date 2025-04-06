@@ -54,6 +54,9 @@ pub fn run() {
 
                 // 计时器线程
                 thread::spawn(move || loop {
+                    // TODO: 检查是否在工作日期、时间范围内
+                    // TODO: 检查是否已经达到目标喝水次数
+                    // TODO: 跨天逻辑检查
                     println!("计时器线程启动");
 
                     if is_running_clone.load(Ordering::SeqCst) {

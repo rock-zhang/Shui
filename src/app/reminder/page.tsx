@@ -2,7 +2,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { register, unregisterAll } from "@tauri-apps/plugin-global-shortcut";
 import { useEffect, useState } from "react";
-import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { listen, TauriEvent } from "@tauri-apps/api/event";
 import { Progress } from "@/components/ui/progress";
 import { ArrowRight } from "lucide-react";
@@ -51,9 +50,6 @@ function getTodayDate() {
   )}${String(today.getDate()).padStart(2, "0")}`;
 }
 
-// 按天存储饮水量
-const todayDate = getTodayDate();
-
 const waterOptions = [
   { ml: 100, label: "中杯" },
   { ml: 200, label: "大杯" },
@@ -92,6 +88,8 @@ export default function ReminderPage() {
   });
   const [countdown, setCountdown] = useState(30);
   const shouldResetTimer = countdown === 30;
+  // 按天存储饮水量
+  const todayDate = getTodayDate();
 
   // 根据饮水量随机选择提醒文案
   useEffect(() => {
@@ -143,6 +141,7 @@ export default function ReminderPage() {
 
     // 监听窗口显示事件
     listen(TauriEvent.WINDOW_FOCUS, () => {
+      drinkAmoutUpdate();
       registerEscShortcut();
       setCountdown(30); // 重置倒计时
     });
@@ -150,14 +149,21 @@ export default function ReminderPage() {
       unregisterAll();
     });
 
-    getAllWebviewWindows().then((windows) => {
-      console.log("windows", windows);
-    });
-
     return () => {
       unregisterAll();
     };
   }, []);
+
+  const drinkAmoutUpdate = async () => {
+    const store = await load("config_store.json", { autoSave: false });
+    const drinkHistory = await store.get<{
+      [todayDate]: number;
+    }>("drink_history");
+
+    await store.set("drink_history", {
+      [todayDate]: drinkHistory?.[todayDate] || 0,
+    });
+  };
 
   const handleWaterSelection = async (ml: number) => {
     const totalDrink = water.drink + ml;
