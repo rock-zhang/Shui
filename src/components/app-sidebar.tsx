@@ -1,5 +1,5 @@
 "use client";
-import { Home, Inbox, Search, Settings } from "lucide-react";
+import { AlarmClock, Keyboard, Settings, Info } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -18,22 +18,22 @@ const items = [
   {
     title: "通用",
     url: "/setting",
-    icon: Home,
+    icon: Settings,
   },
   {
     title: "提醒",
     url: "/setting/reminder",
-    icon: Inbox,
+    icon: AlarmClock,
   },
   {
     title: "快捷键",
     url: "/setting/shortcut",
-    icon: Search,
+    icon: Keyboard, // 使用 Keyboard 图标替换 Search
   },
   {
     title: "关于",
     url: "/setting/about",
-    icon: Settings,
+    icon: Info,
   },
 ];
 

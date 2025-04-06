@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 import { listen, TauriEvent } from "@tauri-apps/api/event";
 import { Progress } from "@/components/ui/progress";
-import { ArrowRightIcon } from "@heroicons/react/24/outline";
+import { ArrowRight } from "lucide-react";
 import { load } from "@tauri-apps/plugin-store";
 import {
   isPermissionGranted,
@@ -218,7 +218,7 @@ export default function ReminderPage() {
             className="text-gray-500 hover:text-gray-700 text-sm inline-flex items-center gap-1.5 transition-colors duration-200 cursor-pointer"
           >
             跳过
-            <ArrowRightIcon className="w-4 h-4" />
+            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       </div>
