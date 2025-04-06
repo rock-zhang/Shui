@@ -23,11 +23,16 @@ fn show_reminder_page(app_handle: &tauri::AppHandle) {
             }
 
             let size = monitor.size();
+            let scale_factor = monitor.scale_factor();
             let position = monitor.position();
 
+            // 根据缩放因子调整尺寸
+            let scaled_width = size.width as f64 / scale_factor;
+            let scaled_height = size.height as f64 / scale_factor;
+
             println!(
-                "Monitor {}: size={:?}, position={:?}",
-                index, size, position
+                "Monitor {}: size={:?}, position={:?}, scale_factor={:?}, scaled_size=({:?}, {:?})",
+                index, size, position, scale_factor, scaled_width, scaled_height
             );
 
             let window = tauri::WebviewWindowBuilder::new(
@@ -40,7 +45,7 @@ fn show_reminder_page(app_handle: &tauri::AppHandle) {
             .always_on_top(true)
             .visible_on_all_workspaces(true)
             .focus()
-            .inner_size(size.width as f64, size.height as f64)
+            .inner_size(scaled_width as f64, scaled_height as f64)
             .position(position.x as f64, position.y as f64)
             .build()
             .expect(&format!("failed to create reminder window {}", index));
