@@ -14,9 +14,8 @@ const menu = async () => {
   await menu.append(
     await MenuItem.new({
       text: "call reminder",
-      action: async () => {
-        console.log("call reminder");
-        console.log("xxxx", await invoke("call_reminder"));
+      action: () => {
+        invoke("call_reminder");
       },
     })
   );

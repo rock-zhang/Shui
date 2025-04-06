@@ -113,6 +113,8 @@ export default function Home() {
           value={config.gap}
           onValueChange={(value) => {
             saveConfig("gap", value);
+            // 重置计时器
+            invoke("reset_timer");
           }}
           defaultValue={config.gap}
         >

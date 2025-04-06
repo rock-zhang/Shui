@@ -1,1 +1,1 @@
-pub mod panel;
+pub mod store;

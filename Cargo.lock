@@ -666,8 +666,10 @@ checksum = "1a7964611d71df112cb1730f2ee67324fcf4d0fc6606acbbe9bfe06df124637c"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
+ "js-sys",
  "num-traits",
  "serde",
+ "wasm-bindgen",
  "windows-link",
 ]
 
@@ -4346,6 +4348,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 name = "shui"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "core-foundation 0.9.4",
  "core-graphics 0.23.2",
  "lazy_static",

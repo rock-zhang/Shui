@@ -1,8 +1,9 @@
 mod commands;
 mod core;
+use core::store::settings::AppSettings;
 mod timer;
 use tauri::{Emitter, Manager};
-use timer::{IS_RUNNING, TIMER_STATE};
+use timer::IS_RUNNING;
 
 #[cfg(target_os = "macos")]
 extern crate core_foundation;
@@ -20,17 +21,10 @@ extern "C" {
 #[cfg(target_os = "macos")]
 use core_foundation::{base::TCFType, base::ToVoid, dictionary::CFDictionary, string::CFString};
 
-use tauri_plugin_autostart::MacosLauncher;
-
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
 use std::sync::atomic::Ordering;
-
 use std::time::Instant;
+use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_store::StoreExt;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -44,35 +38,35 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_nspanel::init())
-        // .tray(tauri::Tray::new().with_menu(tauri::Menu::new()))
         .setup(|app| {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             #[cfg(target_os = "macos")]
             {
                 let is_running_clone = IS_RUNNING.clone();
+                let mut remind_gap = 1200;
                 let app_handle = app.handle().clone();
                 let app_handle2 = app.app_handle().clone();
-                let app_handle3 = app.app_handle().clone();
+
+                let store = app.store("config_store.json")?;
+                let app_settings = AppSettings::load_from_store(&store);
+                remind_gap = app_settings.gap;
 
                 // 计时器线程
                 thread::spawn(move || loop {
-                    println!("计时器线程启动, 外层循环");
-                    let remind_gap = 120; // TODO: 提醒间隔由用户设置
+                    println!("计时器线程启动");
+
                     if is_running_clone.load(Ordering::SeqCst) {
-                        // let mut timer = TIMER_STATE.lock();
-                        // *timer = Instant::now();
-                        println!("开始计时");
                         // 计时开始，记录开始时间
                         let timer = Instant::now();
-                        println!("{:?}", timer);
+                        let app_settings = AppSettings::load_from_store(&store);
+                        remind_gap = app_settings.gap;
+                        println!("timer {:?}，remind_gap {:?}", timer, remind_gap);
 
                         while is_running_clone.load(Ordering::SeqCst) {
-                            println!("is_running_clone, 里层循环");
                             let elapsed = timer.elapsed();
                             let rest = remind_gap - elapsed.as_secs();
-                            println!("计时：{:?}", elapsed);
-                            println!("剩余：{:?}", rest);
+                            println!("计时：{:?}，剩余：{:?}", elapsed, rest);
 
                             // // 更新托盘菜单显示倒计时
                             // 更新托盘文案
@@ -86,38 +80,24 @@ pub fn run() {
                             }
 
                             if rest <= 0 {
-                                println!("计时结束, 满足15秒，拉起提醒页面");
+                                println!("倒计时结束, 拉起提醒页面");
 
                                 // 暂停倒计时
                                 IS_RUNNING.store(false, Ordering::SeqCst);
-                                // let main_window = app_handle.get_webview_window("main").unwrap();
-                                // main_window.show().unwrap();
 
-                                // thread::sleep(Duration::from_secs(4));
+                                if app_settings.today_drink_amount < app_settings.gold {
+                                    // 发送事件到前端，包含计时相关数据
+                                    app_handle
+                                        .emit_to(
+                                            "main", // 窗口名称
+                                            "timer-complete",
+                                            {},
+                                        )
+                                        .unwrap();
+                                }
 
-                                // 发送事件到前端，包含计时相关数据
-                                app_handle
-                                    .emit_to(
-                                        "main", // 窗口名称
-                                        "timer-complete",
-                                        {},
-                                    )
-                                    .unwrap();
-
-                                // commands::show_reminder_page(&app_handle);
                                 break;
                             }
-
-                            // if elapsed.as_secs() >= 5 {
-                            //     // println!("计时结束, 满足12秒，退出程序");
-                            //     // break;
-
-                            //     unsafe {
-                            //         TIMER_STATE.force_unlock();
-
-                            //         // 这里拉起喝水提醒页面
-                            //     }
-                            // }
 
                             thread::sleep(Duration::from_secs(1));
                         }
@@ -177,10 +157,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            greet,
             commands::call_reminder,
             commands::setting,
-            commands::close_window, // TODO: del
             commands::hide_reminder_windows,
             commands::close_reminder_windows,
             commands::reset_timer,

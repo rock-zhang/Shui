@@ -39,6 +39,7 @@ const items = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  console.log("pathname", pathname);
 
   return (
     <Sidebar collapsible="none">
@@ -65,6 +66,9 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        <span className="text-xs text-muted-foreground mt-4 px-4">
+          {pathname}
+        </span>
       </SidebarContent>
     </Sidebar>
   );

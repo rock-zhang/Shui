@@ -1,19 +1,15 @@
-use crate::{core::panel, timer};
-use serde::Serialize;
-// use std::thread::{self, sleep};
-// use std::time::Duration;
+use crate::timer;
+use serde::{Deserialize, Serialize};
 use std::sync::atomic::Ordering;
 
 use tauri::Manager;
-use tauri_nspanel::{cocoa::appkit::NSWindowCollectionBehavior, panel_delegate};
+use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
 use tauri_nspanel::{ManagerExt, WebviewWindowExt};
-use timer::{IS_RUNNING, TIMER_STATE};
+use timer::IS_RUNNING;
 use tokio::time::{sleep, Duration};
 
-const NSWindowStyleMaskNonActivatingPanel: i32 = 1 << 7;
 const NSWindowStyleMaskUtilityWindow: i32 = 1 << 7;
 #[allow(non_upper_case_globals)]
-const NSResizableWindowMask: i32 = 1 << 3;
 
 fn show_reminder_page(app_handle: &tauri::AppHandle) {
     if let Ok(monitors) = app_handle.available_monitors() {
@@ -52,11 +48,8 @@ fn show_reminder_page(app_handle: &tauri::AppHandle) {
             let panel = window.to_panel().unwrap();
             panel.set_level(26);
 
-            // // 不抢占其它窗口的焦点和支持缩放
-            // panel.set_style_mask(NSWindowStyleMaskNonActivatingPanel | NSResizableWindowMask);
             panel.set_style_mask(NSWindowStyleMaskUtilityWindow);
 
-            // | NSWindowCollectionBehavior::NSWindowCollectionBehaviorStationary
             // // 在各个桌面空间、全屏中共享窗口
             panel.set_collection_behaviour(
                 NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces
@@ -76,20 +69,25 @@ fn show_reminder_page(app_handle: &tauri::AppHandle) {
     }
 }
 
-#[tauri::command]
-pub fn call_reminder(app_handle: tauri::AppHandle) -> bool {
-    println!("call_reminder");
-    // let timer = TIMER_STATE.lock();
-    // println!("Timer: {:?}", timer);
-    // let elapsed = timer.elapsed();
-    // println!("Timer has been running for {} seconds", elapsed.as_secs());
-    // let is_running = IS_RUNNING.load(std::sync::atomic::Ordering::SeqCst);
-    // println!("IS_RUNNING: {}", is_running);
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ReminderCaller {
+    Preview,
+    Timer,
+}
 
-    // if is_running && elapsed.as_secs() >= 5 {
-    //     println!("Timer is running and has been running for 20 minutes");
-    show_reminder_page(&app_handle);
+#[tauri::command]
+pub fn call_reminder(app_handle: tauri::AppHandle, caller: Option<ReminderCaller>) -> bool {
+    println!("call_reminder");
+
+    // if call_by == ReminderCaller::Timer {
+    //     if IS_RUNNING.load(Ordering::SeqCst) {
+    //         println!("call_reminder: 计时器正在运行，不显示提醒页面");
+    //         return false;
+    //     }
     // }
+
+    show_reminder_page(&app_handle);
 
     println!("call_reminder end");
     return true;
@@ -102,29 +100,11 @@ pub struct SettingResponse {
 
 #[tauri::command]
 pub fn setting(app_handle: tauri::AppHandle) -> SettingResponse {
-    println!("app_handle");
-
-    // let _ = app_handle
-    //     .get_webview_window("main")
-    //     .unwrap()
-    //     .set_cursor_visible(true);
-
     let main_window = app_handle.get_webview_window("main").unwrap();
     let main_window_size = main_window.inner_size().unwrap();
     println!("main_window_size: {:?}", main_window_size);
 
-    // let _ = app_handle
-    //     .get_webview_window("main")
-    //     .unwrap()
-    //     .set_cursor_visible(false);
-
     SettingResponse { screen: 2 }
-}
-
-#[tauri::command]
-pub fn close_window(app_handle: tauri::AppHandle, label: &str) {
-    println!("Closing window: {}", label);
-    app_handle.get_webview_window(label).unwrap().close();
 }
 
 #[tauri::command]
@@ -162,9 +142,13 @@ pub fn close_reminder_windows(app_handle: tauri::AppHandle, label: &str) {
 
 #[tauri::command]
 pub fn reset_timer() {
-    println!("reset_timer {:?}", IS_RUNNING.load(Ordering::SeqCst));
-    IS_RUNNING.store(true, Ordering::SeqCst);
-    println!("reset_timer {:?}", IS_RUNNING.load(Ordering::SeqCst));
+    // 重置计时器
+    IS_RUNNING.store(false, Ordering::SeqCst);
+
+    tauri::async_runtime::spawn(async move {
+        sleep(Duration::from_millis(1000)).await;
+        IS_RUNNING.store(true, Ordering::SeqCst);
+    });
 }
 
 #[tauri::command]
