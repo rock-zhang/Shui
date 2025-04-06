@@ -182,7 +182,9 @@ export default function ReminderPage() {
 
   return (
     <div
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={(e) => {
+        if (process.env.NODE_ENV === "production") e.preventDefault();
+      }}
       className="reminder-page min-h-screen flex items-center justify-center relative"
     >
       <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/30 backdrop-blur-sm px-4 py-2 rounded-full text-gray-700 text-base font-medium shadow-sm border border-white/20">

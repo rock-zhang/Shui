@@ -27,7 +27,9 @@ export default function RootLayout({
       open
       defaultOpen
       className="h-screen overflow-hidden"
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={(e) => {
+        if (process.env.NODE_ENV === "production") e.preventDefault();
+      }}
     >
       <AppSidebar />
       <main className="flex-1 p-10 overflow-y-auto">{children}</main>

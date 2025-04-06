@@ -4,6 +4,7 @@ import { Switch } from "@/components/ui/switch";
 import { useEffect, useState } from "react";
 import { load } from "@tauri-apps/plugin-store";
 import { useTray } from "@/hooks/use-tray";
+import { enable, isEnabled, disable } from "@tauri-apps/plugin-autostart";
 
 export default function Home() {
   const [config, setConfig] = useState({
@@ -15,14 +16,17 @@ export default function Home() {
   useEffect(() => {
     async function loadConfig() {
       const store = await load("config_store.json", { autoSave: false });
-      const val = await store.get<{
-        isAutoStart: boolean;
-        isCountDown: boolean;
-      }>("general");
-      console.log("loadConfig:", val); // { value: 5 }
+      const [generalSetting, isAutoStart] = await Promise.all([
+        store.get<{
+          isAutoStart: boolean;
+          isCountDown: boolean;
+        }>("general"),
+        isEnabled(),
+      ]);
       setConfig({
         ...config,
-        ...val,
+        isCountDown: generalSetting?.isCountDown || false,
+        isAutoStart,
       });
     }
 
@@ -32,8 +36,6 @@ export default function Home() {
   const saveConfig = async (filed: string, checked: boolean) => {
     const store = await load("config_store.json", { autoSave: false });
     const oldConfig = await store.get<{ value: number }>("general");
-    console.log("oldConfig", oldConfig);
-    console.log("checked", checked);
 
     setConfig({
       ...config,
@@ -45,6 +47,18 @@ export default function Home() {
       [filed]: checked,
     });
     await store.save();
+  };
+
+  const handleAutoStartChange = async (checked: boolean) => {
+    saveConfig("isAutoStart", checked);
+
+    if (checked) {
+      enable();
+      console.log("isAutoStart", await isEnabled());
+    } else {
+      disable();
+      console.log("isAutoStart", await isEnabled());
+    }
   };
 
   return (
@@ -65,7 +79,7 @@ export default function Home() {
         </div>
         <Switch
           checked={config.isAutoStart}
-          onCheckedChange={(checked) => saveConfig("isAutoStart", checked)}
+          onCheckedChange={handleAutoStartChange}
         />
       </div>
 
