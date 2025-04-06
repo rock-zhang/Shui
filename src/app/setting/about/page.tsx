@@ -103,9 +103,9 @@ export default function About() {
           <div className="text-center">
             <div className="mb-2">
               <img
-                src="/qrcode.png"
+                src="/qrcode.jpg"
                 alt="微信群"
-                className="w-32 h-32 rounded-lg border"
+                className="w-[300px] rounded-lg border"
               />
             </div>
             <p className="text-sm text-muted-foreground">加入微信群</p>

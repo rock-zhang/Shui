@@ -75,7 +75,7 @@ export default function Home() {
             id=":r233:-form-item-description"
             className="text-[0.8rem] text-muted-foreground"
           >
-            电脑重启之后自动开始计时
+            电脑重启之后自动开始倒计时
           </p>
         </div>
         <Switch

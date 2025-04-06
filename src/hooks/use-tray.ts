@@ -11,14 +11,14 @@ const menu = async () => {
   const menu = await Menu.new();
 
   // 添加菜单项
-  await menu.append(
-    await MenuItem.new({
-      text: "call reminder",
-      action: () => {
-        invoke("call_reminder");
-      },
-    })
-  );
+  // await menu.append(
+  //   await MenuItem.new({
+  //     text: "call reminder",
+  //     action: () => {
+  //       invoke("call_reminder");
+  //     },
+  //   })
+  // );
 
   // 添加菜单项
   await menu.append(
