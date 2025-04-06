@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { load } from "@tauri-apps/plugin-store";
 import { useTray } from "@/hooks/use-tray";
 import { enable, isEnabled, disable } from "@tauri-apps/plugin-autostart";
+import { invoke } from "@tauri-apps/api/core";
 
 export default function Home() {
   const [config, setConfig] = useState({
@@ -97,7 +98,11 @@ export default function Home() {
         </div>
         <Switch
           checked={config.isCountDown}
-          onCheckedChange={(checked) => saveConfig("isCountDown", checked)}
+          onCheckedChange={async (checked) => {
+            await saveConfig("isCountDown", checked);
+            // 重置计时器
+            invoke("reset_timer");
+          }}
         />
       </div>
     </div>

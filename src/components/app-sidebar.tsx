@@ -17,22 +17,22 @@ import {
 const items = [
   {
     title: "通用",
-    url: "/setting",
+    url: "/setting/",
     icon: Settings,
   },
   {
     title: "提醒",
-    url: "/setting/reminder",
+    url: "/setting/reminder/",
     icon: AlarmClock,
   },
   {
     title: "快捷键",
-    url: "/setting/shortcut",
+    url: "/setting/shortcut/",
     icon: Keyboard, // 使用 Keyboard 图标替换 Search
   },
   {
     title: "关于",
-    url: "/setting/about",
+    url: "/setting/about/",
     icon: Info,
   },
 ];

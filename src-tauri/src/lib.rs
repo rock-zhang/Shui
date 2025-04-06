@@ -68,13 +68,19 @@ pub fn run() {
                             let rest = remind_gap - elapsed.as_secs();
                             println!("计时：{:?}，剩余：{:?}", elapsed, rest);
 
-                            // // 更新托盘菜单显示倒计时
-                            // 更新托盘文案
                             let minutes = rest / 60;
                             let seconds = rest % 60;
-                            let countdown = format!("剩余 {}:{:02}", minutes, seconds);
+                            let countdown = format!("{}:{:02}", minutes, seconds);
+                            // 更新托盘菜单显示倒计时
+                            let tray_text = if app_settings.is_show_countdown {
+                                countdown
+                            } else {
+                                String::new()
+                            };
+
                             if let Some(tray) = app_handle2.tray_by_id("main-tray") {
-                                if let Err(e) = tray.set_title(Some(countdown.as_str())) {
+                                // 更新托盘文案
+                                if let Err(e) = tray.set_title(Some(tray_text.as_str())) {
                                     println!("更新托盘标题失败: {:?}", e);
                                 }
                             }
@@ -85,7 +91,10 @@ pub fn run() {
                                 // 暂停倒计时
                                 IS_RUNNING.store(false, Ordering::SeqCst);
 
-                                if app_settings.today_drink_amount < app_settings.gold {
+                                if app_settings.is_work_day
+                                    && app_settings.is_in_time_range
+                                    && app_settings.today_drink_amount < app_settings.gold
+                                {
                                     // 发送事件到前端，包含计时相关数据
                                     app_handle
                                         .emit_to(

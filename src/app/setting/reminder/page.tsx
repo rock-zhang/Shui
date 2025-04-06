@@ -22,7 +22,7 @@ export default function Home() {
   const [config, setConfig] = useState({
     gold: goldList[0],
     gap: gapList[0],
-    weekdays: [] as number[], // 添加这行
+    weekdays: [] as number[],
     timeStart: "09:00",
     timeEnd: "18:00",
   });
@@ -59,6 +59,9 @@ export default function Home() {
       [filed]: value,
     });
     await store.save();
+
+    // 重置计时器
+    invoke("reset_timer");
   };
 
   return (
@@ -113,8 +116,6 @@ export default function Home() {
           value={config.gap}
           onValueChange={(value) => {
             saveConfig("gap", value);
-            // 重置计时器
-            invoke("reset_timer");
           }}
           defaultValue={config.gap}
         >
