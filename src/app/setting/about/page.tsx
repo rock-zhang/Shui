@@ -33,6 +33,9 @@ export default function About() {
           <p className="text-sm leading-relaxed text-blue-800/70">
             这是一个帮助你养成健康饮水习惯的小工具。它会根据你设定的目标，在合适的时间提醒你喝水，帮助你保持充足的水分摄入，提升身体健康。
           </p>
+          <p className="text-sm leading-relaxed text-blue-800/70 mt-2">
+            如果你有任何想法或遇到问题，欢迎通过以下方式与我们联系。你的反馈将帮助我们做得更好！
+          </p>
         </div>
       </div>
 
@@ -40,7 +43,7 @@ export default function About() {
         <label className="block text-sm font-medium">联系我们</label>
 
         <div className="flex gap-4">
-          <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 w-2/6">
+          <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 w-3/8">
             <div className="flex-shrink-0">
               <svg
                 className="h-5 w-5 text-muted-foreground"
@@ -56,7 +59,7 @@ export default function About() {
               <p className="text-sm text-muted-foreground">微信号：slash__z</p>
             </div>
           </div>
-          <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 w-4/6">
+          <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 w-5/8">
             <div className="flex-shrink-0">
               <svg
                 className="h-5 w-5 text-muted-foreground"

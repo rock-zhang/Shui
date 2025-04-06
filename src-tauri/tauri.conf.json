@@ -16,7 +16,7 @@
     },
     "trayIcon": {
       "iconPath": "icons/icon.ico",
-      "iconAsTemplate": true,
+      "iconAsTemplate": false,
       "title": "Shui",
       "id": "main-tray",
       "showMenuOnLeftClick": true
