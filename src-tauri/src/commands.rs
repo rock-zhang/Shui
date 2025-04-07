@@ -85,14 +85,22 @@ pub enum ReminderCaller {
 pub fn call_reminder(app_handle: tauri::AppHandle, caller: Option<ReminderCaller>) -> bool {
     println!("call_reminder");
 
-    // if call_by == ReminderCaller::Timer {
-    //     if IS_RUNNING.load(Ordering::SeqCst) {
-    //         println!("call_reminder: 计时器正在运行，不显示提醒页面");
-    //         return false;
-    //     }
-    // }
+    if let Ok(panel) = app_handle.get_webview_panel("reminder_0") {
+        if let Ok(monitors) = app_handle.available_monitors() {
+            for (index, monitor) in monitors.iter().enumerate() {
+                let reminder_label = format!("reminder_{}", index);
 
-    show_reminder_page(&app_handle);
+                println!("show_reminder_windows: {}", reminder_label);
+
+                // 检查是否已存在提醒窗口
+                if let Ok(panel) = app_handle.get_webview_panel(&reminder_label) {
+                    panel.show();
+                }
+            }
+        }
+    } else {
+        show_reminder_page(&app_handle);
+    }
 
     println!("call_reminder end");
     return true;
