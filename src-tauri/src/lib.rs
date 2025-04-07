@@ -57,7 +57,7 @@ pub fn run() {
                     // TODO: 检查是否在工作日期、时间范围内
                     // TODO: 检查是否已经达到目标喝水次数
                     // TODO: 跨天逻辑检查
-                    println!("计时器线程启动");
+                    // println!("计时器线程启动");
 
                     if is_running_clone.load(Ordering::SeqCst) {
                         // 计时开始，记录开始时间
@@ -69,7 +69,7 @@ pub fn run() {
                         while is_running_clone.load(Ordering::SeqCst) {
                             let elapsed = timer.elapsed();
                             let rest = remind_gap - elapsed.as_secs();
-                            println!("计时：{:?}，剩余：{:?}", elapsed, rest);
+                            // println!("计时：{:?}，剩余：{:?}", elapsed, rest);
 
                             let minutes = rest / 60;
                             let seconds = rest % 60;

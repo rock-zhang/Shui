@@ -2,7 +2,7 @@ use crate::timer;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::Ordering;
 
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
 use tauri_nspanel::{ManagerExt, WebviewWindowExt};
 use timer::IS_RUNNING;
@@ -81,6 +81,12 @@ pub enum ReminderCaller {
     Timer,
 }
 
+use std::sync::Mutex;
+use tokio::sync::mpsc;
+
+// 只保留 channel 相关的静态变量
+static COUNTDOWN_SENDER: Mutex<Option<mpsc::Sender<()>>> = Mutex::new(None);
+
 #[tauri::command]
 pub fn call_reminder(app_handle: tauri::AppHandle, caller: Option<ReminderCaller>) -> bool {
     println!("call_reminder");
@@ -102,8 +108,38 @@ pub fn call_reminder(app_handle: tauri::AppHandle, caller: Option<ReminderCaller
         show_reminder_page(&app_handle);
     }
 
-    println!("call_reminder end");
-    return true;
+    // 取消之前的倒计时
+    if let Some(sender) = COUNTDOWN_SENDER.lock().unwrap().take() {
+        let _ = sender.try_send(());
+    }
+
+    // 创建新的 channel
+    let (tx, mut rx) = mpsc::channel(1);
+    *COUNTDOWN_SENDER.lock().unwrap() = Some(tx);
+
+    // 启动新的倒计时任务
+    let app_handle_clone = app_handle.clone();
+    tauri::async_runtime::spawn(async move {
+        let mut countdown = 30;
+        let _ = app_handle_clone.emit("countdown", countdown);
+
+        loop {
+            tokio::select! {
+                _ = rx.recv() => {
+                    break; // 收到取消信号
+                }
+                _ = sleep(Duration::from_secs(1)) => {
+                    countdown -= 1;
+                    let _ = app_handle_clone.emit("countdown", countdown);
+                    if countdown <= 0 {
+                        break;
+                    }
+                }
+            }
+        }
+    });
+
+    true
 }
 
 #[derive(Serialize)]
@@ -139,6 +175,11 @@ pub fn hide_reminder_windows(app_handle: tauri::AppHandle) {
             if let Ok(panel) = app_handle.get_webview_panel(&reminder_label) {
                 panel.order_out(None);
             }
+        }
+
+        // 取消之前的倒计时
+        if let Some(sender) = COUNTDOWN_SENDER.lock().unwrap().take() {
+            let _ = sender.try_send(());
         }
     }
 }

@@ -87,7 +87,6 @@ export default function ReminderPage() {
     drink: 0,
   });
   const [countdown, setCountdown] = useState(30);
-  const shouldResetTimer = countdown === 30;
   // 按天存储饮水量
   const todayDate = getTodayDate();
 
@@ -117,23 +116,12 @@ export default function ReminderPage() {
       });
     }
 
+    listen("countdown", (event) => {
+      setCountdown(event.payload as number);
+    });
+
     loadConfig();
   }, []);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          hideWindowAction();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [shouldResetTimer]); // 当倒计时重置为 30 时重新开始计时
 
   useEffect(() => {
     // 首次打开，注册快捷键
@@ -143,7 +131,7 @@ export default function ReminderPage() {
     listen(TauriEvent.WINDOW_FOCUS, () => {
       drinkAmoutUpdate();
       registerEscShortcut();
-      setCountdown(30); // 重置倒计时
+      // setCountdown(30); // 重置倒计时
     });
     listen(TauriEvent.WINDOW_BLUR, () => {
       unregisterAll();
