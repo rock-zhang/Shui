@@ -135,7 +135,6 @@ export default function ReminderPage() {
     listen(TauriEvent.WINDOW_FOCUS, () => {
       drinkAmoutUpdate();
       registerEscShortcut();
-      // setCountdown(30); // 重置倒计时
     });
     listen(TauriEvent.WINDOW_BLUR, () => {
       unregisterAll();
