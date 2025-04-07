@@ -16,7 +16,11 @@ import { Button } from "@/components/ui/button";
 import { invoke } from "@tauri-apps/api/core";
 
 const goldList = ["1000", "1500", "2000", "2500", "3000", "3500", "4000"];
-const gapList = ["1", "3", "20", "30", "45", "60"];
+const gapList = ["10", "20", "30", "45", "60"];
+
+if (process.env.NODE_ENV === "development") {
+  gapList.unshift("1");
+}
 
 export default function Home() {
   const [config, setConfig] = useState({

@@ -1,6 +1,10 @@
 "use client";
 import { invoke } from "@tauri-apps/api/core";
-import { register, unregisterAll } from "@tauri-apps/plugin-global-shortcut";
+import {
+  isRegistered,
+  register,
+  unregisterAll,
+} from "@tauri-apps/plugin-global-shortcut";
 import { useEffect, useState } from "react";
 import { listen, TauriEvent } from "@tauri-apps/api/event";
 import { Progress } from "@/components/ui/progress";
@@ -18,8 +22,8 @@ function hideWindowAction() {
   invoke("reset_timer");
 }
 
-function registerEscShortcut() {
-  console.log("registerEscShortcut");
+async function registerEscShortcut() {
+  if (await isRegistered("Esc")) return;
   register("Esc", async () => {
     hideWindowAction();
   });
