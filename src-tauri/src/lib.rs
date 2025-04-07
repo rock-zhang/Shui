@@ -54,16 +54,25 @@ pub fn run() {
 
                 // 计时器线程
                 thread::spawn(move || loop {
-                    // TODO: 检查是否在工作日期、时间范围内
-                    // TODO: 检查是否已经达到目标喝水次数
-                    // TODO: 跨天逻辑检查
-                    // println!("计时器线程启动");
-
                     if is_running_clone.load(Ordering::SeqCst) {
-                        // 计时开始，记录开始时间
-                        let timer = Instant::now();
                         let app_settings = AppSettings::load_from_store(&store);
                         remind_gap = app_settings.gap;
+
+                        println!("计时开始, remind_gap {:?}", remind_gap);
+                        println!("app_settings {:?}", app_settings);
+
+                        // 检查是否在工作时间范围内且未达到目标
+                        if !app_settings.is_work_day
+                            || !app_settings.is_in_time_range
+                            || app_settings.today_drink_amount >= app_settings.gold
+                        {
+                            println!("未达到目标，不启动计时器");
+                            sleep(Duration::from_secs(1));
+                            continue;
+                        }
+
+                        // 计时开始，记录开始时间
+                        let timer = Instant::now();
                         println!("timer {:?}，remind_gap {:?}", timer, remind_gap);
 
                         while is_running_clone.load(Ordering::SeqCst) {

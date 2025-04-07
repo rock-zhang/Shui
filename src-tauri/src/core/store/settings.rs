@@ -106,7 +106,16 @@ impl AppSettings {
             .unwrap_or(NaiveTime::from_hms_opt(18, 0, 0).unwrap());
 
         let current_time = Local::now().time();
-        let is_in_time_range = current_time >= time_start && current_time <= time_end;
+        let is_in_time_range = if time_end == NaiveTime::from_hms_opt(0, 0, 0).unwrap() {
+            // 如果结束时间是 00:00，表示次日 0 点
+            current_time >= time_start || current_time <= time_end
+        } else {
+            // 普通情况
+            current_time >= time_start && current_time <= time_end
+        };
+
+        println!("current_time: {:?}", current_time);
+        println!("time_end: {:?}", time_end);
 
         println!(
             "time_range: {:?} - {:?}, current: {:?}, is_in_range: {}",

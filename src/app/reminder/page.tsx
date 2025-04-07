@@ -122,6 +122,9 @@ export default function ReminderPage() {
 
     listen("countdown", (event) => {
       setCountdown(event.payload as number);
+      if (event.payload === 0) {
+        setTimeout(hideWindowAction, 500);
+      }
     });
 
     loadConfig();
