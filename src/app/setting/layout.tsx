@@ -31,8 +31,12 @@ export default function RootLayout({
         if (process.env.NODE_ENV === "production") e.preventDefault();
       }}
     >
+      <div
+        data-tauri-drag-region
+        className="absolute top-0 left-0 right-0 h-8"
+      />
       <AppSidebar />
-      <main className="flex-1 p-10 overflow-y-auto">{children}</main>
+      <main className="flex-1 p-10 pt-8 overflow-y-auto">{children}</main>
     </SidebarProvider>
   );
 }

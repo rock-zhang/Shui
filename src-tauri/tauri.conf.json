@@ -28,11 +28,19 @@
         "url": "setting/",
         "width": 680,
         "height": 460,
-        "maximizable": false,
-        "decorations": true,
         "resizable": false,
-        "transparent": false,
-        "visible": false
+        "visible": false,
+        "maximizable": false,
+        "hiddenTitle": true,
+        "skipTaskbar": true,
+        "titleBarStyle": "Overlay",
+        "dragDropEnabled": false,
+        "windowEffects": {
+          "effects": [
+            "sidebar"
+          ],
+          "state": "active"
+        }
       }
     ]
   },

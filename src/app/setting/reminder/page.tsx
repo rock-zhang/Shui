@@ -150,7 +150,7 @@ export default function Home() {
           {["日", "一", "二", "三", "四", "五", "六"].map((day, index) => (
             <button
               key={day}
-              className={`h-8 w-8 rounded-full text-sm font-medium transition-colors
+              className={`h-8 w-8 rounded-full text-sm font-medium transition-colors cursor-pointer
                 ${
                   config.weekdays?.includes(index)
                     ? "bg-primary text-primary-foreground"

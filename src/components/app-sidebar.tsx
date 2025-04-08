@@ -42,7 +42,7 @@ export function AppSidebar() {
   console.log("pathname", pathname);
 
   return (
-    <Sidebar collapsible="none">
+    <Sidebar collapsible="none" className="pt-8">
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>

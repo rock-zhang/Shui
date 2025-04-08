@@ -62,14 +62,14 @@ fn show_reminder_page(app_handle: &tauri::AppHandle) {
                     | NSWindowCollectionBehavior::NSWindowCollectionBehaviorIgnoresCycle,
             );
 
-            let window_clone = window.clone();
-            tauri::async_runtime::spawn(async move {
-                loop {
-                    // 保证在切换 space 之后获取焦点，可以响应键盘、鼠标事件
-                    sleep(Duration::from_millis(100)).await;
-                    let _ = window_clone.set_focus();
-                }
-            });
+            // let window_clone = window.clone();
+            // tauri::async_runtime::spawn(async move {
+            //     loop {
+            //         // 保证在切换 space 之后获取焦点，可以响应键盘、鼠标事件
+            //         sleep(Duration::from_millis(100)).await;
+            //         let _ = window_clone.set_focus();
+            //     }
+            // });
         }
     }
 }
