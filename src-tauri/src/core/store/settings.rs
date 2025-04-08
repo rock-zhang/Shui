@@ -33,7 +33,6 @@ pub fn get_today_string() -> String {
 
 impl AppSettings {
     pub fn is_first_open<R: tauri::Runtime>(store: &Store<R>) -> bool {
-        println!("is_first_open: {:?}", store.is_empty());
         store.is_empty()
     }
 
@@ -79,7 +78,6 @@ impl AppSettings {
             .and_then(|v| v.as_object().cloned());
 
         let alert_config = alert_config.unwrap_or_default();
-        println!("alert_config: {:?}", alert_config);
 
         let gap_minutes = alert_config
             .get(store_keys::GAP)
@@ -114,14 +112,6 @@ impl AppSettings {
             current_time >= time_start && current_time <= time_end
         };
 
-        println!("current_time: {:?}", current_time);
-        println!("time_end: {:?}", time_end);
-
-        println!(
-            "time_range: {:?} - {:?}, current: {:?}, is_in_range: {}",
-            time_start, time_end, current_time, is_in_time_range
-        );
-
         let weekdays = alert_config
             .get(store_keys::WEEKDAYS)
             .and_then(|v| v.as_array())
@@ -130,11 +120,6 @@ impl AppSettings {
                                         // 获取今天是星期几（0-6，0 表示星期天）
         let today_weekday = Local::now().weekday().num_days_from_sunday() as u64;
         let is_work_day = weekdays.contains(&today_weekday);
-
-        println!(
-            "weekdays: {:?}, today: {}, is_work_day: {}",
-            weekdays, today_weekday, is_work_day
-        );
 
         let drink_amount = store
             .get(store_pages::DRINK_HISTORY)
@@ -149,13 +134,6 @@ impl AppSettings {
             .and_then(|obj| obj.get(store_keys::ISCOUNTDOWN).cloned())
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
-
-        println!("gap_minutes: {:?}", gap_minutes);
-        println!("gold: {:?}", gold);
-        println!("drink_amount: {:?}", drink_amount);
-        println!("weekdays: {:?}", weekdays);
-        println!("get_today_string(): {:?}", get_today_string());
-        println!("is_show_countdown(): {:?}", is_show_countdown);
 
         AppSettings {
             gold: gold,

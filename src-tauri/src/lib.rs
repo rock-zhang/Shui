@@ -41,6 +41,29 @@ pub fn run() {
         .setup(|app| {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
+            // #[cfg(desktop)]
+            // {
+            //     use tauri::Manager;
+            //     use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
+
+            //     app.handle().plugin(
+            //         tauri_plugin_global_shortcut::Builder::new()
+            //             .with_shortcuts(["Esc"])?
+            //             .with_handler(|app, shortcut, event| {
+            //                 println!("shortcut {:?}, event {:?}", shortcut, event);
+            //                 if event.state == ShortcutState::Pressed {
+            //                     if shortcut.matches(Modifiers::CONTROL, Code::Escape) {
+            //                         let _ = app.emit("shortcut-event", "Ctrl+D triggered");
+            //                     }
+            //                     if shortcut.matches(Modifiers::ALT, Code::Space) {
+            //                         let _ = app.emit("shortcut-event", "Alt+Space triggered");
+            //                     }
+            //                 }
+            //             })
+            //             .build(),
+            //     )?;
+            // }
+
             #[cfg(target_os = "macos")]
             {
                 let is_running_clone = IS_RUNNING.clone();
@@ -58,15 +81,14 @@ pub fn run() {
                         let app_settings = AppSettings::load_from_store(&store);
                         remind_gap = app_settings.gap;
 
-                        println!("计时开始, remind_gap {:?}", remind_gap);
-                        println!("app_settings {:?}", app_settings);
+                        // println!("app_settings {:?}", app_settings);
 
                         // 检查是否在工作时间范围内且未达到目标
                         if !app_settings.is_work_day
                             || !app_settings.is_in_time_range
                             || app_settings.today_drink_amount >= app_settings.gold
                         {
-                            println!("未达到目标，不启动计时器");
+                            // println!("未达到目标，不启动计时器");
                             sleep(Duration::from_secs(1));
                             continue;
                         }
