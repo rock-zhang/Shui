@@ -102,23 +102,7 @@ export default function ReminderPage() {
   }, [water.drink]);
 
   useEffect(() => {
-    async function loadConfig() {
-      const store = await load("config_store.json", { autoSave: false });
-      const [goldSetting, drinkHistory] = await Promise.all([
-        store.get<{
-          gold: number;
-        }>("alert"),
-        store.get<{
-          [todayDate]: number;
-        }>("drink_history"),
-      ]);
-
-      setWater({
-        ...water,
-        gold: Number(goldSetting?.gold),
-        drink: drinkHistory?.[todayDate] || 0,
-      });
-    }
+    updateFromStore();
 
     listen("countdown", (event) => {
       setCountdown(event.payload as number);
@@ -126,8 +110,6 @@ export default function ReminderPage() {
         setTimeout(hideWindowAction, 500);
       }
     });
-
-    loadConfig();
   }, []);
 
   useEffect(() => {
@@ -136,7 +118,7 @@ export default function ReminderPage() {
 
     // 监听窗口显示事件
     listen(TauriEvent.WINDOW_FOCUS, () => {
-      drinkAmoutUpdate();
+      updateFromStore();
       registerEscShortcut();
     });
     listen(TauriEvent.WINDOW_BLUR, () => {
@@ -148,14 +130,20 @@ export default function ReminderPage() {
     };
   }, []);
 
-  const drinkAmoutUpdate = async () => {
+  const updateFromStore = async () => {
     const store = await load("config_store.json", { autoSave: false });
-    const drinkHistory = await store.get<{
-      [todayDate]: number;
-    }>("drink_history");
+    const [goldSetting, drinkHistory] = await Promise.all([
+      store.get<{
+        gold: number;
+      }>("alert"),
+      store.get<{
+        [todayDate]: number;
+      }>("drink_history"),
+    ]);
 
-    await store.set("drink_history", {
-      [todayDate]: drinkHistory?.[todayDate] || 0,
+    setWater({
+      gold: Number(goldSetting?.gold),
+      drink: drinkHistory?.[todayDate] || 0,
     });
   };
 
