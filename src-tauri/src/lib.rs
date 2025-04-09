@@ -80,7 +80,6 @@ pub fn run() {
                     if is_running_clone.load(Ordering::SeqCst) {
                         let app_settings = AppSettings::load_from_store(&store);
                         remind_gap = app_settings.gap;
-
                         // println!("app_settings {:?}", app_settings);
 
                         // 检查是否在工作时间范围内且未达到目标
@@ -88,7 +87,16 @@ pub fn run() {
                             || !app_settings.is_in_time_range
                             || app_settings.today_drink_amount >= app_settings.gold
                         {
-                            // println!("未达到目标，不启动计时器");
+                            if let Some(tray) = app_handle2.tray_by_id("main-tray") {
+                                if app_settings.today_drink_amount >= app_settings.gold {
+                                    let _ = tray.set_title(Some("已达标"));
+                                    let _ = tray.set_tooltip(Some("太棒啦，再接再厉"));
+                                } else {
+                                    let _ = tray.set_title(Some("Shui"));
+                                    let _ = tray.set_tooltip(Some("非工作日或非工作时间"));
+                                }
+                            }
+
                             sleep(Duration::from_secs(1));
                             continue;
                         }
@@ -113,10 +121,8 @@ pub fn run() {
                             };
 
                             if let Some(tray) = app_handle2.tray_by_id("main-tray") {
-                                // 更新托盘文案
-                                if let Err(e) = tray.set_title(Some(tray_text.as_str())) {
-                                    println!("更新托盘标题失败: {:?}", e);
-                                }
+                                let _ = tray.set_title(Some(tray_text.as_str()));
+                                let _ = tray.set_tooltip(Some(""));
                             }
 
                             if rest <= 0 {

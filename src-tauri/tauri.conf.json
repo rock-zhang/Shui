@@ -29,7 +29,7 @@
         "width": 680,
         "height": 460,
         "resizable": false,
-        "visible": false,
+        "visible": true,
         "maximizable": false,
         "hiddenTitle": true,
         "skipTaskbar": true,
