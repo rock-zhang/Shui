@@ -1,7 +1,26 @@
-# Tauri + React + Typescript
+# Shui - 喝水提醒助手
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+<!-- TODO: 提现页面截图 -->
 
-## Recommended IDE Setup
+![Shui](src-tauri/icons/128x128@2x.png)
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+一个基于 Tauri + React 开发的桌面端喝水提醒应用。
+
+## 项目愿景
+
+## 功能特点
+
+- 🌐 每日饮水目标设定
+- 🕒 自定义提醒间隔
+- 📅 工作日智能提醒
+- ⏰ 自定义时间范围
+- 🔔 系统通知提醒
+- 🖥️ 托盘显示倒计时
+- ⌨️ 全局快捷键支持
+- 🔄 锁屏自动暂停
+- [x] 基本功能实现
+- [ ] 多语言支持
+- [ ] 自定义提醒声音
+- [ ] 自定义提醒音效
+- [ ] 自定义喝水量单位
+- [ ] 自定义喝水量单位

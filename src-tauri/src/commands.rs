@@ -1,7 +1,12 @@
+// use crate::core::store::AppSettings;
+use crate::core::store::settings::AppSettings;
 use crate::timer;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::Ordering;
+use tauri_plugin_store::StoreExt;
 
+// Remove this line since we don't need it
+// use tauri::api::version::Version;
 use tauri::{Emitter, Manager};
 use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
 use tauri_nspanel::{ManagerExt, WebviewWindowExt};
@@ -142,20 +147,6 @@ pub fn call_reminder(app_handle: tauri::AppHandle, caller: Option<ReminderCaller
     true
 }
 
-#[derive(Serialize)]
-pub struct SettingResponse {
-    screen: i32,
-}
-
-#[tauri::command]
-pub fn setting(app_handle: tauri::AppHandle) -> SettingResponse {
-    let main_window = app_handle.get_webview_window("main").unwrap();
-    let main_window_size = main_window.inner_size().unwrap();
-    println!("main_window_size: {:?}", main_window_size);
-
-    SettingResponse { screen: 2 }
-}
-
 #[tauri::command]
 fn show_panel(app_handle: tauri::AppHandle, label: &str) {
     let panel = app_handle.get_webview_panel(label).unwrap();
@@ -208,4 +199,43 @@ pub fn reset_timer() {
 #[tauri::command]
 pub async fn quit(app_handle: tauri::AppHandle) {
     app_handle.exit(0);
+}
+
+#[derive(Serialize)]
+pub struct SettingResponse {
+    screen: i32,
+}
+
+#[tauri::command]
+pub fn setting(app_handle: tauri::AppHandle) -> SettingResponse {
+    let main_window = app_handle.get_webview_window("main").unwrap();
+    let main_window_size = main_window.inner_size().unwrap();
+    println!("main_window_size: {:?}", main_window_size);
+
+    SettingResponse { screen: 2 }
+}
+
+#[derive(Serialize, Debug)]
+pub struct AppRuntimeInfoResponse {
+    is_running: bool,
+    app_settings: AppSettings,
+    version: String,
+}
+
+#[tauri::command(async)]
+pub async fn get_app_runtime_info(app_handle: tauri::AppHandle) -> AppRuntimeInfoResponse {
+    let store = app_handle
+        .app_handle()
+        .store("config_store.json")
+        .expect("无法加载配置文件");
+    let app_settings = AppSettings::load_from_store(&store);
+    let is_running = IS_RUNNING.load(Ordering::SeqCst);
+    // We can get version directly from package_info()
+    let version = app_handle.package_info().version.to_string();
+
+    AppRuntimeInfoResponse {
+        app_settings,
+        is_running,
+        version,
+    }
 }

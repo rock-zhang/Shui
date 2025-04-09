@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
+import { Toaster } from "@/components/ui/sonner";
 
 export default function RootLayout({
   children,
@@ -37,6 +38,7 @@ export default function RootLayout({
       />
       <AppSidebar />
       <main className="flex-1 p-10 pt-8 overflow-y-auto">{children}</main>
+      <Toaster />
     </SidebarProvider>
   );
 }

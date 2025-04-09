@@ -39,7 +39,8 @@ tauri-plugin-macos-permissions = "2"
 tauri-plugin-store = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-notification = "2"
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+tauri-plugin-clipboard-manager = "2"
 # tauri-plugin-shell.workspace = true
 # tauri-plugin-fs-pro.workspace = true
 # tauri-plugin-eco-window.workspace = true

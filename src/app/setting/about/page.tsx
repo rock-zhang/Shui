@@ -2,6 +2,10 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { getVersion } from "@tauri-apps/api/app";
 import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { invoke } from "@tauri-apps/api/core";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { toast } from "sonner";
 
 export default function About() {
   const [version, setVersion] = useState("");
@@ -12,6 +16,12 @@ export default function About() {
 
   const openGithub = async () => {
     await openUrl("https://github.com/rock-zhang/Shui");
+  };
+
+  const handleCopyAppInfo = async () => {
+    const appInfo = await invoke("get_app_runtime_info");
+    await writeText(JSON.stringify(appInfo));
+    toast.success("复制成功");
   };
 
   return (
@@ -45,6 +55,30 @@ export default function About() {
             如果你有任何想法或遇到问题，欢迎通过以下方式与我们联系。你的反馈将帮助我们做得更好！
           </p>
         </div>
+      </div>
+
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
+        <div>
+          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+            版本
+          </label>
+          <p className="text-[0.8rem] text-muted-foreground">{version}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
+        <div>
+          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+            软件信息
+          </label>
+          <p
+            id=":r233:-form-item-description"
+            className="text-[0.8rem] text-muted-foreground"
+          >
+            复制软件信息并提供给 Bug Issue
+          </p>
+        </div>
+        <Button onClick={handleCopyAppInfo}>复制</Button>
       </div>
 
       <div className="rounded-lg border p-3 shadow-xs space-y-4 mb-4">
@@ -118,15 +152,6 @@ export default function About() {
             </div>
             <p className="text-sm text-muted-foreground">加入微信群</p>
           </div>
-        </div>
-      </div>
-
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
-        <div>
-          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            版本
-          </label>
-          <p className="text-[0.8rem] text-muted-foreground">{version}</p>
         </div>
       </div>
     </div>

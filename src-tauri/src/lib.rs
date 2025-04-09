@@ -29,6 +29,7 @@ use tauri_plugin_store::StoreExt;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             Some(vec!["--test_args=1"]),
@@ -211,6 +212,7 @@ pub fn run() {
             commands::hide_reminder_windows,
             commands::close_reminder_windows,
             commands::reset_timer,
+            commands::get_app_runtime_info,
             commands::quit
         ])
         .run(tauri::generate_context!())

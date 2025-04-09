@@ -1,5 +1,6 @@
 use chrono::{Datelike, Local, NaiveTime};
-use tauri_plugin_store::Store;
+use serde::Serialize;
+use tauri_plugin_store::Store; // 添加这行到文件顶部
 
 pub mod store_pages {
     pub const ALERT: &str = "alert";
@@ -16,7 +17,17 @@ pub mod store_keys {
     pub const ISCOUNTDOWN: &str = "isCountDown";
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)] // 添加 Serialize
+pub struct AppSettingsMeta {
+    pub weekdays: Vec<u64>,
+    pub current_time: NaiveTime,
+    pub time_start: NaiveTime,
+    pub time_end: NaiveTime,
+    pub today_weekday: u64,
+    pub gap_minutes: u64,
+}
+
+#[derive(Debug, Clone, Serialize)] // 添加 Serialize
 pub struct AppSettings {
     pub gold: u64,
     pub gap: u64,
@@ -24,6 +35,7 @@ pub struct AppSettings {
     pub is_work_day: bool,
     pub is_in_time_range: bool,
     pub is_show_countdown: bool,
+    pub meta: AppSettingsMeta,
 }
 
 pub fn get_today_string() -> String {
@@ -142,6 +154,14 @@ impl AppSettings {
             is_work_day: is_work_day,
             is_in_time_range: is_in_time_range,
             is_show_countdown: is_show_countdown,
+            meta: AppSettingsMeta {
+                weekdays,
+                current_time,
+                time_start,
+                time_end,
+                today_weekday,
+                gap_minutes,
+            },
         }
     }
 }
