@@ -210,7 +210,7 @@ pub fn run() {
             commands::call_reminder,
             commands::setting,
             commands::hide_reminder_windows,
-            commands::close_reminder_windows,
+            commands::hide_reminder_window,
             commands::reset_timer,
             commands::get_app_runtime_info,
             commands::quit

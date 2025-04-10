@@ -13,6 +13,7 @@
     "core:default",
     "core:tray:allow-get-by-id",
     "core:window:allow-show",
+    "core:window:allow-hide",
     "core:window:allow-start-dragging",
     "core:window:deny-internal-toggle-maximize",
     "core:window:allow-get-all-windows",

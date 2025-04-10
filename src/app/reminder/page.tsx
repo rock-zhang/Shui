@@ -16,10 +16,12 @@ import {
   sendNotification,
 } from "@tauri-apps/plugin-notification";
 import "./index.css";
+import { currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 
 function hideWindowAction() {
   invoke("hide_reminder_windows");
   invoke("reset_timer");
+  unregisterAll();
 }
 
 async function registerEscShortcut() {
@@ -91,6 +93,7 @@ export default function ReminderPage() {
     drink: 0,
   });
   const [countdown, setCountdown] = useState(30);
+  const [monitorName, setMonitorName] = useState("");
   // 按天存储饮水量
   const todayDate = getTodayDate();
 
@@ -102,7 +105,7 @@ export default function ReminderPage() {
   }, [water.drink]);
 
   useEffect(() => {
-    updateFromStore();
+    registerEscShortcut();
 
     listen("countdown", (event) => {
       setCountdown(event.payload as number);
@@ -110,19 +113,21 @@ export default function ReminderPage() {
         setTimeout(hideWindowAction, 500);
       }
     });
-  }, []);
 
-  useEffect(() => {
-    // 首次打开，注册快捷键
-    registerEscShortcut();
+    // TODO:被其他窗口隐藏时，注销快捷键
+    // 待确认多屏场景下，是否需要注销快捷键
+    listen("reminder_already_hidden", () => {
+      unregisterAll();
+    });
 
     // 监听窗口显示事件
     listen(TauriEvent.WINDOW_FOCUS, () => {
-      updateFromStore();
+      console.log("TauriEvent.WINDOW_FOCUS");
       registerEscShortcut();
     });
-    listen(TauriEvent.WINDOW_BLUR, () => {
-      unregisterAll();
+
+    currentMonitor().then((mo) => {
+      setMonitorName(mo?.name || "");
     });
 
     return () => {
@@ -130,22 +135,39 @@ export default function ReminderPage() {
     };
   }, []);
 
-  const updateFromStore = async () => {
-    const store = await load("config_store.json", { autoSave: false });
-    const [goldSetting, drinkHistory] = await Promise.all([
-      store.get<{
-        gold: number;
-      }>("alert"),
-      store.get<{
-        [todayDate]: number;
-      }>("drink_history"),
-    ]);
-
-    setWater({
-      gold: Number(goldSetting?.gold),
-      drink: drinkHistory?.[todayDate] || 0,
+  useEffect(() => {
+    if (!monitorName) return;
+    listen(TauriEvent.WINDOW_MOVED, async () => {
+      console.log("TauriEvent.WINDOW_MOVED", monitorName);
+      const mo = await currentMonitor();
+      if (mo?.name !== monitorName) {
+        // 外接屏幕变化时，隐藏窗口
+        const win = await getCurrentWindow();
+        invoke("hide_reminder_window", { label: win.label });
+      }
     });
-  };
+  }, [monitorName]);
+
+  useEffect(() => {
+    const storeUpdate = async () => {
+      const store = await load("config_store.json", { autoSave: false });
+      const [goldSetting, drinkHistory] = await Promise.all([
+        store.get<{
+          gold: number;
+        }>("alert"),
+        store.get<{
+          [todayDate]: number;
+        }>("drink_history"),
+      ]);
+
+      setWater({
+        gold: Number(goldSetting?.gold),
+        drink: drinkHistory?.[todayDate] || 0,
+      });
+    };
+
+    storeUpdate();
+  }, [countdown]);
 
   const handleWaterSelection = async (ml: number) => {
     const totalDrink = water.drink + ml;

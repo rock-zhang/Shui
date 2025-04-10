@@ -7,7 +7,7 @@ use tauri_plugin_store::StoreExt;
 
 // Remove this line since we don't need it
 // use tauri::api::version::Version;
-use tauri::{Emitter, Manager};
+use tauri::{Emitter, LogicalPosition, Manager};
 use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
 use tauri_nspanel::{ManagerExt, WebviewWindowExt};
 use timer::IS_RUNNING;
@@ -24,7 +24,7 @@ fn show_reminder_page(app_handle: &tauri::AppHandle) {
             // 检查是否已存在提醒窗口
             if let Ok(panel) = app_handle.get_webview_panel(&reminder_label) {
                 panel.show();
-                return;
+                continue;
             }
 
             let size = monitor.size();
@@ -105,7 +105,13 @@ pub fn call_reminder(app_handle: tauri::AppHandle, caller: Option<ReminderCaller
 
                 // 检查是否已存在提醒窗口
                 if let Ok(panel) = app_handle.get_webview_panel(&reminder_label) {
+                    let win = app_handle.get_webview_window(&reminder_label).unwrap();
+                    let position = monitor.position();
+                    let _ = win.set_position(LogicalPosition::new(position.x, position.y));
                     panel.show();
+                } else {
+                    // 接入新的外接屏幕，需要重新创建Window
+                    show_reminder_page(&app_handle);
                 }
             }
         }
@@ -176,13 +182,10 @@ pub fn hide_reminder_windows(app_handle: tauri::AppHandle) {
 }
 
 #[tauri::command]
-pub fn close_reminder_windows(app_handle: tauri::AppHandle, label: &str) {
-    let panel = app_handle.get_webview_panel(label).unwrap();
-
-    // 需设置 isReleasedWhenClosed = false，否则关闭窗口后对象可能被释放导致崩溃。
-    panel.set_released_when_closed(false);
-
-    panel.close();
+pub fn hide_reminder_window(app_handle: tauri::AppHandle, label: &str) {
+    if let Ok(panel) = app_handle.get_webview_panel(&label) {
+        panel.order_out(None);
+    }
 }
 
 #[tauri::command]
