@@ -150,19 +150,20 @@ export default function ReminderPage() {
 
   useEffect(() => {
     const storeUpdate = async () => {
-      const store = await load("config_store.json", { autoSave: false });
-      const [goldSetting, drinkHistory] = await Promise.all([
-        store.get<{
+      const config_store = await load("config_store.json", { autoSave: false });
+      const drinkHistory = await load("drink_history.json", {
+        autoSave: false,
+      });
+      const [goldSetting, drink = 0] = await Promise.all([
+        config_store.get<{
           gold: number;
         }>("alert"),
-        store.get<{
-          [todayDate]: number;
-        }>("drink_history"),
+        drinkHistory.get<number>(todayDate),
       ]);
 
       setWater({
         gold: Number(goldSetting?.gold),
-        drink: drinkHistory?.[todayDate] || 0,
+        drink,
       });
     };
 
@@ -175,10 +176,8 @@ export default function ReminderPage() {
       ...water,
       drink: totalDrink,
     });
-    const store = await load("config_store.json", { autoSave: false });
-    await store.set("drink_history", {
-      [todayDate]: totalDrink,
-    });
+    const store = await load("drink_history.json", { autoSave: false });
+    await store.set(todayDate, totalDrink);
     await store.save();
 
     if (totalDrink >= water.gold) {
