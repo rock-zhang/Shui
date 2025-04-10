@@ -217,6 +217,7 @@ export default function ReminderPage() {
           {waterOptions.map((option) => (
             <button
               key={option.ml}
+              tabIndex={-1}
               onClick={() => handleWaterSelection(option.ml)}
               className="p-4 rounded-xl transition-all duration-200 cursor-pointer bg-blue-50 hover:bg-blue-100 text-blue-700"
             >
@@ -229,6 +230,7 @@ export default function ReminderPage() {
         <div className="mt-6 text-center">
           <button
             onClick={hideWindowAction}
+            tabIndex={-1}
             className="text-gray-500 hover:text-gray-700 text-sm inline-flex items-center gap-1.5 transition-colors duration-200 cursor-pointer"
           >
             跳过
