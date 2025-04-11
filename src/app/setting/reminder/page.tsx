@@ -14,6 +14,7 @@ import { load } from "@tauri-apps/plugin-store";
 import { useTray } from "@/hooks/use-tray";
 import { Button } from "@/components/ui/button";
 import { invoke } from "@tauri-apps/api/core";
+import { STORE_NAME } from "@/lib/constants";
 
 const goldList = ["1000", "1500", "2000", "2500", "3000", "3500", "4000"];
 const gapList = ["10", "20", "30", "45", "60"];
@@ -34,7 +35,7 @@ export default function Home() {
 
   useEffect(() => {
     async function loadConfig() {
-      const store = await load("config_store.json", { autoSave: false });
+      const store = await load(STORE_NAME.config, { autoSave: false });
       const val = await store.get<{
         gold: string;
         gap: string;
@@ -57,7 +58,7 @@ export default function Home() {
       [filed]: value,
     });
 
-    const store = await load("config_store.json", { autoSave: false });
+    const store = await load(STORE_NAME.config, { autoSave: false });
     await store.set("alert", {
       ...config,
       [filed]: value,

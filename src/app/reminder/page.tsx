@@ -17,6 +17,7 @@ import {
 } from "@tauri-apps/plugin-notification";
 import "./index.css";
 import { currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
+import { STORE_NAME } from "@/lib/constants";
 
 function hideWindowAction() {
   invoke("hide_reminder_windows");
@@ -150,8 +151,8 @@ export default function ReminderPage() {
 
   useEffect(() => {
     const storeUpdate = async () => {
-      const config_store = await load("config_store.json", { autoSave: false });
-      const drinkHistory = await load("drink_history.json", {
+      const config_store = await load(STORE_NAME.config, { autoSave: false });
+      const drinkHistory = await load(STORE_NAME.drink_history, {
         autoSave: false,
       });
       const [goldSetting, drink = 0] = await Promise.all([
@@ -176,7 +177,7 @@ export default function ReminderPage() {
       ...water,
       drink: totalDrink,
     });
-    const store = await load("drink_history.json", { autoSave: false });
+    const store = await load(STORE_NAME.drink_history, { autoSave: false });
     await store.set(todayDate, totalDrink);
     await store.save();
 

@@ -226,19 +226,16 @@ pub struct AppRuntimeInfoResponse {
 }
 
 #[tauri::command(async)]
-pub async fn get_app_runtime_info(app_handle: tauri::AppHandle) -> AppRuntimeInfoResponse {
-    let store = app_handle
-        .app_handle()
-        .store("config_store.json")
-        .expect("无法加载配置文件");
-    let app_settings = AppSettings::load_from_store(&store);
+pub async fn get_app_runtime_info(
+    app_handle: tauri::AppHandle,
+) -> Result<AppRuntimeInfoResponse, String> {
+    let app_settings = AppSettings::load_from_store::<tauri::Wry>(&app_handle);
     let is_running = IS_RUNNING.load(Ordering::SeqCst);
-    // We can get version directly from package_info()
     let version = app_handle.package_info().version.to_string();
 
-    AppRuntimeInfoResponse {
+    Ok(AppRuntimeInfoResponse {
         app_settings,
         is_running,
         version,
-    }
+    })
 }

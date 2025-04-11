@@ -1,14 +1,18 @@
 use chrono::{Datelike, Local, NaiveTime};
 use serde::Serialize;
-use tauri_plugin_store::Store; // 添加这行到文件顶部
+use tauri_plugin_store::{Store, StoreExt}; // 添加这行到文件顶部
 
-pub mod store_pages {
-    pub const ALERT: &str = "alert";
-    pub const GENERAL: &str = "general";
-    pub const DRINK_HISTORY: &str = "drink_history";
+pub mod store_files {
+    pub const CONFIG: &str = "config_store.json";
+    pub const DRINK_HISTORY: &str = "drink_history_store.json";
 }
 
-pub mod store_keys {
+pub mod config_store_category {
+    pub const ALERT: &str = "alert";
+    pub const GENERAL: &str = "general";
+}
+
+pub mod store_fields {
     pub const GAP: &str = "gap";
     pub const GOLD: &str = "gold";
     pub const WEEKDAYS: &str = "weekdays";
@@ -55,7 +59,7 @@ impl AppSettings {
 
         // 设置默认配置
         store.set(
-            store_pages::ALERT.to_string(),
+            config_store_category::ALERT.to_string(),
             json!({
                 "gap": "20",
                 "gold": "1000",
@@ -65,7 +69,7 @@ impl AppSettings {
             }),
         );
         store.set(
-            store_pages::GENERAL.to_string(),
+            config_store_category::GENERAL.to_string(),
             json!({
                 "isAutoStart": false,
                 "isCountDown": true
@@ -77,40 +81,47 @@ impl AppSettings {
         Ok(())
     }
 
-    pub fn load_from_store<R: tauri::Runtime>(store: &Store<R>) -> AppSettings {
+    pub fn load_from_store<R: tauri::Runtime>(app_handle: &tauri::AppHandle) -> AppSettings {
+        let config_store = app_handle
+            .store(store_files::CONFIG)
+            .expect("无法获取 Store");
+        let drink_history_store = app_handle
+            .store(store_files::DRINK_HISTORY)
+            .expect("无法获取 Store");
+
         // 检查是否首次打开
-        if Self::is_first_open(store) {
-            if let Err(e) = Self::init_store(store) {
+        if Self::is_first_open(&config_store) {
+            if let Err(e) = Self::init_store(&config_store) {
                 println!("初始化配置失败: {:?}", e);
             }
         }
 
-        let alert_config = store
-            .get(store_pages::ALERT)
+        let alert_config = config_store
+            .get(config_store_category::ALERT)
             .and_then(|v| v.as_object().cloned());
 
         let alert_config = alert_config.unwrap_or_default();
 
         let gap_minutes = alert_config
-            .get(store_keys::GAP)
+            .get(store_fields::GAP)
             .and_then(|v| v.as_str())
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(20);
 
         let gold = alert_config
-            .get(store_keys::GOLD)
+            .get(store_fields::GOLD)
             .and_then(|v| v.as_str())
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(1000);
 
         let time_start = alert_config
-            .get(store_keys::TIMESTART)
+            .get(store_fields::TIMESTART)
             .and_then(|v| v.as_str())
             .and_then(|s| NaiveTime::parse_from_str(s, "%H:%M").ok())
             .unwrap_or(NaiveTime::from_hms_opt(9, 0, 0).unwrap());
 
         let time_end = alert_config
-            .get(store_keys::TIMEEND)
+            .get(store_fields::TIMEEND)
             .and_then(|v| v.as_str())
             .and_then(|s| NaiveTime::parse_from_str(s, "%H:%M").ok())
             .unwrap_or(NaiveTime::from_hms_opt(18, 0, 0).unwrap());
@@ -125,7 +136,7 @@ impl AppSettings {
         };
 
         let weekdays = alert_config
-            .get(store_keys::WEEKDAYS)
+            .get(store_fields::WEEKDAYS)
             .and_then(|v| v.as_array())
             .map(|arr| arr.iter().filter_map(|v| v.as_u64()).collect::<Vec<u64>>())
             .unwrap_or_else(|| vec![]); // 默认为空数组
@@ -133,17 +144,17 @@ impl AppSettings {
         let today_weekday = Local::now().weekday().num_days_from_sunday() as u64;
         let is_work_day = weekdays.contains(&today_weekday);
 
-        let drink_amount = store
-            .get(store_pages::DRINK_HISTORY)
-            .and_then(|v| v.as_object().cloned())
-            .and_then(|obj| obj.get(&get_today_string()).cloned())
+        let drink_amount = drink_history_store
+            .get(&get_today_string())
             .and_then(|v| v.as_u64())
             .unwrap_or(0);
 
-        let is_show_countdown = store
-            .get(store_pages::GENERAL)
+        // println!("drink_amount: {:?}", drink_amount);
+
+        let is_show_countdown = config_store
+            .get(config_store_category::GENERAL)
             .and_then(|v| v.as_object().cloned())
-            .and_then(|obj| obj.get(store_keys::ISCOUNTDOWN).cloned())
+            .and_then(|obj| obj.get(store_fields::ISCOUNTDOWN).cloned())
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 

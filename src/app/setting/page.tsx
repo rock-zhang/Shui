@@ -6,6 +6,7 @@ import { load } from "@tauri-apps/plugin-store";
 import { useTray } from "@/hooks/use-tray";
 import { enable, isEnabled, disable } from "@tauri-apps/plugin-autostart";
 import { invoke } from "@tauri-apps/api/core";
+import { STORE_NAME } from "@/lib/constants";
 
 export default function Home() {
   const [config, setConfig] = useState({
@@ -16,7 +17,7 @@ export default function Home() {
 
   useEffect(() => {
     async function loadConfig() {
-      const store = await load("config_store.json", { autoSave: false });
+      const store = await load(STORE_NAME.config, { autoSave: false });
       const [generalSetting, isAutoStart] = await Promise.all([
         store.get<{
           isAutoStart: boolean;
@@ -35,7 +36,7 @@ export default function Home() {
   }, []);
 
   const saveConfig = async (filed: string, checked: boolean) => {
-    const store = await load("config_store.json", { autoSave: false });
+    const store = await load(STORE_NAME.config, { autoSave: false });
     const oldConfig = await store.get<{ value: number }>("general");
 
     setConfig({

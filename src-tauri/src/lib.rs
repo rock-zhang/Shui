@@ -69,17 +69,15 @@ pub fn run() {
             {
                 let is_running_clone = IS_RUNNING.clone();
                 let mut remind_gap = 1200;
-                let app_handle = app.handle().clone();
-                let app_handle2 = app.app_handle().clone();
+                let app_handle = app.app_handle().clone();
 
-                let store = app.store("config_store.json")?;
-                let app_settings = AppSettings::load_from_store(&store);
+                let app_settings = AppSettings::load_from_store::<tauri::Wry>(&app_handle);
                 remind_gap = app_settings.gap;
 
                 // 计时器线程
                 thread::spawn(move || loop {
                     if is_running_clone.load(Ordering::SeqCst) {
-                        let app_settings = AppSettings::load_from_store(&store);
+                        let app_settings = AppSettings::load_from_store::<tauri::Wry>(&app_handle);
                         remind_gap = app_settings.gap;
                         // println!("app_settings {:?}", app_settings);
 
@@ -88,7 +86,7 @@ pub fn run() {
                             || !app_settings.is_in_time_range
                             || app_settings.today_drink_amount >= app_settings.gold
                         {
-                            if let Some(tray) = app_handle2.tray_by_id("main-tray") {
+                            if let Some(tray) = app_handle.tray_by_id("main-tray") {
                                 if app_settings.today_drink_amount >= app_settings.gold {
                                     let _ = tray.set_title(Some("已达标"));
                                     let _ = tray.set_tooltip(Some("太棒啦，再接再厉"));
@@ -121,7 +119,7 @@ pub fn run() {
                                 String::new()
                             };
 
-                            if let Some(tray) = app_handle2.tray_by_id("main-tray") {
+                            if let Some(tray) = app_handle.tray_by_id("main-tray") {
                                 let _ = tray.set_title(Some(tray_text.as_str()));
                                 let _ = tray.set_tooltip(Some(""));
                             }
