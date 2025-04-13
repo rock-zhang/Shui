@@ -97,7 +97,7 @@ export default function Home() {
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectLabel>毫升</SelectLabel>
+              <SelectLabel>建议不低于 1500ml</SelectLabel>
               {goldList.map((gold) => (
                 <SelectItem key={gold} value={gold}>
                   {gold}ml
