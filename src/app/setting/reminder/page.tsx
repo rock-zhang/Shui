@@ -12,7 +12,7 @@ import {
 import { useEffect, useState } from "react";
 import { load } from "@tauri-apps/plugin-store";
 import { useTray } from "@/hooks/use-tray";
-import { Button } from "@/components/ui/button";
+// import { Button } from "@/components/ui/button";
 import { invoke } from "@tauri-apps/api/core";
 import { STORE_NAME } from "@/lib/constants";
 
@@ -234,7 +234,7 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="flex justify-end">
+      {/* <div className="flex justify-end">
         <Button
           onClick={() => {
             invoke("call_reminder");
@@ -242,7 +242,7 @@ export default function Home() {
         >
           预览
         </Button>
-      </div>
+      </div> */}
     </div>
   );
 }

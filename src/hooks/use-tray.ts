@@ -28,7 +28,6 @@ export function useTray() {
   };
 
   const getMenu = useCallback(async () => {
-    console.log("a");
     const menu = await Menu.new();
 
     // 创建子菜单
@@ -42,7 +41,7 @@ export function useTray() {
           },
         },
         {
-          text: "重新开始",
+          text: "重新计时",
           action: async () => {
             invoke("start_timer");
           },
@@ -51,6 +50,14 @@ export function useTray() {
     });
 
     await menu.append(submenu);
+    await menu.append(
+      await MenuItem.new({
+        text: "休息",
+        action: async () => {
+          invoke("call_reminder");
+        },
+      })
+    );
     await menu.append(await PredefinedMenuItem.new({ item: "Separator" }));
 
     await menu.append(
