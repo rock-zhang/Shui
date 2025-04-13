@@ -90,7 +90,7 @@ use std::sync::Mutex;
 use tokio::sync::mpsc;
 
 // 只保留 channel 相关的静态变量
-static COUNTDOWN_SENDER: Mutex<Option<mpsc::Sender<()>>> = Mutex::new(None);
+static REMINDER_PAGE_COUNTDOWN_SENDER: Mutex<Option<mpsc::Sender<()>>> = Mutex::new(None);
 
 #[tauri::command]
 pub fn call_reminder(app_handle: tauri::AppHandle, caller: Option<ReminderCaller>) -> bool {
@@ -120,13 +120,13 @@ pub fn call_reminder(app_handle: tauri::AppHandle, caller: Option<ReminderCaller
     }
 
     // 取消之前的倒计时
-    if let Some(sender) = COUNTDOWN_SENDER.lock().unwrap().take() {
+    if let Some(sender) = REMINDER_PAGE_COUNTDOWN_SENDER.lock().unwrap().take() {
         let _ = sender.try_send(());
     }
 
     // 创建新的 channel
     let (tx, mut rx) = mpsc::channel(1);
-    *COUNTDOWN_SENDER.lock().unwrap() = Some(tx);
+    *REMINDER_PAGE_COUNTDOWN_SENDER.lock().unwrap() = Some(tx);
 
     // 启动新的倒计时任务
     let app_handle_clone = app_handle.clone();
@@ -175,7 +175,7 @@ pub fn hide_reminder_windows(app_handle: tauri::AppHandle) {
         }
 
         // 取消之前的倒计时
-        if let Some(sender) = COUNTDOWN_SENDER.lock().unwrap().take() {
+        if let Some(sender) = REMINDER_PAGE_COUNTDOWN_SENDER.lock().unwrap().take() {
             let _ = sender.try_send(());
         }
     }
@@ -197,6 +197,16 @@ pub fn reset_timer() {
         sleep(Duration::from_millis(1000)).await;
         IS_RUNNING.store(true, Ordering::SeqCst);
     });
+}
+
+#[tauri::command]
+pub fn pause_timer() {
+    IS_RUNNING.store(false, Ordering::SeqCst);
+}
+
+#[tauri::command]
+pub fn start_timer() {
+    IS_RUNNING.store(true, Ordering::SeqCst);
 }
 
 #[tauri::command]

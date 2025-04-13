@@ -42,29 +42,6 @@ pub fn run() {
         .setup(|app| {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            // #[cfg(desktop)]
-            // {
-            //     use tauri::Manager;
-            //     use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
-
-            //     app.handle().plugin(
-            //         tauri_plugin_global_shortcut::Builder::new()
-            //             .with_shortcuts(["Esc"])?
-            //             .with_handler(|app, shortcut, event| {
-            //                 println!("shortcut {:?}, event {:?}", shortcut, event);
-            //                 if event.state == ShortcutState::Pressed {
-            //                     if shortcut.matches(Modifiers::CONTROL, Code::Escape) {
-            //                         let _ = app.emit("shortcut-event", "Ctrl+D triggered");
-            //                     }
-            //                     if shortcut.matches(Modifiers::ALT, Code::Space) {
-            //                         let _ = app.emit("shortcut-event", "Alt+Space triggered");
-            //                     }
-            //                 }
-            //             })
-            //             .build(),
-            //     )?;
-            // }
-
             #[cfg(target_os = "macos")]
             {
                 let is_running_clone = IS_RUNNING.clone();
@@ -95,6 +72,14 @@ pub fn run() {
                                     let _ = tray.set_tooltip(Some("非工作日或非工作时间"));
                                 }
                             }
+
+                            // app_handle
+                            //     .emit_to(
+                            //         "main", // 窗口名称
+                            //         "timer-running",
+                            //         serde_json::json!({ "is_running": true}),
+                            //     )
+                            //     .unwrap();
 
                             sleep(Duration::from_secs(1));
                             continue;
@@ -145,11 +130,27 @@ pub fn run() {
                                 }
 
                                 break;
+                            } else {
+                                // app_handle
+                                //     .emit_to(
+                                //         "main", // 窗口名称
+                                //         "timer-running",
+                                //         serde_json::json!({ "is_running": true}),
+                                //     )
+                                //     .unwrap();
                             }
 
                             thread::sleep(Duration::from_secs(1));
                         }
                     }
+                    // app_handle
+                    //     .emit_to(
+                    //         "main", // 窗口名称
+                    //         "timer-running",
+                    //         serde_json::json!({ "is_running": false}),
+                    //     )
+                    //     .unwrap();
+
                     thread::sleep(Duration::from_millis(100));
                 });
 
@@ -210,6 +211,8 @@ pub fn run() {
             commands::hide_reminder_windows,
             commands::hide_reminder_window,
             commands::reset_timer,
+            commands::pause_timer,
+            commands::start_timer,
             commands::get_app_runtime_info,
             commands::quit
         ])
