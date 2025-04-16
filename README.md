@@ -40,7 +40,7 @@
 
 ### 下载安装
 
-从 [Releases](https://github.com/yourusername/shui/releases) 页面下载最新版本。
+从 [Releases](https://github.com/rock-zhang/Shui/releases/) 页面下载最新版本。
 
 ## 🛣 开发路线
 
