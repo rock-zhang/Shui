@@ -45,143 +45,114 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             {
                 let is_running_clone = IS_RUNNING.clone();
-                let mut remind_gap = 1200;
                 let app_handle = app.app_handle().clone();
 
-                let app_settings = AppSettings::load_from_store::<tauri::Wry>(&app_handle);
-                remind_gap = app_settings.gap;
-
                 // 计时器线程
-                thread::spawn(move || loop {
-                    if is_running_clone.load(Ordering::SeqCst) {
-                        let app_settings = AppSettings::load_from_store::<tauri::Wry>(&app_handle);
-                        remind_gap = app_settings.gap;
-                        // println!("app_settings {:?}", app_settings);
+                thread::spawn(move || {
+                    let mut tray = app_handle.tray_by_id("main-tray");
 
-                        // 检查是否在工作时间范围内且未达到目标
+                    loop {
+                        if !is_running_clone.load(Ordering::SeqCst) {
+                            thread::sleep(Duration::from_millis(100));
+                            continue;
+                        }
+
+                        let app_settings = AppSettings::load_from_store::<tauri::Wry>(&app_handle);
+
+                        // 更新托盘状态
+                        fn update_tray_status(
+                            tray: &mut Option<tauri::tray::TrayIcon>,
+                            status: &str,
+                            tooltip: &str,
+                        ) {
+                            if let Some(ref tray_handle) = tray {
+                                let _ = tray_handle.set_title(Some(status));
+                                let _ = tray_handle.set_tooltip(Some(tooltip));
+                            }
+                        }
+
+                        // 检查工作状态
                         if !app_settings.is_work_day
                             || !app_settings.is_in_time_range
                             || app_settings.today_drink_amount >= app_settings.gold
                         {
-                            if let Some(tray) = app_handle.tray_by_id("main-tray") {
+                            let (status, tooltip) =
                                 if app_settings.today_drink_amount >= app_settings.gold {
-                                    let _ = tray.set_title(Some("已达标"));
-                                    let _ = tray.set_tooltip(Some("太棒啦，再接再厉"));
+                                    ("已达标", "太棒啦，再接再厉")
                                 } else {
-                                    let _ = tray.set_title(Some("Shui"));
-                                    let _ = tray.set_tooltip(Some("非工作日或非工作时间"));
-                                }
-                            }
-
-                            // app_handle
-                            //     .emit_to(
-                            //         "main", // 窗口名称
-                            //         "timer-running",
-                            //         serde_json::json!({ "is_running": true}),
-                            //     )
-                            //     .unwrap();
-
+                                    ("Shui", "非工作日或非工作时间")
+                                };
+                            update_tray_status(&mut tray, status, tooltip);
                             sleep(Duration::from_secs(1));
                             continue;
                         }
 
-                        // 计时开始，记录开始时间
+                        // 计时开始
                         let timer = Instant::now();
-                        println!("timer {:?}，remind_gap {:?}", timer, remind_gap);
+                        println!("开始计时，间隔：{} 秒", app_settings.gap);
 
                         while is_running_clone.load(Ordering::SeqCst) {
-                            let elapsed = timer.elapsed();
-                            let rest = remind_gap - elapsed.as_secs();
-                            // println!("计时：{:?}，剩余：{:?}", elapsed, rest);
+                            let elapsed_secs = timer.elapsed().as_secs();
 
-                            let minutes = rest / 60;
-                            let seconds = rest % 60;
-                            let countdown = format!("{}:{:02}", minutes, seconds);
-                            // 更新托盘菜单显示倒计时
-                            let tray_text = if app_settings.is_show_countdown {
-                                countdown
+                            // 检查是否需要重新加载设置
+                            let app_settings =
+                                AppSettings::load_from_store::<tauri::Wry>(&app_handle);
+
+                            let rest = if elapsed_secs >= app_settings.gap {
+                                0
                             } else {
-                                String::new()
+                                app_settings.gap - elapsed_secs
                             };
 
-                            if let Some(tray) = app_handle.tray_by_id("main-tray") {
-                                let _ = tray.set_title(Some(tray_text.as_str()));
-                                let _ = tray.set_tooltip(Some(""));
+                            // 更新托盘显示
+                            if app_settings.is_show_countdown && rest >= 0 {
+                                let countdown = format!("{}:{:02}", rest / 60, rest % 60);
+                                update_tray_status(&mut tray, &countdown, "");
                             }
 
-                            if rest <= 0 {
-                                println!("倒计时结束, 拉起提醒页面");
-
-                                // 暂停倒计时
+                            // 检查是否需要触发提醒
+                            if rest == 0 {
+                                println!("倒计时结束，准备提醒");
                                 IS_RUNNING.store(false, Ordering::SeqCst);
 
                                 if app_settings.is_work_day
                                     && app_settings.is_in_time_range
                                     && app_settings.today_drink_amount < app_settings.gold
                                 {
-                                    // 发送事件到前端，包含计时相关数据
-                                    app_handle
-                                        .emit_to(
-                                            "main", // 窗口名称
-                                            "timer-complete",
-                                            {},
-                                        )
-                                        .unwrap();
+                                    if let Err(e) = app_handle.emit_to("main", "timer-complete", {})
+                                    {
+                                        println!("发送提醒事件失败: {}", e);
+                                    }
                                 }
-
                                 break;
-                            } else {
-                                // app_handle
-                                //     .emit_to(
-                                //         "main", // 窗口名称
-                                //         "timer-running",
-                                //         serde_json::json!({ "is_running": true}),
-                                //     )
-                                //     .unwrap();
                             }
 
                             thread::sleep(Duration::from_secs(1));
                         }
                     }
-                    // app_handle
-                    //     .emit_to(
-                    //         "main", // 窗口名称
-                    //         "timer-running",
-                    //         serde_json::json!({ "is_running": false}),
-                    //     )
-                    //     .unwrap();
-
-                    thread::sleep(Duration::from_millis(100));
                 });
 
                 // 锁屏监听线程
                 thread::spawn(move || {
-                    let mut flg = false;
+                    let mut previous_lock_state = false;
                     let lock_key = CFString::new("CGSSessionScreenIsLocked");
                     loop {
                         unsafe {
                             let session_dictionary_ref = CGSessionCopyCurrentDictionary();
                             let session_dictionary: CFDictionary =
                                 CFDictionary::wrap_under_create_rule(session_dictionary_ref);
-                            let current_session_property =
+                            let current_lock_state =
                                 session_dictionary.find(lock_key.to_void()).is_some();
 
-                            if flg != current_session_property {
-                                flg = current_session_property;
-                                IS_RUNNING.store(!current_session_property, Ordering::SeqCst);
-                                println!(
-                                    "系统{}，{}计时",
-                                    if current_session_property {
-                                        "锁屏"
-                                    } else {
-                                        "解锁"
-                                    },
-                                    if current_session_property {
-                                        "停止"
-                                    } else {
-                                        "开始"
-                                    }
-                                );
+                            if previous_lock_state != current_lock_state {
+                                previous_lock_state = current_lock_state;
+                                IS_RUNNING.store(!current_lock_state, Ordering::SeqCst);
+                                let (status, action) = if current_lock_state {
+                                    ("锁屏", "停止")
+                                } else {
+                                    ("解锁", "开始")
+                                };
+                                println!("系统{}，{}计时", status, action);
                             }
                             thread::sleep(Duration::from_millis(1000));
                         }

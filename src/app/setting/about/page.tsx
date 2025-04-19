@@ -141,7 +141,7 @@ export default function About() {
           </div>
         </div>
 
-        <div className="mt-4 flex justify-center space-x-6">
+        {/* <div className="mt-4 flex justify-center space-x-6">
           <div className="text-center">
             <div className="mb-2">
               <img
@@ -152,7 +152,7 @@ export default function About() {
             </div>
             <p className="text-sm text-muted-foreground">加入微信群</p>
           </div>
-        </div>
+        </div> */}
       </div>
     </div>
   );
