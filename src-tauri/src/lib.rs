@@ -29,6 +29,7 @@ use tauri_plugin_store::StoreExt;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
@@ -98,14 +99,14 @@ pub fn run() {
                             let app_settings =
                                 AppSettings::load_from_store::<tauri::Wry>(&app_handle);
 
-                            let rest = if elapsed_secs >= app_settings.gap {
+                            let rest: u64 = if elapsed_secs >= app_settings.gap {
                                 0
                             } else {
                                 app_settings.gap - elapsed_secs
                             };
 
                             // 更新托盘显示
-                            if app_settings.is_show_countdown && rest >= 0 {
+                            if app_settings.is_show_countdown {
                                 let countdown = format!("{}:{:02}", rest / 60, rest % 60);
                                 update_tray_status(&mut tray, &countdown, "");
                             }
