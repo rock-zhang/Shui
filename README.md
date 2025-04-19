@@ -1,7 +1,7 @@
 # Shui - 智能喝水提醒助手
 
 <p align="center">
-  <img src="public/screenshot-1.png" alt="Shui Screenshot" width="600"/>
+  <img src="public/screenshot-0.png" alt="Shui Screenshot" width="500"/>
 </p>
 
 一个专注喝水提醒的 macOS App，关注打工人健康 💪 ，改善你的喝水习惯。
@@ -31,9 +31,9 @@
 ## 🖥 应用界面
 
 <p align="center">
-  <img src="public/screenshot-2.png" alt="Settings" width="300"/>
+  <img src="public/screenshot-2.png" alt="Settings"/>
   <br/>
-  <img src="public/screenshot-3.png" alt="Notification" width="300"/>
+  <img src="public/screenshot-3.png" alt="Notification"/>
 </p>
 
 ## 🚀 开始使用
