@@ -74,6 +74,8 @@ fn run_timer(app_handle: tauri::AppHandle, is_running: &std::sync::atomic::Atomi
         if app_settings.is_show_countdown {
             let countdown = format!("{}:{:02}", rest / 60, rest % 60);
             update_tray_status(&mut tray, &countdown, "");
+        } else {
+            update_tray_status(&mut tray, "", "");
         }
 
         if rest == 0 && app_settings.should_run_timer() {

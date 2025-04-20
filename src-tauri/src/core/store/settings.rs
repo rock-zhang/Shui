@@ -196,7 +196,7 @@ impl AppSettings {
         if self.today_drink_amount >= self.gold {
             ("已达标", "太棒啦，再接再厉")
         } else {
-            ("Shui", "非工作日或非工作时间")
+            ("", "非工作日或非工作时间")
         }
     }
 }
