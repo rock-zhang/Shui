@@ -41,6 +41,10 @@ tauri-plugin-opener = "2"
 tauri-plugin-notification = "2"
 chrono = { version = "0.4", features = ["serde"] }
 tauri-plugin-clipboard-manager = "2"
+
+objc = "0.2.7"          # Objective-C 运行时绑定
+objc-foundation = "0.1" # Foundation 框架支持
+
 # tauri-plugin-shell.workspace = true
 # tauri-plugin-fs-pro.workspace = true
 # tauri-plugin-eco-window.workspace = true

@@ -1,6 +1,7 @@
 mod commands;
 mod core;
 use core::store::settings::AppSettings;
+use core::util::whitelist::is_frontapp_in_whitelist;
 mod timer;
 use tauri::{Emitter, Manager};
 use timer::IS_RUNNING;
@@ -24,7 +25,6 @@ use core_foundation::{base::TCFType, base::ToVoid, dictionary::CFDictionary, str
 use std::sync::atomic::Ordering;
 use std::time::Instant;
 use tauri_plugin_autostart::MacosLauncher;
-use tauri_plugin_store::StoreExt;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -71,58 +71,50 @@ pub fn run() {
                             }
                         }
 
-                        // 检查工作状态
-                        if !app_settings.is_work_day
-                            || !app_settings.is_in_time_range
-                            || app_settings.today_drink_amount >= app_settings.gold
-                        {
-                            let (status, tooltip) =
-                                if app_settings.today_drink_amount >= app_settings.gold {
-                                    ("已达标", "太棒啦，再接再厉")
-                                } else {
-                                    ("Shui", "非工作日或非工作时间")
-                                };
+                        // 检查非工作状态
+                        if !app_settings.should_run_timer() {
+                            let (status, tooltip) = app_settings.get_status_message();
                             update_tray_status(&mut tray, status, tooltip);
                             sleep(Duration::from_secs(1));
                             continue;
                         }
 
                         // 计时开始
-                        let timer = Instant::now();
-                        println!("开始计时，间隔：{} 秒", app_settings.gap);
+                        let mut timer = Instant::now();
+                        let mut elapsed_total = 0;
 
                         while is_running_clone.load(Ordering::SeqCst) {
-                            let elapsed_secs = timer.elapsed().as_secs();
-
-                            // 检查是否需要重新加载设置
                             let app_settings =
                                 AppSettings::load_from_store::<tauri::Wry>(&app_handle);
+                            let elapsed_secs = elapsed_total + timer.elapsed().as_secs();
 
-                            let rest = if elapsed_secs >= app_settings.gap {
-                                0
-                            } else {
-                                app_settings.gap - elapsed_secs
-                            };
+                            // 处理白名单应用
+                            // if is_frontapp_in_whitelist(&app_settings.whitelist_apps) {
+                            if is_frontapp_in_whitelist(&vec![
+                                "微信".to_string(),
+                                "Code".to_string(),
+                            ]) {
+                                elapsed_total = elapsed_secs;
+                                update_tray_status(&mut tray, "暂停", "白名单应用运行中");
+                                sleep(Duration::from_secs(1));
+                                timer = Instant::now();
+                                continue;
+                            }
+
+                            // 计算剩余时间
+                            let rest = app_settings.gap.saturating_sub(elapsed_secs);
 
                             // 更新托盘显示
-                            if app_settings.is_show_countdown && rest >= 0 {
+                            if app_settings.is_show_countdown {
                                 let countdown = format!("{}:{:02}", rest / 60, rest % 60);
                                 update_tray_status(&mut tray, &countdown, "");
                             }
 
-                            // 检查是否需要触发提醒
-                            if rest == 0 {
-                                println!("倒计时结束，准备提醒");
+                            // 检查是否完成计时
+                            if rest == 0 && app_settings.should_run_timer() {
                                 IS_RUNNING.store(false, Ordering::SeqCst);
-
-                                if app_settings.is_work_day
-                                    && app_settings.is_in_time_range
-                                    && app_settings.today_drink_amount < app_settings.gold
-                                {
-                                    if let Err(e) = app_handle.emit_to("main", "timer-complete", {})
-                                    {
-                                        println!("发送提醒事件失败: {}", e);
-                                    }
+                                if let Err(e) = app_handle.emit_to("main", "timer-complete", {}) {
+                                    println!("发送提醒事件失败: {}", e);
                                 }
                                 break;
                             }

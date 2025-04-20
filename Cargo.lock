@@ -4462,6 +4462,8 @@ dependencies = [
  "core-foundation 0.9.4",
  "core-graphics 0.23.2",
  "lazy_static",
+ "objc",
+ "objc-foundation",
  "parking_lot",
  "serde",
  "serde_json",
