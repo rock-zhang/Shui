@@ -16,6 +16,7 @@ pub mod store_fields {
     pub const GAP: &str = "gap";
     pub const GOLD: &str = "gold";
     pub const WEEKDAYS: &str = "weekdays";
+    pub const WHITELIST_APPS: &str = "whitelist_apps";
     pub const TIMESTART: &str = "timeStart";
     pub const TIMEEND: &str = "timeEnd";
     pub const ISCOUNTDOWN: &str = "isCountDown";
@@ -35,6 +36,7 @@ pub struct AppSettingsMeta {
 pub struct AppSettings {
     pub gold: u64,
     pub gap: u64,
+    pub whitelist_apps: Vec<String>,
     pub today_drink_amount: u64,
     pub is_work_day: bool,
     pub is_in_time_range: bool,
@@ -149,7 +151,16 @@ impl AppSettings {
             .and_then(|v| v.as_u64())
             .unwrap_or(0);
 
-        // println!("drink_amount: {:?}", drink_amount);
+        let whitelist_apps = alert_config
+            .get(store_fields::WHITELIST_APPS)
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+            })
+            .unwrap_or_else(|| vec![]); // 默认为空数组
 
         let is_show_countdown = config_store
             .get(config_store_category::GENERAL)
@@ -161,6 +172,7 @@ impl AppSettings {
         AppSettings {
             gold: gold,
             gap: gap_minutes * 60,
+            whitelist_apps: whitelist_apps,
             today_drink_amount: drink_amount,
             is_work_day: is_work_day,
             is_in_time_range: is_in_time_range,

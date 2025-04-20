@@ -249,3 +249,39 @@ pub async fn get_app_runtime_info(
         version,
     })
 }
+
+use std::process::Command;
+
+#[tauri::command]
+pub fn get_installed_apps(app_handle: tauri::AppHandle) -> Vec<String> {
+    let self_name = app_handle.package_info().name.clone();
+
+    let output = Command::new("ls")
+        .arg("/Applications")
+        .output()
+        .expect("failed to execute command");
+
+    String::from_utf8_lossy(&output.stdout)
+        .split('\n')
+        .filter(|app| app.ends_with(".app"))
+        .filter(|app| !app.starts_with(&format!("{}.app", self_name))) // 过滤掉本应用
+        .filter_map(|app| {
+            let path = format!("/Applications/{}", app);
+            let output = Command::new("mdls")
+                .args(["-name", "kMDItemDisplayName", "-raw", &path])
+                .output()
+                .ok()?;
+
+            let display_name = String::from_utf8_lossy(&output.stdout)
+                .trim()
+                .trim_end_matches(".app")
+                .to_string();
+
+            if !display_name.is_empty() {
+                Some(display_name)
+            } else {
+                Some(app.trim_end_matches(".app").to_string())
+            }
+        })
+        .collect()
+}
