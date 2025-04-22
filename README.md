@@ -42,6 +42,10 @@
 
 从 [Releases](https://github.com/rock-zhang/Shui/releases/) 页面下载最新版本。
 
+#### 注意
+
+如果遇到`"Shui"已损坏，无法打开`的提示，请在终端运行`sudo xattr -r -d com.apple.quarantine /Applications/Shui.app`后即可打开。
+
 ## 🛣 开发路线
 
 ### 已实现功能
