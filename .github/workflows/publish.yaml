@@ -16,22 +16,24 @@ jobs:
       fail-fast: false
       matrix:
         # 我这里只需要两个平台，完整的可以参考官方的workflow
-        platform: ["windows-latest", "macos-latest"]
+        platform: ["macos-latest"]
 
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Rust setup
-        uses: dtolnay/rust-toolchain@stable
 
-      - name: Install pnpm
-        run: npm install -g pnpm
-      - name: Sync node version and setup cache
-        uses: actions/setup-node@v3
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
         with:
-          node-version: "lts/*"
-          cache: "pnpm"
+          # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
       - name: install frontend dependencies
         run: yarn install # change this to npm, pnpm or bun depending on which one you use.
       # 使用tauri actions
