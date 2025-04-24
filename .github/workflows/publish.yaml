@@ -9,14 +9,14 @@ on:
 
 jobs:
   release:
-  	# 由于需要创建release所以需要设置写入权限
+    # 由于需要创建release所以需要设置写入权限
     permissions:
       contents: write
     strategy:
       fail-fast: false
       matrix:
-      	# 我这里只需要两个平台，完整的可以参考官方的workflow
-        platform: ['windows-latest', 'macos-latest']
+        # 我这里只需要两个平台，完整的可以参考官方的workflow
+        platform: ["windows-latest", "macos-latest"]
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Rust setup
         uses: dtolnay/rust-toolchain@stable
-      
+
       - name: Install pnpm
         run: npm install -g pnpm
       - name: Sync node version and setup cache
@@ -43,7 +43,7 @@ jobs:
           # 使用之前配置的私钥
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           # 使用之前配置的私钥密码
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: 
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "app v__VERSION__"
