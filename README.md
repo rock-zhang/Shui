@@ -38,6 +38,12 @@
 
 ## 🚀 开始使用
 
+### Platform Support
+
+- ✅ macOS
+- 🚧 Windows (coming soon)
+- 🚧 Linux (coming soon)
+
 ### 下载安装
 
 从 [Releases](https://github.com/rock-zhang/Shui/releases/) 页面下载最新版本。
