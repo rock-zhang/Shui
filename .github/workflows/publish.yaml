@@ -31,6 +31,11 @@ jobs:
         with:
           # Those targets are only used on macos runners so it's in an `if` to slightly speed up windows and linux builds.
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      # 使用 Rust 缓存，加快安装速度
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: target
 
       - name: setup node
         uses: actions/setup-node@v4
@@ -51,13 +56,14 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "app v__VERSION__"
-          releaseBody: "See the assets to download and install this version."
+          releaseName: "Shui v__VERSION__"
+          releaseBody: "Feature"
           releaseDraft: true
           prerelease: false
+          args: ${{ matrix.args }}
 
-      # - name: Upload assets
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   # 运行自己的脚本
-      #   run: node scripts/updater.mjs
+      - name: Upload assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # 运行自己的脚本
+        run: node scripts/updater.mjs
