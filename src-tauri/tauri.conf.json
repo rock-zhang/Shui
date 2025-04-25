@@ -45,6 +45,7 @@
     ]
   },
   "bundle": {
+    "createUpdaterArtifacts": true,
     "active": true,
     "targets": "all",
     "icon": [
@@ -58,5 +59,13 @@
     "resources": [
       "icons/**/*"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEMzOUFERENERDlCNzYxQTQKUldTa1liZlp6ZDJhd3lmUDh4TktmL092dVNuZlRXbWtiS2tYUm9uY29xRFdVOVZja0N6aDdpQUQK",
+      "endpoints": [
+        "https://github.com/user/repo/releases/latest/download/latest.json"
+      ]
+    }
   }
 }
