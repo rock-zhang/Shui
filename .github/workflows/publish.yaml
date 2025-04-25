@@ -60,10 +60,10 @@ jobs:
           releaseBody: "Feature"
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }}
+          args: --target ${{ matrix.target }}
 
       - name: Upload assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # 运行自己的脚本
-        run: node scripts/updater.mjs
+        run: node .github/workflows/updater.mjs

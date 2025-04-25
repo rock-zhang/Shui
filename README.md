@@ -92,3 +92,7 @@
   <source media="(prefers-color-scheme: light)" srcset="public/qrcode_wechat_light.jpg" />
   <img width="300px" src="public/qrcode_wechat_light.jpg" />
 </picture>
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=rock-zhang/Shui&type=Date)](https://www.star-history.com/#rock-zhang/Shui&Date)
