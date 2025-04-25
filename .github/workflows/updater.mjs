@@ -13,17 +13,17 @@ const updateRelease = async () => {
     tag: "updater",
   });
   // 删除旧的的文件
-  // const deletePromises = release.assets
-  //   .filter((item) => item.name === "latest.json")
-  //   .map(async (item) => {
-  //     await octokit.rest.repos.deleteReleaseAsset({
-  //       owner: context.repo.owner,
-  //       repo: context.repo.repo,
-  //       asset_id: item.id,
-  //     });
-  //   });
+  const deletePromises = release.assets
+    .filter((item) => item.name === "latest.json")
+    .map(async (item) => {
+      await octokit.rest.repos.deleteReleaseAsset({
+        owner: context.repo.owner,
+        repo: context.repo.repo,
+        asset_id: item.id,
+      });
+    });
 
-  // await Promise.all(deletePromises);
+  await Promise.all(deletePromises);
 
   // 上传新的文件
   const file = await readFile("latest.json", { encoding: "utf-8" });
