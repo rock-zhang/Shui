@@ -30,6 +30,28 @@ export function useTray() {
   const getMenu = useCallback(async () => {
     const menu = await Menu.new();
 
+    await menu.append(
+      await MenuItem.new({
+        text: "偏好设置",
+        action: async () => {
+          console.log("打开设置");
+          const mainWindow = await WebviewWindow.getByLabel("main");
+          // mainWindow?.setDecorations(true);
+          mainWindow?.show();
+          mainWindow?.setFocus();
+        },
+      })
+    );
+    await menu.append(await PredefinedMenuItem.new({ item: "Separator" }));
+    await menu.append(
+      await MenuItem.new({
+        text: "立即休息",
+        action: async () => {
+          invoke("call_reminder");
+        },
+      })
+    );
+
     // 创建子菜单
     const submenu = await Submenu.new({
       text: "计时控制",
@@ -48,31 +70,11 @@ export function useTray() {
         },
       ],
     });
-
     await menu.append(submenu);
-    await menu.append(
-      await MenuItem.new({
-        text: "休息",
-        action: async () => {
-          invoke("call_reminder");
-        },
-      })
-    );
+
     await menu.append(await PredefinedMenuItem.new({ item: "Separator" }));
 
-    await menu.append(
-      await MenuItem.new({
-        text: "设置",
-        action: async () => {
-          console.log("打开设置");
-          const mainWindow = await WebviewWindow.getByLabel("main");
-          // mainWindow?.setDecorations(true);
-          mainWindow?.show();
-          mainWindow?.setFocus();
-        },
-      })
-    );
-
+    // TODO: 增加检查更新
     await menu.append(
       await PredefinedMenuItem.new({ text: "退出", item: "Quit" })
     );

@@ -6,9 +6,13 @@ import { Button } from "@/components/ui/button";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { toast } from "sonner";
+import { useUpdaterCheck, useUpdaterDownload } from "@/hooks/use-updater";
 
 export default function About() {
   const [version, setVersion] = useState("");
+  const { checking, updateAvailable, updateInfo, checkForUpdate } =
+    useUpdaterCheck();
+  const { installing, progress, downloadAndInstall } = useUpdaterDownload();
 
   useEffect(() => {
     getVersion().then(setVersion);
@@ -22,6 +26,14 @@ export default function About() {
     const appInfo = await invoke("get_app_runtime_info");
     await writeText(JSON.stringify(appInfo));
     toast.success("复制成功");
+  };
+
+  const handleCheck = async () => {
+    await checkForUpdate();
+
+    if (updateAvailable && updateInfo) {
+      toast.success(`发现新版本: ${updateInfo.version}`);
+    }
   };
 
   return (
@@ -63,6 +75,20 @@ export default function About() {
             版本
           </label>
           <p className="text-[0.8rem] text-muted-foreground">{version}</p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleCheck}
+            disabled={checking || installing}
+          >
+            {checking ? "检查中..." : "检查更新"}
+          </Button>
+          {updateAvailable && (
+            <Button onClick={downloadAndInstall} disabled={installing}>
+              {installing ? `更新中 ${progress}%` : "立即更新"}
+            </Button>
+          )}
         </div>
       </div>
 

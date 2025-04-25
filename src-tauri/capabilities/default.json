@@ -32,6 +32,9 @@
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
-    "clipboard-manager:allow-write-text"
+    "clipboard-manager:allow-write-text",
+    "process:default",
+    "process:allow-restart",
+    "process:allow-exit"
   ]
 }

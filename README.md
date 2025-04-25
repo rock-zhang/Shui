@@ -49,7 +49,13 @@
 
 #### 注意
 
-如果遇到`"Shui"已损坏，无法打开`的提示，请在终端运行`sudo xattr -r -d com.apple.quarantine /Applications/Shui.app`后即可打开。
+<img src="public/install_error.png" />
+
+如果遇到`"Shui"已损坏，无法打开`的提示，请在终端运行
+
+```shell
+sudo xattr -r -d com.apple.quarantine /Applications/Shui.app
+```
 
 ## 🛣 开发路线
 
@@ -92,3 +98,13 @@
   <source media="(prefers-color-scheme: light)" srcset="public/qrcode_wechat_light.jpg" />
   <img width="300px" src="public/qrcode_wechat_light.jpg" />
 </picture>
+
+## Star History
+
+<a href="https://www.star-history.com/#rock-zhang/Shui&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=rock-zhang/Shui&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=rock-zhang/Shui&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=rock-zhang/Shui&type=Date" />
+ </picture>
+</a>
