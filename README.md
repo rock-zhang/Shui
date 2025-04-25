@@ -67,7 +67,7 @@
 - [x] 系统原生通知
 - [x] 托盘实时倒计时
 
-### 🛣 开发计划
+### 开发计划
 
 - [ ] 自定义提醒音效
 - [ ] 数据统计与分析
@@ -85,6 +85,10 @@
 - [Rust](https://www.rust-lang.org/) - 后端逻辑实现
 - [shadcn/ui](https://ui.shadcn.com/) - UI 组件库
 
-## 📝 License
+## 社区交流
 
-MIT License © 2024 [Slash]
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/qrcode_wechat_dark.jpg" />
+  <source media="(prefers-color-scheme: light)" srcset="public/qrcode_wechat_light.jpg" />
+  <img width="300px" src="public/qrcode_wechat_light.jpg" />
+</picture>
