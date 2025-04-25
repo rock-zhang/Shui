@@ -49,7 +49,13 @@
 
 #### 注意
 
-如果遇到`"Shui"已损坏，无法打开`的提示，请在终端运行`sudo xattr -r -d com.apple.quarantine /Applications/Shui.app`后即可打开。
+<img src="public/install_error.png" />
+
+如果遇到`"Shui"已损坏，无法打开`的提示，请在终端运行
+
+```shell
+sudo xattr -r -d com.apple.quarantine /Applications/Shui.app
+```
 
 ## 🛣 开发路线
 

@@ -10,6 +10,9 @@
   ],
   "permissions": [
     "autostart:default",
+    "process:default",
+    "process:allow-restart",
+    "process:allow-exit",
     "updater:default"
   ]
 }
