@@ -65,11 +65,11 @@ sudo xattr -r -d com.apple.quarantine /Applications/Shui.app
 - [x] Workday detection
 - [x] System tray integration
 - [x] Global hotkeys
+- [x] App whitelist management
 
 ### Planned
 
 - [ ] Custom notification sounds
-- [x] App whitelist management
 - [ ] Advanced analytics
   - [ ] Hydration trends
   - [ ] Break time reports
