@@ -15,8 +15,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 我这里只需要两个平台，完整的可以参考官方的workflow
-        platform: ["macos-latest"]
+        include:
+          - platform: "macos-latest"
+            target: "aarch64-apple-darwin"
+          - platform: "macos-latest"
+            target: "x86_64-apple-darwin"
 
     runs-on: ${{ matrix.platform }}
     steps:
