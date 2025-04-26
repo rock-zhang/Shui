@@ -1,5 +1,5 @@
 use crate::core::store::settings::AppSettings;
-use crate::core::util::whitelist::is_frontapp_in_whitelist;
+use crate::core::util::is_frontapp_in_whitelist;
 use crate::timer::IS_RUNNING;
 use tauri::Emitter;
 
