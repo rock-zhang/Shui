@@ -2,7 +2,7 @@ use objc::runtime::Object;
 use objc::{class, msg_send, sel, sel_impl};
 use objc_foundation::{INSString, NSString};
 
-pub fn is_frontapp_in_whitelist(whitelist_apps: &Vec<String>) -> bool {
+pub fn check_whitelist(whitelist_apps: &Vec<String>) -> bool {
     #[cfg(target_os = "macos")]
     {
         unsafe {
