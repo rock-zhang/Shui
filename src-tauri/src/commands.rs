@@ -3,7 +3,6 @@ use crate::core::store::settings::AppSettings;
 use crate::timer;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::Ordering;
-use tauri_plugin_store::StoreExt;
 
 // Remove this line since we don't need it
 // use tauri::api::version::Version;
