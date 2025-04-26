@@ -60,6 +60,17 @@ core-graphics = "0.23.1"
 objc = "0.2.7"          # Objective-C 运行时绑定
 objc-foundation = "0.1" # Foundation 框架支持
 
+[dependencies.windows]
+version = "0.48"
+features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Threading",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Registry",
+    "Win32_Foundation"
+]
+
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"
