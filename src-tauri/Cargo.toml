@@ -42,9 +42,6 @@ tauri-plugin-notification = "2"
 chrono = { version = "0.4", features = ["serde"] }
 tauri-plugin-clipboard-manager = "2"
 
-objc = "0.2.7"          # Objective-C 运行时绑定
-objc-foundation = "0.1" # Foundation 框架支持
-
 # tauri-plugin-shell.workspace = true
 # tauri-plugin-fs-pro.workspace = true
 # tauri-plugin-eco-window.workspace = true
@@ -60,6 +57,9 @@ objc-foundation = "0.1" # Foundation 框架支持
 tauri-nspanel.workspace = true
 core-foundation = "0.9.4"
 core-graphics = "0.23.1"
+objc = "0.2.7"          # Objective-C 运行时绑定
+objc-foundation = "0.1" # Foundation 框架支持
+
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"
