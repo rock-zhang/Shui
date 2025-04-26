@@ -2,8 +2,9 @@ name: "publish"
 
 on:
   push:
-    branches:
-      - release
+    # 匹配特定标签 (refs/tags)
+    tags:
+      - "v*" # 推送事件匹配 v*, 例如 v1.0，v20.15.10 等来触发工作流
 
 # This workflow will trigger on each push to the `release` branch to create or update a GitHub release, build your app, and upload the artifacts to the release.
 
