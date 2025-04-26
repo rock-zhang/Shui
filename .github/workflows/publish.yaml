@@ -9,7 +9,33 @@ on:
 # This workflow will trigger on each push to the `release` branch to create or update a GitHub release, build your app, and upload the artifacts to the release.
 
 jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set output
+        id: vars
+        run: echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+
+      # 安装 Node.js
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 发布 Release，使用自定义名称
+      - name: Generate changelog
+        id: create_release
+        run: npx changelogithub --draft --name ${{ steps.vars.outputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   release:
+    needs: create-release
     # 由于需要创建release所以需要设置写入权限
     permissions:
       contents: write
@@ -38,10 +64,19 @@ jobs:
         with:
           workspaces: target
 
+      - name: Install rust target
+        run: rustup target add ${{ matrix.target }}
+
       - name: setup node
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
+
+      - name: Sync node version and setup cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
 
       - name: install frontend dependencies
         run: yarn install # change this to npm, pnpm or bun depending on which one you use.
