@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { check } from "@tauri-apps/plugin-updater";
-import { exit, relaunch } from "@tauri-apps/plugin-process";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { toast } from "sonner";
 
 export function useUpdaterCheck() {
   const [checking, setChecking] = useState(false);
@@ -8,13 +9,11 @@ export function useUpdaterCheck() {
   const [updateInfo, setUpdateInfo] = useState<{
     version: string;
   } | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const checkForUpdate = async () => {
     console.log("checking for update");
     try {
       setChecking(true);
-      setError(null);
 
       const update = await check();
 
@@ -28,9 +27,12 @@ export function useUpdaterCheck() {
         setUpdateInfo({
           version: update.version,
         });
+      } else {
+        toast("当前已是最新版本");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "检查更新失败");
+      toast.error("检查更新失败");
+      console.error(err instanceof Error ? err.message : "检查更新失败");
       setUpdateAvailable(false);
     } finally {
       setChecking(false);
@@ -41,7 +43,6 @@ export function useUpdaterCheck() {
     checking,
     updateAvailable,
     updateInfo,
-    error,
     checkForUpdate,
   };
 }
@@ -49,12 +50,10 @@ export function useUpdaterCheck() {
 export function useUpdaterDownload() {
   const [installing, setInstalling] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
 
   const downloadAndInstall = async () => {
     try {
       setInstalling(true);
-      setError(null);
       setProgress(0);
 
       const update = await check();
@@ -66,6 +65,8 @@ export function useUpdaterDownload() {
       let contentLength = 0;
 
       await update.downloadAndInstall(async (event) => {
+        console.log("download progress", event);
+
         switch (event.event) {
           case "Started":
             contentLength = event.data.contentLength as number;
@@ -77,8 +78,6 @@ export function useUpdaterDownload() {
             break;
           case "Finished":
             setProgress(100);
-            await exit(0);
-            await relaunch();
             break;
         }
       });
@@ -86,7 +85,10 @@ export function useUpdaterDownload() {
       // 安装完成后重启应用
       await relaunch();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "更新安装失败");
+      toast.error("更新安装失败");
+      console.log(err);
+
+      console.error(err instanceof Error ? err.message : "更新安装失败");
       setProgress(0);
     } finally {
       setInstalling(false);
@@ -96,7 +98,6 @@ export function useUpdaterDownload() {
   return {
     installing,
     progress,
-    error,
     downloadAndInstall,
   };
 }
