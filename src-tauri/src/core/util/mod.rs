@@ -13,3 +13,7 @@ pub use windows::*;
 pub fn is_frontapp_in_whitelist(whitelist_apps: &Vec<String>) -> bool {
     check_whitelist(whitelist_apps)
 }
+
+pub fn get_installed_apps(app_handle: &tauri::AppHandle) -> Vec<String> {
+    get_local_installed_apps(&app_handle)
+}

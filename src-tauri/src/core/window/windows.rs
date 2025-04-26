@@ -1,33 +1,33 @@
-use tauri::{LogicalPosition, Manager};
-use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
-use tauri_nspanel::{ManagerExt, WebviewWindowExt};
-
-const NSWindowStyleMaskUtilityWindow: i32 = 1 << 7;
+use tauri::{LogicalPosition, Manager, WindowBuilder, WindowUrl};
 
 pub fn show_reminder(app_handle: &tauri::AppHandle) {
-    println!("[macos] show_reminder");
+    println!("[windows] show_reminder");
 
-    if let Ok(panel) = app_handle.get_webview_panel("reminder_0") {
-        if let Ok(monitors) = app_handle.available_monitors() {
-            for (index, monitor) in monitors.iter().enumerate() {
-                let reminder_label = format!("reminder_{}", index);
+    // 优化检查逻辑，避免重复代码
+    if let Ok(monitors) = app_handle.available_monitors() {
+        let needs_create = !monitors.iter().enumerate().any(|(index, _)| {
+            let reminder_label = format!("reminder_{}", index);
+            app_handle.get_window(&reminder_label).is_ok()
+        });
 
-                println!("[macos] show_reminder_windows: {}", reminder_label);
-
-                // 检查是否已存在提醒窗口
-                if let Ok(panel) = app_handle.get_webview_panel(&reminder_label) {
-                    let win = app_handle.get_webview_window(&reminder_label).unwrap();
-                    let position = monitor.position();
-                    let _ = win.set_position(LogicalPosition::new(position.x, position.y));
-                    panel.show();
-                } else {
-                    // 接入新的外接屏幕，需要重新创建Window
-                    show_or_create_reminder_window(&app_handle);
-                }
-            }
+        if needs_create {
+            show_or_create_reminder_window(app_handle);
+        } else {
+            update_existing_windows(app_handle, &monitors);
         }
-    } else {
-        show_or_create_reminder_window(&app_handle);
+    }
+}
+
+// 新增函数：更新现有窗口
+fn update_existing_windows(app_handle: &tauri::AppHandle, monitors: &Vec<tauri::Monitor>) {
+    for (index, monitor) in monitors.iter().enumerate() {
+        let reminder_label = format!("reminder_{}", index);
+        
+        if let Ok(window) = app_handle.get_window(&reminder_label) {
+            let position = monitor.position();
+            let _ = window.set_position(LogicalPosition::new(position.x, position.y));
+            let _ = window.show();
+        }
     }
 }
 
@@ -35,73 +35,71 @@ fn show_or_create_reminder_window(app_handle: &tauri::AppHandle) {
     if let Ok(monitors) = app_handle.available_monitors() {
         for (index, monitor) in monitors.iter().enumerate() {
             let reminder_label = format!("reminder_{}", index);
-
-            // 检查是否已存在提醒窗口
-            if let Ok(panel) = app_handle.get_webview_panel(&reminder_label) {
-                panel.show();
+            
+            // 如果窗口已存在则显示
+            if let Ok(window) = app_handle.get_window(&reminder_label) {
+                let _ = window.show();
                 continue;
             }
 
-            let size = monitor.size();
-            let scale_factor = monitor.scale_factor();
-            let position = monitor.position();
-
-            // 根据缩放因子调整尺寸
-            let scaled_width = size.width as f64 / scale_factor;
-            let scaled_height = size.height as f64 / scale_factor;
+            // 计算窗口尺寸和位置
+            let (scaled_width, scaled_height, position) = calculate_window_metrics(monitor);
 
             println!(
-                "Monitor {}: size={:?}, position={:?}, scale_factor={:?}, scaled_size=({:?}, {:?})",
-                index, size, position, scale_factor, scaled_width, scaled_height
+                "Monitor {}: position={:?}, scale_factor={:?}, scaled_size=({:?}, {:?})",
+                index, position, monitor.scale_factor(), scaled_width, scaled_height
             );
 
-            let window = tauri::WebviewWindowBuilder::new(
-                app_handle,
-                format!("reminder_{}", index),
-                tauri::WebviewUrl::App("reminder/".into()),
-            )
-            .decorations(false)
-            .transparent(true)
-            .always_on_top(true)
-            .visible_on_all_workspaces(true)
-            .focus()
-            .inner_size(scaled_width as f64, scaled_height as f64)
-            .position(position.x as f64, position.y as f64)
-            .build()
-            .expect(&format!("failed to create reminder window {}", index));
-
-            let panel = window.to_panel().unwrap();
-            panel.set_level(26);
-
-            panel.set_style_mask(NSWindowStyleMaskUtilityWindow);
-
-            // // 在各个桌面空间、全屏中共享窗口
-            panel.set_collection_behaviour(
-                NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces
-                    | NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary
-                    | NSWindowCollectionBehavior::NSWindowCollectionBehaviorIgnoresCycle,
-            );
+            // 创建新窗口
+            create_reminder_window(app_handle, &reminder_label, scaled_width, scaled_height, position);
         }
     }
 }
 
+// 新增函数：计算窗口度量
+fn calculate_window_metrics(monitor: &tauri::Monitor) -> (f64, f64, tauri::PhysicalPosition<i32>) {
+    let size = monitor.size();
+    let scale_factor = monitor.scale_factor();
+    let position = monitor.position();
+
+    let scaled_width = size.width as f64 / scale_factor;
+    let scaled_height = size.height as f64 / scale_factor;
+
+    (scaled_width, scaled_height, position)
+}
+
+// 新增函数：创建提醒窗口
+fn create_reminder_window(
+    app_handle: &tauri::AppHandle,
+    label: &str,
+    width: f64,
+    height: f64,
+    position: tauri::PhysicalPosition<i32>,
+) {
+    let _ = WindowBuilder::new(app_handle, label, WindowUrl::App("reminder/".into()))
+        .decorations(false)
+        .transparent(true)
+        .always_on_top(true)
+        .fullscreen(false)
+        .inner_size(width, height)
+        .position(position.x as f64, position.y as f64)
+        .build()
+        .expect(&format!("failed to create reminder window {}", label));
+}
+
 pub fn hide_reminder(app_handle: &tauri::AppHandle) {
     if let Ok(monitors) = app_handle.available_monitors() {
-        for (index, monitor) in monitors.iter().enumerate() {
+        for (index, _) in monitors.iter().enumerate() {
             let reminder_label = format!("reminder_{}", index);
-
-            println!("hide_reminder_windows: {}", reminder_label); // 打印 reminder_label 的值，以检查是否正确获取了窗口标签
-
-            // 检查是否已存在提醒窗口
-            if let Ok(panel) = app_handle.get_webview_panel(&reminder_label) {
-                panel.order_out(None);
+            if let Ok(window) = app_handle.get_window(&reminder_label) {
+                let _ = window.hide();
             }
         }
     }
 }
 
 pub fn hide_reminder_single(app_handle: &tauri::AppHandle, label: &str) {
-    if let Ok(panel) = app_handle.get_webview_panel(&label) {
-        panel.order_out(None);
+    if let Ok(window) = app_handle.get_window(label) {
+        let _ = window.hide();
     }
 }
