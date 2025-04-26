@@ -90,35 +90,82 @@ fn run_timer(app_handle: tauri::AppHandle, is_running: &std::sync::atomic::Atomi
     }
 }
 
-// 提取锁屏监听逻辑
+// 将锁屏监听逻辑移到平台特定的模块中
 #[cfg(target_os = "macos")]
-fn monitor_lock_screen() {
-    let mut previous_lock_state = false;
-    let lock_key = CFString::new("CGSSessionScreenIsLocked");
+mod platform {
+    use super::*;
+    use core_foundation::{
+        base::TCFType, base::ToVoid, dictionary::CFDictionary, string::CFString,
+    };
 
-    loop {
-        unsafe {
-            let session_dictionary_ref = CGSessionCopyCurrentDictionary();
-            let session_dictionary: CFDictionary =
-                CFDictionary::wrap_under_create_rule(session_dictionary_ref);
-            let current_lock_state = session_dictionary.find(lock_key.to_void()).is_some();
+    extern "C" {
+        fn CGSessionCopyCurrentDictionary() -> core_foundation::dictionary::CFDictionaryRef;
+    }
 
-            if previous_lock_state != current_lock_state {
-                previous_lock_state = current_lock_state;
-                IS_RUNNING.store(!current_lock_state, Ordering::SeqCst);
-                let (status, action) = if current_lock_state {
-                    ("锁屏", "停止")
-                } else {
-                    ("解锁", "开始")
-                };
-                println!("系统{}，{}计时", status, action);
+    pub fn monitor_lock_screen() {
+        let mut previous_lock_state = false;
+        let lock_key = CFString::new("CGSSessionScreenIsLocked");
+
+        loop {
+            unsafe {
+                let session_dictionary_ref = CGSessionCopyCurrentDictionary();
+                let session_dictionary: CFDictionary =
+                    CFDictionary::wrap_under_create_rule(session_dictionary_ref);
+                let current_lock_state = session_dictionary.find(lock_key.to_void()).is_some();
+
+                if previous_lock_state != current_lock_state {
+                    previous_lock_state = current_lock_state;
+                    IS_RUNNING.store(!current_lock_state, Ordering::SeqCst);
+                    let (status, action) = if current_lock_state {
+                        ("锁屏", "停止")
+                    } else {
+                        ("解锁", "开始")
+                    };
+                    println!("系统{}，{}计时", status, action);
+                }
             }
+            thread::sleep(Duration::from_secs(1));
         }
-        thread::sleep(Duration::from_secs(1));
     }
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[cfg(target_os = "windows")]
+mod platform {
+    use super::*;
+    use windows::Win32::System::Power::{
+        RegisterPowerSettingNotification, GUID_CONSOLE_DISPLAY_STATE,
+    };
+    use windows::Win32::UI::WindowsAndMessaging::{GetMessageW, MSG};
+
+    pub fn monitor_lock_screen() {
+        loop {
+            // Windows 平台下监听系统锁屏状态
+            // 这里使用 Windows API 监听系统电源状态变化
+            let mut msg = MSG::default();
+            unsafe {
+                if GetMessageW(&mut msg, None, 0, 0).as_bool() {
+                    if msg.message == WM_POWERBROADCAST {
+                        let is_locked = match msg.wParam.0 as u32 {
+                            PBT_APMRESUMEAUTOMATIC => false,
+                            PBT_APMSUSPEND => true,
+                            _ => continue,
+                        };
+                        IS_RUNNING.store(!is_locked, Ordering::SeqCst);
+                        let (status, action) = if is_locked {
+                            ("锁屏", "停止")
+                        } else {
+                            ("解锁", "开始")
+                        };
+                        println!("系统{}，{}计时", status, action);
+                    }
+                }
+            }
+            thread::sleep(Duration::from_secs(1));
+        }
+    }
+}
+
+// 修改 run() 函数中的平台特定代码
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
@@ -136,7 +183,8 @@ pub fn run() {
         .setup(|app| {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            #[cfg(target_os = "macos")]
+            // 使用条件编译区分不同平台
+            #[cfg(any(target_os = "macos", target_os = "windows"))]
             {
                 let is_running = IS_RUNNING.clone();
                 let app_handle = app.app_handle();
@@ -157,10 +205,10 @@ pub fn run() {
                 // 启动锁屏监听线程
                 let lock_thread = thread::Builder::new()
                     .name("lock-monitor-thread".into())
-                    .spawn(monitor_lock_screen)
+                    .spawn(platform::monitor_lock_screen)
                     .expect("无法创建锁屏监听线程");
 
-                // 保存线程句柄（可选）
+                // 保存线程句柄
                 app_handle.manage(TimerThreads {
                     timer: timer_thread,
                     lock: lock_thread,
