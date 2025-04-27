@@ -1,7 +1,8 @@
 # Shui - 喝水提醒助手
 
 <p align="center">
-  <img src="public/screenshot-0.png" alt="Shui Screenshot" width="500"/>
+  <img src="public/screenshot-0.png" alt="Shui Screenshot" width="350"/>
+  <br/>
 </p>
 
 一个专注喝水提醒的跨端桌面 App，关注打工人健康 💪 ，改善你的喝水习惯。
@@ -109,6 +110,10 @@ sudo xattr -r -d com.apple.quarantine /Applications/Shui.app
   <source media="(prefers-color-scheme: light)" srcset="public/qrcode_wechat_light.jpg" />
   <img width="300px" src="public/qrcode_wechat_light.jpg" />
 </picture>
+
+## ☕ 支持
+
+如果你觉得本项目帮助到了你，请给作者一个免费的 Star，感谢你的支持！
 
 ## Star History
 
