@@ -3,7 +3,10 @@ mod core;
 use core::setup;
 mod timer;
 use tauri::Manager;
+// #[cfg(target_os = "macos")]
 use tauri_plugin_autostart::MacosLauncher;
+// #[cfg(target_os = "windows")]
+// use tauri_plugin_autostart::WindowsLauncher;
 
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -33,7 +36,7 @@ pub fn run() {
     #[cfg(target_os = "windows")]
     {
         builder = builder.plugin(tauri_plugin_autostart::init(
-            WindowsLauncher::WinRT,
+            MacosLauncher::LaunchAgent,
             Some(vec!["--test_args=1"]),
         ));
     }
