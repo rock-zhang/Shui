@@ -1,6 +1,4 @@
 use crate::core::store::settings::AppSettings;
-use crate::core::util::is_frontapp_in_whitelist;
-use crate::timer::IS_RUNNING;
 use std::sync::atomic::Ordering;
 use std::thread::{self, sleep};
 use std::time::Duration;
@@ -25,12 +23,13 @@ fn update_tray_status(tray: &mut Option<tauri::tray::TrayIcon>, status: &str, to
 // 提取计时器逻辑
 pub fn run_timer(app_handle: &tauri::AppHandle, is_running: &std::sync::atomic::AtomicBool) {
     let mut tray = app_handle.tray_by_id("main-tray");
-    let mut timer = Instant::now();
-    let mut elapsed_total = 0;
+    let timer = Instant::now();
+    let elapsed_total = 0;
 
     while is_running.load(Ordering::SeqCst) {
         let app_settings = AppSettings::load_from_store::<tauri::Wry>(&app_handle);
 
+        println!("app_settings {:?}", app_settings);
         // 检查非工作状态
         if !app_settings.should_run_timer() {
             let (status, tooltip) = app_settings.get_status_message();
@@ -62,6 +61,7 @@ pub fn run_timer(app_handle: &tauri::AppHandle, is_running: &std::sync::atomic::
 
         if rest == 0 && app_settings.should_run_timer() {
             is_running.store(false, Ordering::SeqCst);
+            println!("timer-complete");
             if let Err(e) = app_handle.emit_to("main", "timer-complete", {}) {
                 eprintln!("发送提醒事件失败: {}", e);
             }
