@@ -1,16 +1,4 @@
-use std::path::Path;
-use std::process::Command;
-use windows::core::{w, PCWSTR};
-use windows::core::{HSTRING, PWSTR};
 
-use windows::Win32::Foundation::{HANDLE, HWND};
-use windows::Win32::System::ProcessStatus::GetModuleFileNameExW;
-use windows::Win32::System::Registry::{
-    RegCloseKey, RegEnumKeyExW, RegOpenKeyExW, RegQueryValueExW, HKEY_LOCAL_MACHINE, KEY_READ,
-    REG_SZ,
-};
-use windows::Win32::System::Threading::{PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
-use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
 
 pub fn check_whitelist(whitelist_apps: &Vec<String>) -> bool {
     // unsafe {
