@@ -1,9 +1,10 @@
 use scopeguard;
 use std::ptr;
 use windows::{
+    core::w, // 添加这行导入 w! 宏
     core::{HSTRING, PCWSTR, PWSTR},
+    Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_NO_MORE_ITEMS}, // 添加 ERROR_FILE_NOT_FOUND
     Win32::System::Registry::*,
-    Win32::Foundation::ERROR_NO_MORE_ITEMS,
 };
 
 pub fn check_whitelist(whitelist_apps: &Vec<String>) -> bool {
@@ -62,11 +63,18 @@ pub fn get_local_installed_apps(app_handle: &tauri::AppHandle) -> Vec<String> {
         "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
     ];
 
-    for uninstall_path in UNINSTALL_PATHS.iter() {
-        if let Err(_) = scan_registry_key(uninstall_path, &self_name, &mut apps) {
-            continue;
+    // 遍历不同的根键
+    let roots = [HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER];
+    for root in roots.iter() {
+        for uninstall_path in UNINSTALL_PATHS.iter() {
+            if let Err(e) = scan_registry_key(*root, uninstall_path, &self_name, &mut apps) {
+                println!("Failed to scan registry key: {} - {}", uninstall_path, e);
+                continue;
+            }
         }
     }
+
+    println!("[apps] {:?}", apps);
 
     apps.sort();
     apps.dedup();
@@ -74,25 +82,27 @@ pub fn get_local_installed_apps(app_handle: &tauri::AppHandle) -> Vec<String> {
 }
 
 fn scan_registry_key(
+    root: HKEY, // 添加根键参数
     path: &str,
     self_name: &str,
     apps: &mut Vec<String>,
 ) -> windows::core::Result<()> {
     unsafe {
         let uninstall_key = HSTRING::from(path);
-        let mut hkey = HKEY_LOCAL_MACHINE;
+        let mut hkey = root; // 使用传入的根键
 
         // 打开主注册表键
         RegOpenKeyExW(
-            HKEY_LOCAL_MACHINE,
+            root, // 使用传入的根键
             PCWSTR::from_raw(uninstall_key.as_ptr()),
             0,
             KEY_READ,
             &mut hkey,
-        )?;
+        )
+        .ok()?;
 
-        let _guard = scopeguard::guard(hkey, |h| {
-            unsafe { let _ = RegCloseKey(h); }
+        let _guard = scopeguard::guard(hkey, |h| unsafe {
+            let _ = RegCloseKey(h);
         });
 
         let mut index = 0;
@@ -105,20 +115,26 @@ fn scan_registry_key(
                 index,
                 PWSTR::from_raw(name_buf.as_mut_ptr()),
                 &mut name_size,
-                ptr::null_mut(),
-                ptr::null_mut(),
-                ptr::null_mut(),
-                ptr::null_mut(),
-            ) {
+                None,          // 改为 None 而不是 ptr::null_mut()
+                PWSTR::null(), // 改为 None 而不是 ptr::null_mut()
+                None,          // 改为 None 而不是 ptr::null_mut()
+                None,          // 改为 None 而不是 ptr::null_mut()
+            )
+            .ok()
+            {
                 Ok(_) => {
-                    if let Some(app_name) = read_app_display_name(hkey, &name_buf[..name_size as usize])? {
+                    if let Some(app_name) =
+                        read_app_display_name(hkey, &name_buf[..name_size as usize])?
+                    {
+                        println!("[read_app_display_name] {:?}", app_name);
+
                         if !app_name.is_empty() && app_name != self_name {
                             apps.push(app_name);
                         }
                     }
                     index += 1;
                 }
-                Err(e) if e.code() == ERROR_NO_MORE_ITEMS => break,
+                // Err(e) if e.code() == ERROR_NO_MORE_ITEMS => break,
                 Err(e) => return Err(e),
             }
         }
@@ -136,41 +152,140 @@ fn read_app_display_name(
         let full_key = format!("{}", app_key.trim_end_matches('\0'));
         let full_key_hstring = HSTRING::from(full_key);
 
-        let mut app_hkey = HKEY_LOCAL_MACHINE;
+        let mut app_hkey = parent_key;
         RegOpenKeyExW(
             parent_key,
             PCWSTR::from_raw(full_key_hstring.as_ptr()),
             0,
             KEY_READ,
             &mut app_hkey,
-        )?;
+        )
+        .ok()?;
 
-        let _guard = scopeguard::guard(app_hkey, |h| {
-            unsafe { let _ = RegCloseKey(h); }
+        let _guard = scopeguard::guard(app_hkey, |h| unsafe {
+            let _ = RegCloseKey(h);
         });
 
+        // 检查 SystemComponent 值，如果为 1 则表示是系统组件
+        let mut system_component: u32 = 0;
+        let mut data_size = std::mem::size_of::<u32>() as u32;
+        let mut data_type = REG_DWORD;
+        let system_component_name = HSTRING::from("SystemComponent");
+
+        let is_system = RegQueryValueExW(
+            app_hkey,
+            PCWSTR::from_raw(system_component_name.as_ptr()),
+            None,
+            Some(&mut data_type),
+            Some(&mut system_component as *mut u32 as *mut u8),
+            Some(&mut data_size),
+        )
+        .is_ok()
+            && system_component == 1;
+
+        if is_system {
+            return Ok(None);
+        }
+
+        // 检查 ParentKeyName，如果存在则可能是系统组件或更新
+        let parent_key_name = HSTRING::from("ParentKeyName");
+        let mut buffer = [0u16; 256];
+        let mut data_size = (buffer.len() * 2) as u32;
+        let mut data_type = REG_SZ;
+
+        let has_parent = RegQueryValueExW(
+            app_hkey,
+            PCWSTR::from_raw(parent_key_name.as_ptr()),
+            None,
+            Some(&mut data_type),
+            Some(buffer.as_mut_ptr() as *mut u8),
+            Some(&mut data_size),
+        )
+        .is_ok();
+
+        if has_parent {
+            return Ok(None);
+        }
+
+        // 检查 WindowsInstaller 值，如果为 1 则表示是通过 Windows Installer 安装的应用
+        let mut windows_installer: u32 = 0;
+        let mut data_size = std::mem::size_of::<u32>() as u32;
+        let mut data_type = REG_DWORD;
+        let windows_installer_name = HSTRING::from("WindowsInstaller");
+
+        let is_msi = RegQueryValueExW(
+            app_hkey,
+            PCWSTR::from_raw(windows_installer_name.as_ptr()),
+            None,
+            Some(&mut data_type),
+            Some(&mut windows_installer as *mut u32 as *mut u8),
+            Some(&mut data_size),
+        )
+        .is_ok()
+            && windows_installer == 1;
+
+        // 检查 UninstallString，如果存在说明是可卸载的应用
+        let uninstall_string = HSTRING::from("UninstallString");
+        let mut buffer = [0u16; 256];
+        let mut data_size = (buffer.len() * 2) as u32;
+        let mut data_type = REG_SZ;
+
+        let has_uninstall = RegQueryValueExW(
+            app_hkey,
+            PCWSTR::from_raw(uninstall_string.as_ptr()),
+            None,
+            Some(&mut data_type),
+            Some(buffer.as_mut_ptr() as *mut u8),
+            Some(&mut data_size),
+        )
+        .is_ok();
+
+        // 如果没有卸载字符串，可能不是用户安装的应用
+        if !has_uninstall {
+            return Ok(None);
+        }
+
+        // 读取 DisplayName
         let mut display_name_buf = [0u16; 256];
         let mut data_type = REG_SZ;
         let mut data_size = (display_name_buf.len() * 2) as u32;
+        let display_name = HSTRING::from("DisplayName");
 
-        match RegQueryValueExW(
+        let result = RegQueryValueExW(
             app_hkey,
-            w!("DisplayName"),
-            ptr::null(),
+            PCWSTR::from_raw(display_name.as_ptr()),
+            None,
             Some(&mut data_type),
             Some(display_name_buf.as_mut_ptr() as *mut u8),
             Some(&mut data_size),
-        ) {
-            Ok(_) => {
-                let len = data_size as usize / 2;
-                Ok(Some(
-                    String::from_utf16_lossy(&display_name_buf[..len])
-                        .trim_matches('\0')
-                        .to_string(),
-                ))
+        )
+        .ok();
+
+        if let Ok(_) = result {
+            let len = data_size as usize / 2;
+            let name = String::from_utf16_lossy(&display_name_buf[..len])
+                .trim_matches('\0')
+                .to_string();
+
+            // 只过滤掉明确的系统组件
+            if !name.is_empty()
+                && !name.contains("Windows SDK")
+                && !name.contains("Windows Kit")
+                && !name.contains("Visual Studio")
+                && !name.contains("Windows Software Development Kit")
+                && !name.contains("Microsoft SDK")
+                && !name.contains("Update for")
+                && !name.contains("Security Update")
+                && !name.contains("Hotfix")
+                && !name.starts_with("KB")
+            {
+                // 添加调试输出
+                println!("[Found app] {}", name);
+                // println!("[Registry key] {}", full_key);
+                return Ok(Some(name));
             }
-            Err(e) if e.code() == ERROR_FILE_NOT_FOUND => Ok(None),
-            Err(e) => Err(e),
         }
+
+        Ok(None)
     }
 }

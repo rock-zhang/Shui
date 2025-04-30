@@ -29,7 +29,7 @@ pub fn run_timer(app_handle: &tauri::AppHandle, is_running: &std::sync::atomic::
     while is_running.load(Ordering::SeqCst) {
         let app_settings = AppSettings::load_from_store::<tauri::Wry>(&app_handle);
 
-        println!("app_settings {:?}", app_settings);
+        // println!("app_settings {:?}", app_settings);
         // 检查非工作状态
         if !app_settings.should_run_timer() {
             let (status, tooltip) = app_settings.get_status_message();
