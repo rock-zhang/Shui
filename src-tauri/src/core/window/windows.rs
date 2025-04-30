@@ -87,9 +87,9 @@ fn create_reminder_window(
     position: tauri::PhysicalPosition<i32>,
 ) {
     let _ = WebviewWindowBuilder::new(app_handle, label, WebviewUrl::App("reminder/".into()))
-        .decorations(false)
-        .transparent(true)
-        .always_on_top(true)
+        // .decorations(false)
+        // .transparent(true)
+        // .always_on_top(true)
         .fullscreen(false)
         .inner_size(width, height)
         .position(position.x as f64, position.y as f64)

@@ -4465,6 +4465,7 @@ dependencies = [
  "objc",
  "objc-foundation",
  "parking_lot",
+ "scopeguard",
  "serde",
  "serde_json",
  "tauri",
