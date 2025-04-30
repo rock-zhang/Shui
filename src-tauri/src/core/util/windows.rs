@@ -1,5 +1,3 @@
-
-
 pub fn check_whitelist(whitelist_apps: &Vec<String>) -> bool {
     // unsafe {
     //     // 获取前台窗口句柄
@@ -47,96 +45,123 @@ pub fn check_whitelist(whitelist_apps: &Vec<String>) -> bool {
 }
 
 pub fn get_local_installed_apps(app_handle: &tauri::AppHandle) -> Vec<String> {
-    return vec!["腾讯会议".to_string()];
-    // let self_name = app_handle.package_info().name.clone();
-    // let mut apps = Vec::new();
+    let self_name = app_handle.package_info().name.clone();
+    let mut apps = Vec::new();
 
-    // unsafe {
-    //     // 使用 HSTRING 创建注册表路径
-    //     let uninstall_key =
-    //         HSTRING::from("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall");
-    //     let mut hkey = HKEY_LOCAL_MACHINE;
+    // 定义要搜索的注册表路径
+    const UNINSTALL_PATHS: [&str; 2] = [
+        "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+        "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+    ];
 
-    //     // 打开主注册表键
-    //     if RegOpenKeyExW(
-    //         HKEY_LOCAL_MACHINE,
-    //         PCWSTR::from_raw(uninstall_key.as_ptr()),
-    //         0,
-    //         KEY_READ,
-    //         &mut hkey,
-    //     )
-    //     .is_ok()
-    //     {
-    //         let mut index = 0;
-    //         let mut name_buf = [0u16; 256];
-    //         let mut name_size = name_buf.len() as u32;
+    for uninstall_path in UNINSTALL_PATHS.iter() {
+        if let Err(_) = scan_registry_key(uninstall_path, &self_name, &mut apps) {
+            continue;
+        }
+    }
 
-    //         // 枚举所有子键
-    //         while RegEnumKeyExW(
-    //             hkey,
-    //             index,
-    //             PWSTR::from_raw(name_buf.as_mut_ptr()),
-    //             &mut name_size,
-    //             None,
-    //             None,
-    //             None,
-    //             None,
-    //         )
-    //         .is_ok()
-    //         {
-    //             // 构建完整的子键路径
-    //             let app_key = String::from_utf16_lossy(&name_buf[..name_size as usize]);
-    //             let full_key = format!("{}\\{}", uninstall_key.to_string_lossy(), app_key);
-    //             let full_key_hstring = HSTRING::from(full_key);
+    apps.sort();
+    apps.dedup();
+    apps
+}
 
-    //             // 打开子键
-    //             let mut app_hkey = HKEY_LOCAL_MACHINE;
-    //             if RegOpenKeyExW(
-    //                 HKEY_LOCAL_MACHINE,
-    //                 PCWSTR::from_raw(full_key_hstring.as_ptr()),
-    //                 0,
-    //                 KEY_READ,
-    //                 &mut app_hkey,
-    //             )
-    //             .is_ok()
-    //             {
-    //                 // 读取显示名称
-    //                 let mut display_name_buf = [0u16; 256];
-    //                 let mut data_type = REG_SZ;
-    //                 let mut data_size = (display_name_buf.len() * 2) as u32;
+fn scan_registry_key(
+    path: &str,
+    self_name: &str,
+    apps: &mut Vec<String>,
+) -> windows::core::Result<()> {
+    unsafe {
+        let uninstall_key = HSTRING::from(path);
+        let mut hkey = HKEY_LOCAL_MACHINE;
 
-    //                 if RegQueryValueExW(
-    //                     app_hkey,
-    //                     w!("DisplayName"),
-    //                     None,
-    //                     Some(&mut data_type),
-    //                     Some(display_name_buf.as_mut_ptr() as *mut u8),
-    //                     Some(&mut data_size),
-    //                 )
-    //                 .is_ok()
-    //                 {
-    //                     let display_name =
-    //                         String::from_utf16_lossy(&display_name_buf[..data_size as usize / 2])
-    //                             .trim_matches('\0')
-    //                             .to_string();
+        // 打开主注册表键
+        RegOpenKeyExW(
+            HKEY_LOCAL_MACHINE,
+            PCWSTR::from_raw(uninstall_key.as_ptr()),
+            0,
+            KEY_READ,
+            &mut hkey,
+        )?;
 
-    //                     if !display_name.is_empty() && display_name != self_name {
-    //                         apps.push(display_name);
-    //                     }
-    //                 }
+        let _guard = scopeguard::guard(hkey, |h| {
+            let _ = RegCloseKey(h);
+        });
 
-    //                 RegCloseKey(app_hkey);
-    //             }
+        let mut index = 0;
+        loop {
+            let mut name_buf = [0u16; 256];
+            let mut name_size = name_buf.len() as u32;
 
-    //             index += 1;
-    //             name_size = name_buf.len() as u32;
-    //         }
+            match RegEnumKeyExW(
+                hkey,
+                index,
+                PWSTR::from_raw(name_buf.as_mut_ptr()),
+                &mut name_size,
+                None,
+                None,
+                None,
+                None,
+            ) {
+                Ok(_) => {
+                    if let Some(app_name) =
+                        read_app_display_name(hkey, &name_buf[..name_size as usize])?
+                    {
+                        if !app_name.is_empty() && app_name != self_name {
+                            apps.push(app_name);
+                        }
+                    }
+                    index += 1;
+                }
+                Err(e) if e.code() == ERROR_NO_MORE_ITEMS => break,
+                Err(e) => return Err(e),
+            }
+        }
 
-    //         RegCloseKey(hkey);
-    //     }
-    // }
+        Ok(())
+    }
+}
 
-    // apps.sort();
-    // apps.dedup();
-    // apps
+fn read_app_display_name(
+    parent_key: HKEY,
+    subkey_name: &[u16],
+) -> windows::core::Result<Option<String>> {
+    unsafe {
+        let app_key = String::from_utf16_lossy(subkey_name);
+        let full_key = format!("{}\\", app_key);
+        let full_key_hstring = HSTRING::from(full_key);
+
+        let mut app_hkey = HKEY_LOCAL_MACHINE;
+        RegOpenKeyExW(
+            parent_key,
+            PCWSTR::from_raw(full_key_hstring.as_ptr()),
+            0,
+            KEY_READ,
+            &mut app_hkey,
+        )?;
+
+        let _guard = scopeguard::guard(app_hkey, |h| {
+            let _ = RegCloseKey(h);
+        });
+
+        let mut display_name_buf = [0u16; 256];
+        let mut data_type = REG_SZ;
+        let mut data_size = (display_name_buf.len() * 2) as u32;
+
+        match RegQueryValueExW(
+            app_hkey,
+            w!("DisplayName"),
+            None,
+            Some(&mut data_type),
+            Some(display_name_buf.as_mut_ptr() as *mut u8),
+            Some(&mut data_size),
+        ) {
+            Ok(_) => Ok(Some(
+                String::from_utf16_lossy(&display_name_buf[..data_size as usize / 2])
+                    .trim_matches('\0')
+                    .to_string(),
+            )),
+            Err(e) if e.code() == ERROR_FILE_NOT_FOUND => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
 }
