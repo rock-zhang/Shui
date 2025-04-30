@@ -1,3 +1,11 @@
+use scopeguard;
+use std::ptr;
+use windows::{
+    core::{HSTRING, PCWSTR, PWSTR},
+    Win32::System::Registry::*,
+    Win32::Foundation::ERROR_NO_MORE_ITEMS,
+};
+
 pub fn check_whitelist(whitelist_apps: &Vec<String>) -> bool {
     // unsafe {
     //     // 获取前台窗口句柄
@@ -84,28 +92,26 @@ fn scan_registry_key(
         )?;
 
         let _guard = scopeguard::guard(hkey, |h| {
-            let _ = RegCloseKey(h);
+            unsafe { let _ = RegCloseKey(h); }
         });
 
         let mut index = 0;
-        loop {
-            let mut name_buf = [0u16; 256];
-            let mut name_size = name_buf.len() as u32;
+        let mut name_buf = [0u16; 256];
 
+        loop {
+            let mut name_size = name_buf.len() as u32;
             match RegEnumKeyExW(
                 hkey,
                 index,
                 PWSTR::from_raw(name_buf.as_mut_ptr()),
                 &mut name_size,
-                None,
-                None,
-                None,
-                None,
+                ptr::null_mut(),
+                ptr::null_mut(),
+                ptr::null_mut(),
+                ptr::null_mut(),
             ) {
                 Ok(_) => {
-                    if let Some(app_name) =
-                        read_app_display_name(hkey, &name_buf[..name_size as usize])?
-                    {
+                    if let Some(app_name) = read_app_display_name(hkey, &name_buf[..name_size as usize])? {
                         if !app_name.is_empty() && app_name != self_name {
                             apps.push(app_name);
                         }
@@ -127,7 +133,7 @@ fn read_app_display_name(
 ) -> windows::core::Result<Option<String>> {
     unsafe {
         let app_key = String::from_utf16_lossy(subkey_name);
-        let full_key = format!("{}\\", app_key);
+        let full_key = format!("{}", app_key.trim_end_matches('\0'));
         let full_key_hstring = HSTRING::from(full_key);
 
         let mut app_hkey = HKEY_LOCAL_MACHINE;
@@ -140,7 +146,7 @@ fn read_app_display_name(
         )?;
 
         let _guard = scopeguard::guard(app_hkey, |h| {
-            let _ = RegCloseKey(h);
+            unsafe { let _ = RegCloseKey(h); }
         });
 
         let mut display_name_buf = [0u16; 256];
@@ -150,16 +156,19 @@ fn read_app_display_name(
         match RegQueryValueExW(
             app_hkey,
             w!("DisplayName"),
-            None,
+            ptr::null(),
             Some(&mut data_type),
             Some(display_name_buf.as_mut_ptr() as *mut u8),
             Some(&mut data_size),
         ) {
-            Ok(_) => Ok(Some(
-                String::from_utf16_lossy(&display_name_buf[..data_size as usize / 2])
-                    .trim_matches('\0')
-                    .to_string(),
-            )),
+            Ok(_) => {
+                let len = data_size as usize / 2;
+                Ok(Some(
+                    String::from_utf16_lossy(&display_name_buf[..len])
+                        .trim_matches('\0')
+                        .to_string(),
+                ))
+            }
             Err(e) if e.code() == ERROR_FILE_NOT_FOUND => Ok(None),
             Err(e) => Err(e),
         }
