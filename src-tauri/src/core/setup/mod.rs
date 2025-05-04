@@ -1,3 +1,4 @@
+use crate::commands::pause_timer;
 // mod timer;
 use crate::timer::IS_RUNNING;
 use tauri::Manager;
@@ -115,7 +116,7 @@ fn run_timer(app_handle: &tauri::AppHandle, is_running: &std::sync::atomic::Atom
         }
 
         if rest == 0 && app_settings.should_run_timer() {
-            is_running.store(false, Ordering::SeqCst);
+            pause_timer();
             if let Err(e) = app_handle.emit_to("main", "timer-complete", {}) {
                 eprintln!("发送提醒事件失败: {}", e);
             }
