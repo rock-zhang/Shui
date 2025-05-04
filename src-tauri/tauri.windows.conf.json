@@ -1,7 +1,8 @@
 {
   "app": {
     "trayIcon": {
-      "iconPath": "icons/icon.ico"
+      "iconPath": "icons/icon.ico",
+      "title": "Shui win"
     }
   }
 }
