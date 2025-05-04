@@ -52,14 +52,20 @@
 
 #### macOS
 
-- Apple Silicon：下载 `Shui_0.2.5_aarch64.dmg`
-- Intel Chip：下载 `Shui_0.2.5_x64.dmg`
+- Apple Silicon：下载 `Shui_x.x.x_aarch64.dmg`
+- Intel Chip：下载 `Shui_x.x.x_x64.dmg`
+
+#### Windows
+
+- 64 位系统：下载 `Shui_x.x.x_x64-setup.exe`
+- 32 位系统：下载 `Shui_x.x.x_x86-setup.exe`
+- ARM64 架构：下载 `Shui_x.x.x_arm64-setup.exe`
 
 #### 注意
 
 <img src="public/install_error.png" />
 
-如果遇到`"Shui"已损坏，无法打开`的提示，请在终端运行
+`macOS`下如果遇到`"Shui"已损坏，无法打开`的提示，请在终端运行
 
 ```shell
 sudo xattr -r -d com.apple.quarantine /Applications/Shui.app

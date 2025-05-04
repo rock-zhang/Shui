@@ -1,89 +1,14 @@
-// use crate::core::store::AppSettings;
-use crate::core::store::settings::AppSettings;
+use crate::core::window;
+use crate::core::{store::settings::AppSettings, util};
 use crate::timer;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::sync::atomic::Ordering;
 
 // Remove this line since we don't need it
 // use tauri::api::version::Version;
-use tauri::{Emitter, LogicalPosition, Manager};
-use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
-use tauri_nspanel::{ManagerExt, WebviewWindowExt};
+use tauri::{Emitter, Manager};
 use timer::IS_RUNNING;
 use tokio::time::{sleep, Duration};
-
-const NSWindowStyleMaskUtilityWindow: i32 = 1 << 7;
-#[allow(non_upper_case_globals)]
-
-fn show_reminder_page(app_handle: &tauri::AppHandle) {
-    if let Ok(monitors) = app_handle.available_monitors() {
-        for (index, monitor) in monitors.iter().enumerate() {
-            let reminder_label = format!("reminder_{}", index);
-
-            // 检查是否已存在提醒窗口
-            if let Ok(panel) = app_handle.get_webview_panel(&reminder_label) {
-                panel.show();
-                continue;
-            }
-
-            let size = monitor.size();
-            let scale_factor = monitor.scale_factor();
-            let position = monitor.position();
-
-            // 根据缩放因子调整尺寸
-            let scaled_width = size.width as f64 / scale_factor;
-            let scaled_height = size.height as f64 / scale_factor;
-
-            println!(
-                "Monitor {}: size={:?}, position={:?}, scale_factor={:?}, scaled_size=({:?}, {:?})",
-                index, size, position, scale_factor, scaled_width, scaled_height
-            );
-
-            let window = tauri::WebviewWindowBuilder::new(
-                app_handle,
-                format!("reminder_{}", index),
-                tauri::WebviewUrl::App("reminder/".into()),
-            )
-            .decorations(false)
-            .transparent(true)
-            .always_on_top(true)
-            .visible_on_all_workspaces(true)
-            .focus()
-            .inner_size(scaled_width as f64, scaled_height as f64)
-            .position(position.x as f64, position.y as f64)
-            .build()
-            .expect(&format!("failed to create reminder window {}", index));
-
-            let panel = window.to_panel().unwrap();
-            panel.set_level(26);
-
-            panel.set_style_mask(NSWindowStyleMaskUtilityWindow);
-
-            // // 在各个桌面空间、全屏中共享窗口
-            panel.set_collection_behaviour(
-                NSWindowCollectionBehavior::NSWindowCollectionBehaviorCanJoinAllSpaces
-                    | NSWindowCollectionBehavior::NSWindowCollectionBehaviorFullScreenAuxiliary
-                    | NSWindowCollectionBehavior::NSWindowCollectionBehaviorIgnoresCycle,
-            );
-
-            // let window_clone = window.clone();
-            // tauri::async_runtime::spawn(async move {
-            //     loop {
-            //         // 保证在切换 space 之后获取焦点，可以响应键盘、鼠标事件
-            //         sleep(Duration::from_millis(100)).await;
-            //         let _ = window_clone.set_focus();
-            //     }
-            // });
-        }
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum ReminderCaller {
-    Preview,
-    Timer,
-}
 
 use std::sync::Mutex;
 use tokio::sync::mpsc;
@@ -91,33 +16,7 @@ use tokio::sync::mpsc;
 // 只保留 channel 相关的静态变量
 static REMINDER_PAGE_COUNTDOWN_SENDER: Mutex<Option<mpsc::Sender<()>>> = Mutex::new(None);
 
-#[tauri::command]
-pub fn call_reminder(app_handle: tauri::AppHandle, caller: Option<ReminderCaller>) -> bool {
-    println!("call_reminder");
-
-    if let Ok(panel) = app_handle.get_webview_panel("reminder_0") {
-        if let Ok(monitors) = app_handle.available_monitors() {
-            for (index, monitor) in monitors.iter().enumerate() {
-                let reminder_label = format!("reminder_{}", index);
-
-                println!("show_reminder_windows: {}", reminder_label);
-
-                // 检查是否已存在提醒窗口
-                if let Ok(panel) = app_handle.get_webview_panel(&reminder_label) {
-                    let win = app_handle.get_webview_window(&reminder_label).unwrap();
-                    let position = monitor.position();
-                    let _ = win.set_position(LogicalPosition::new(position.x, position.y));
-                    panel.show();
-                } else {
-                    // 接入新的外接屏幕，需要重新创建Window
-                    show_reminder_page(&app_handle);
-                }
-            }
-        }
-    } else {
-        show_reminder_page(&app_handle);
-    }
-
+fn countdown_async(app_handle: tauri::AppHandle) {
     // 取消之前的倒计时
     if let Some(sender) = REMINDER_PAGE_COUNTDOWN_SENDER.lock().unwrap().take() {
         let _ = sender.try_send(());
@@ -127,11 +26,11 @@ pub fn call_reminder(app_handle: tauri::AppHandle, caller: Option<ReminderCaller
     let (tx, mut rx) = mpsc::channel(1);
     *REMINDER_PAGE_COUNTDOWN_SENDER.lock().unwrap() = Some(tx);
 
-    // 启动新的倒计时任务
-    let app_handle_clone = app_handle.clone();
+    // 只在需要移动所有权到异步闭包时才 clone
+    let app_handle = app_handle.clone();
     tauri::async_runtime::spawn(async move {
         let mut countdown = 30;
-        let _ = app_handle_clone.emit("countdown", countdown);
+        let _ = app_handle.emit("countdown", countdown);
 
         loop {
             tokio::select! {
@@ -140,7 +39,7 @@ pub fn call_reminder(app_handle: tauri::AppHandle, caller: Option<ReminderCaller
                 }
                 _ = sleep(Duration::from_secs(1)) => {
                     countdown -= 1;
-                    let _ = app_handle_clone.emit("countdown", countdown);
+                    let _ = app_handle.emit("countdown", countdown);
                     if countdown <= 0 {
                         break;
                     }
@@ -148,43 +47,50 @@ pub fn call_reminder(app_handle: tauri::AppHandle, caller: Option<ReminderCaller
             }
         }
     });
+}
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub fn call_reminder(app_handle: tauri::AppHandle) -> bool {
+    println!("call_reminder");
+
+    pause_timer();
+    window::show_reminder_windows(&app_handle);
+
+    countdown_async(app_handle);
+
+    true
+}
+
+// TODO: windows的command居然要加async，笑死，浪费我2个晚上的时间
+// https://github.com/tauri-apps/wry/issues/583
+#[cfg(target_os = "windows")]
+#[tauri::command]
+pub async fn call_reminder(app_handle: tauri::AppHandle) -> bool {
+    println!("call_reminder");
+
+    pause_timer();
+    // 直接传递引用，避免不必要的 clone
+    window::show_reminder_windows(&app_handle);
+
+    countdown_async(app_handle);
 
     true
 }
 
 #[tauri::command]
-fn show_panel(app_handle: tauri::AppHandle, label: &str) {
-    let panel = app_handle.get_webview_panel(label).unwrap();
-
-    panel.show();
-}
-
-#[tauri::command]
 pub fn hide_reminder_windows(app_handle: tauri::AppHandle) {
-    if let Ok(monitors) = app_handle.available_monitors() {
-        for (index, monitor) in monitors.iter().enumerate() {
-            let reminder_label = format!("reminder_{}", index);
+    window::hide_reminder_windows(&app_handle);
 
-            println!("hide_reminder_windows: {}", reminder_label); // 打印 reminder_label 的值，以检查是否正确获取了窗口标签
-
-            // 检查是否已存在提醒窗口
-            if let Ok(panel) = app_handle.get_webview_panel(&reminder_label) {
-                panel.order_out(None);
-            }
-        }
-
-        // 取消之前的倒计时
-        if let Some(sender) = REMINDER_PAGE_COUNTDOWN_SENDER.lock().unwrap().take() {
-            let _ = sender.try_send(());
-        }
+    // 取消之前的倒计时
+    if let Some(sender) = REMINDER_PAGE_COUNTDOWN_SENDER.lock().unwrap().take() {
+        let _ = sender.try_send(());
     }
 }
 
 #[tauri::command]
 pub fn hide_reminder_window(app_handle: tauri::AppHandle, label: &str) {
-    if let Ok(panel) = app_handle.get_webview_panel(&label) {
-        panel.order_out(None);
-    }
+    window::hide_reminder_window(&app_handle, &label);
 }
 
 #[tauri::command]
@@ -249,38 +155,7 @@ pub async fn get_app_runtime_info(
     })
 }
 
-use std::process::Command;
-
 #[tauri::command]
 pub fn get_installed_apps(app_handle: tauri::AppHandle) -> Vec<String> {
-    let self_name = app_handle.package_info().name.clone();
-
-    let output = Command::new("ls")
-        .arg("/Applications")
-        .output()
-        .expect("failed to execute command");
-
-    String::from_utf8_lossy(&output.stdout)
-        .split('\n')
-        .filter(|app| app.ends_with(".app"))
-        .filter(|app| !app.starts_with(&format!("{}.app", self_name))) // 过滤掉本应用
-        .filter_map(|app| {
-            let path = format!("/Applications/{}", app);
-            let output = Command::new("mdls")
-                .args(["-name", "kMDItemDisplayName", "-raw", &path])
-                .output()
-                .ok()?;
-
-            let display_name = String::from_utf8_lossy(&output.stdout)
-                .trim()
-                .trim_end_matches(".app")
-                .to_string();
-
-            if !display_name.is_empty() {
-                Some(display_name)
-            } else {
-                Some(app.trim_end_matches(".app").to_string())
-            }
-        })
-        .collect()
+    util::get_installed_apps(&app_handle)
 }

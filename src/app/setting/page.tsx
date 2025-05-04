@@ -7,12 +7,14 @@ import { useTray } from "@/hooks/use-tray";
 import { enable, isEnabled, disable } from "@tauri-apps/plugin-autostart";
 import { invoke } from "@tauri-apps/api/core";
 import { STORE_NAME } from "@/lib/constants";
+import { usePlatform } from "@/hooks/use-platform";
 
 export default function Home() {
   const [config, setConfig] = useState({
     isAutoStart: false,
     isCountDown: false,
   });
+  const { isMacOS } = usePlatform();
   useTray();
 
   useEffect(() => {
@@ -94,10 +96,11 @@ export default function Home() {
             id=":r233:-form-item-description"
             className="text-[0.8rem] text-muted-foreground"
           >
-            开启后将在菜单栏显示倒计时
+            开启后将在菜单栏显示倒计时，仅支持macOS
           </p>
         </div>
         <Switch
+          disabled={!isMacOS}
           checked={config.isCountDown}
           onCheckedChange={async (checked) => {
             await saveConfig("isCountDown", checked);

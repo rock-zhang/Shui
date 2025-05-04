@@ -13,6 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { usePlatform } from "@/hooks/use-platform";
 
 const items = [
   {
@@ -38,11 +39,13 @@ const items = [
 ];
 
 export function AppSidebar() {
+  const { isMacOS } = usePlatform();
+
   const pathname = usePathname();
   console.log("pathname", pathname);
 
   return (
-    <Sidebar collapsible="none" className="pt-8">
+    <Sidebar collapsible="none" className={`${isMacOS ? "pt-8" : "pt-0"}`}>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
