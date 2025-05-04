@@ -42,8 +42,8 @@ tauri-plugin-notification = "2"
 chrono = { version = "0.4", features = ["serde"] }
 tauri-plugin-clipboard-manager = "2"
 scopeguard = "1.2"
-
-# tauri-plugin-shell.workspace = true
+winapi = { version = "0.3", features = [ "wtsapi32", "winuser", "winbase", "libloaderapi", "winnt", "powersetting"] }
+widestring = "1.0"  # 用于处理Windows宽字符
 # tauri-plugin-fs-pro.workspace = true
 # tauri-plugin-eco-window.workspace = true
 # tauri-plugin-eco-locale.workspace = true
@@ -69,7 +69,9 @@ features = [
     "Win32_System_Threading",
     "Win32_System_ProcessStatus",
     "Win32_System_Registry",
-    "Win32_Foundation"
+    "Win32_System_LibraryLoader",
+    "Win32_System_RemoteDesktop",
+    "Win32_System_Power",  # 添加这一行
 ]
 
 

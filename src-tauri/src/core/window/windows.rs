@@ -86,12 +86,19 @@ fn create_reminder_window(
     height: f64,
     position: tauri::PhysicalPosition<i32>,
 ) {
+    println!("width xxxxx{:?}{:?}", width, height);
+    println!("position xxxxx{:?}", position);
     let _ = WebviewWindowBuilder::new(app_handle, label, WebviewUrl::App("reminder/".into()))
-        // .decorations(false)
-        // .transparent(true)
-        // .always_on_top(true)
-        .fullscreen(false)
+        .decorations(false)
+        .closable(false)
+        .maximized(false)
+        .transparent(true)
+        .always_on_top(true)
+        .fullscreen(true)
         .inner_size(width, height)
+        .maximizable(false)
+        .resizable(false)
+        .minimizable(false)
         .position(position.x as f64, position.y as f64)
         .build()
         .expect(&format!("failed to create reminder window {}", label));
