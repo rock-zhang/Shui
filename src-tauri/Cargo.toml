@@ -29,7 +29,7 @@ tauri-plugin-autostart = "2"
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 tauri-plugin-log = "2"
 tauri-plugin-global-shortcut = "2"
-tauri-plugin-os = { version = "2" }
+tauri-plugin-os = "2"
 tauri-plugin-dialog = "2"   
 tauri-plugin-fs = "2"
 tauri-plugin-updater = "2"

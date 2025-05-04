@@ -16,15 +16,7 @@ use tokio::sync::mpsc;
 // 只保留 channel 相关的静态变量
 static REMINDER_PAGE_COUNTDOWN_SENDER: Mutex<Option<mpsc::Sender<()>>> = Mutex::new(None);
 
-// TODO: windows的command居然要加async，笑死，浪费我2个晚上的时间
-// https://github.com/tauri-apps/wry/issues/583
-#[tauri::command]
-pub async fn call_reminder(app_handle: tauri::AppHandle) -> bool {
-    println!("call_reminder");
-
-    // 直接传递引用，避免不必要的 clone
-    window::show_reminder_windows(&app_handle);
-
+fn countdown_async(app_handle: tauri::AppHandle) {
     // 取消之前的倒计时
     if let Some(sender) = REMINDER_PAGE_COUNTDOWN_SENDER.lock().unwrap().take() {
         let _ = sender.try_send(());
@@ -55,6 +47,31 @@ pub async fn call_reminder(app_handle: tauri::AppHandle) -> bool {
             }
         }
     });
+}
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub fn call_reminder(app_handle: tauri::AppHandle) -> bool {
+    println!("call_reminder");
+
+    window::show_reminder_windows(&app_handle);
+
+    countdown_async(app_handle);
+
+    true
+}
+
+// TODO: windows的command居然要加async，笑死，浪费我2个晚上的时间
+// https://github.com/tauri-apps/wry/issues/583
+#[cfg(target_os = "windows")]
+#[tauri::command]
+pub async fn call_reminder(app_handle: tauri::AppHandle) -> bool {
+    println!("call_reminder");
+
+    // 直接传递引用，避免不必要的 clone
+    window::show_reminder_windows(&app_handle);
+
+    countdown_async(app_handle);
 
     true
 }

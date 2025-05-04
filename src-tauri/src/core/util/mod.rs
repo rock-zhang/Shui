@@ -21,7 +21,7 @@ pub fn is_frontapp_in_whitelist(whitelist_apps: &Vec<String>) -> bool {
 pub fn get_installed_apps(app_handle: &tauri::AppHandle) -> Vec<String> {
     #[cfg(target_os = "macos")]
     {
-        get_local_installed_apps(&app_handle)
+        return get_local_installed_apps(&app_handle);
     }
 
     vec![]
