@@ -67,10 +67,26 @@ pub fn default(app_handle: &tauri::AppHandle) {
     let main_window = app_handle.get_webview_window("main").unwrap();
     let window_handle = main_window.clone();
     main_window.on_window_event(move |event| {
-        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-            api.prevent_close();
-            let _ = window_handle.hide();
-            println!("窗口关闭请求被拦截");
+        match event {
+            tauri::WindowEvent::CloseRequested { api, .. } => {
+                api.prevent_close();
+                let _ = window_handle.hide();
+                println!("窗口关闭请求被拦截");
+            }
+            // #[cfg(target_os = "windows")]
+            // tauri::WindowEvent::Destroyed => {
+            //     // Windows 下窗口最小化时隐藏窗口
+            //     let _ = window_handle.hide();
+            //     println!("窗口最小化，已隐藏");
+            // }
+            // #[cfg(target_os = "windows")]
+            // tauri::WindowEvent::Focused(focused) => {
+            //     if !focused {
+            //         // Windows 下窗口失去焦点时保存当前状态
+            //         let _ = window_handle.hide();
+            //     }
+            // }
+            _ => {}
         }
     });
 }

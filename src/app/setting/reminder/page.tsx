@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { platform } from "@tauri-apps/plugin-os";
+import { usePlatform } from "@/hooks/use-platform";
 
 const goldList = ["1000", "1500", "2000", "2500", "3000", "3500", "4000"];
 const gapList = ["10", "20", "30", "45", "60"];
@@ -49,14 +49,9 @@ export default function Home() {
     whitelist_apps: [] as string[],
   });
   const [installedApps, setInstalledApps] = useState<string[]>([]);
-  const [isWindows, setIsWindows] = useState(false);
+  const { isWindows } = usePlatform();
 
   useEffect(() => {
-    // 检查操作系统
-    const currentPlatform = platform();
-    console.log(currentPlatform);
-    setIsWindows(currentPlatform === PLATFORM_OS.WINDOWS);
-
     // 加载已安装应用列表
     if (!isWindows) {
       invoke<string[]>("get_installed_apps").then(setInstalledApps);
