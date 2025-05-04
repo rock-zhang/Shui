@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { load } from "@tauri-apps/plugin-store";
 import { useTray } from "@/hooks/use-tray";
 import { invoke } from "@tauri-apps/api/core";
-import { STORE_NAME } from "@/lib/constants";
+import { PLATFORM_OS, STORE_NAME } from "@/lib/constants";
 import {
   Command,
   CommandEmpty,
@@ -55,7 +55,7 @@ export default function Home() {
     // 检查操作系统
     const currentPlatform = platform();
     console.log(currentPlatform);
-    setIsWindows(currentPlatform === "windows");
+    setIsWindows(currentPlatform === PLATFORM_OS.WINDOWS);
 
     // 加载已安装应用列表
     if (!isWindows) {

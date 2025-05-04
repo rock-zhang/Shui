@@ -54,6 +54,7 @@ fn countdown_async(app_handle: tauri::AppHandle) {
 pub fn call_reminder(app_handle: tauri::AppHandle) -> bool {
     println!("call_reminder");
 
+    pause_timer();
     window::show_reminder_windows(&app_handle);
 
     countdown_async(app_handle);
@@ -68,6 +69,7 @@ pub fn call_reminder(app_handle: tauri::AppHandle) -> bool {
 pub async fn call_reminder(app_handle: tauri::AppHandle) -> bool {
     println!("call_reminder");
 
+    pause_timer();
     // 直接传递引用，避免不必要的 clone
     window::show_reminder_windows(&app_handle);
 
