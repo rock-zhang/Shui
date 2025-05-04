@@ -1,100 +1,230 @@
-use crate::core::store::settings::AppSettings;
+use std::{io, ptr};
+use winapi::{
+    ctypes::c_void,
+    shared::{
+        guiddef::GUID,
+        minwindef::{LPARAM, LRESULT, TRUE, UINT, WPARAM},
+        windef::HWND,
+    },
+    um::{
+        libloaderapi::GetModuleHandleW,
+        winuser::{
+            CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, PostQuitMessage,
+            RegisterClassExW, RegisterPowerSettingNotification, TranslateMessage, CW_USEDEFAULT,
+            MSG, PBT_POWERSETTINGCHANGE, POWERBROADCAST_SETTING, WM_DESTROY, WM_POWERBROADCAST,
+            WM_WTSSESSION_CHANGE, WNDCLASSEXW, WS_EX_OVERLAPPEDWINDOW,
+        },
+        wtsapi32::*,
+    },
+};
+// use windows::Win32::Foundation::HWND;
+use chrono::{Datelike, Local, NaiveTime};
+// use winapi::um::wtsapi32::{WTS_SESSION_LOCK, WTS_SESSION_UNLOCK};
+use crate::timer::IS_RUNNING;
 use std::sync::atomic::Ordering;
-use std::thread::{self, sleep};
-use std::time::Duration;
-use std::time::Instant;
-use tauri::Emitter;
+use windows::Win32::System::RemoteDesktop::WTSRegisterSessionNotification;
+use windows::Win32::System::RemoteDesktop::NOTIFY_FOR_THIS_SESSION;
 
-// use super::*;
-// use ::windows::Win32::System::SystemServices::{
-//     RegisterPowerSettingNotification, GUID_CONSOLE_DISPLAY_STATE, PBT_APMRESUMEAUTOMATIC,
-//     PBT_APMSUSPEND,
-// };
-// use ::windows::Win32::UI::WindowsAndMessaging::{GetMessageW, MSG, WM_POWERBROADCAST};
+// 显示器状态 GUID
+const GUID_CONSOLE_DISPLAY_STATE: GUID = GUID {
+    Data1: 0x6fe69556,
+    Data2: 0x704a,
+    Data3: 0x47a0,
+    Data4: [0x8f, 0x24, 0xc2, 0x8d, 0x93, 0x6f, 0xda, 0x47],
+};
 
-// 提取托盘状态更新逻辑
-fn update_tray_status(tray: &mut Option<tauri::tray::TrayIcon>, status: &str, tooltip: &str) {
-    if let Some(ref tray_handle) = tray {
-        let _ = tray_handle.set_title(Some(status));
-        let _ = tray_handle.set_tooltip(Some(tooltip));
+// 显示器状态枚举
+#[derive(Debug)]
+enum MonitorState {
+    Off,
+    On,
+    Dim,
+    Unknown(u32),
+}
+
+impl From<u32> for MonitorState {
+    fn from(state: u32) -> Self {
+        match state {
+            0 => MonitorState::Off,
+            1 => MonitorState::On,
+            2 => MonitorState::Dim,
+            x => MonitorState::Unknown(x),
+        }
     }
 }
 
-// 提取计时器逻辑
-pub fn run_timer(app_handle: &tauri::AppHandle, is_running: &std::sync::atomic::AtomicBool) {
-    let mut tray = app_handle.tray_by_id("main-tray");
-    let timer = Instant::now();
-    let elapsed_total = 0;
+fn reset_timer_running(lock_state: bool) {
+    IS_RUNNING.store(lock_state, Ordering::SeqCst);
+    let (status, action) = if lock_state {
+        ("锁屏", "停止")
+    } else {
+        ("解锁", "开始")
+    };
+    println!("系统{}，{}计时", status, action);
+}
 
-    while is_running.load(Ordering::SeqCst) {
-        let app_settings = AppSettings::load_from_store::<tauri::Wry>(&app_handle);
-
-        // println!("app_settings {:?}", app_settings);
-        // 检查非工作状态
-        if !app_settings.should_run_timer() {
-            let (status, tooltip) = app_settings.get_status_message();
-            update_tray_status(&mut tray, status, tooltip);
-            sleep(Duration::from_secs(1));
-            continue;
-        }
-
-        let elapsed_secs = elapsed_total + timer.elapsed().as_secs();
-
-        // 处理白名单应用
-        // if is_frontapp_in_whitelist(&app_settings.whitelist_apps) {
-        //     elapsed_total = elapsed_secs;
-        //     update_tray_status(&mut tray, "暂停", "白名单应用前台运行中");
-        //     sleep(Duration::from_secs(1));
-        //     timer = Instant::now();
-        //     continue;
-        // }
-
-        let rest = app_settings.gap.saturating_sub(elapsed_secs);
-
-        // 更新托盘倒计时
-        if app_settings.is_show_countdown {
-            let countdown = format!("{}:{:02}", rest / 60, rest % 60);
-            update_tray_status(&mut tray, &countdown, "");
-        } else {
-            update_tray_status(&mut tray, "", "");
-        }
-
-        if rest == 0 && app_settings.should_run_timer() {
-            is_running.store(false, Ordering::SeqCst);
-            println!("timer-complete");
-            if let Err(e) = app_handle.emit_to("main", "timer-complete", {}) {
-                eprintln!("发送提醒事件失败: {}", e);
+// 窗口处理函数
+extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    println!("wparam: {:?}: {:?}", wparam, Local::now().time());
+    match msg {
+        WM_WTSSESSION_CHANGE => {
+            match wparam as u32 {
+                7 => {
+                    println!("[事件] 系统已锁定");
+                    reset_timer_running(false);
+                }
+                8 => {
+                    println!("[事件] 系统已解锁");
+                    reset_timer_running(true);
+                }
+                _ => {}
             }
-            break;
+            0
         }
+        WM_POWERBROADCAST => {
+            if wparam == PBT_POWERSETTINGCHANGE as WPARAM {
+                println!(
+                    "PBT_POWERSETTINGCHANGE: {:?}: {:?}",
+                    wparam,
+                    Local::now().time()
+                );
+                let setting = lparam as *const POWERBROADCAST_SETTING;
+                println!("setting: {:?}: {:?}", setting, Local::now().time());
+                unsafe {
+                    if let Ok(state) = handle_power_setting(setting) {
+                        println!(
+                            "handle_power_setting: {:?}: {:?}",
+                            state,
+                            Local::now().time()
+                        );
+                        match state {
+                            MonitorState::Off => {
+                                println!("[事件] 显示器已关闭");
+                                reset_timer_running(false);
+                            }
+                            MonitorState::On => {
+                                println!("[事件] 显示器已打开");
+                                reset_timer_running(true);
+                            }
+                            MonitorState::Dim => println!("[事件] 显示器变暗"),
+                            MonitorState::Unknown(x) => println!("[事件] 未知状态: {}", x),
+                        }
+                    }
+                }
+            }
+            TRUE.try_into().unwrap()
+        }
+        WM_DESTROY => {
+            unsafe { PostQuitMessage(0) };
+            0
+        }
+        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
+    }
+}
 
-        thread::sleep(Duration::from_secs(1));
+// 处理电源设置变化
+unsafe fn handle_power_setting(setting: *const POWERBROADCAST_SETTING) -> io::Result<MonitorState> {
+    // 使用 memcmp 比较 GUID
+    let setting_guid = &(*setting).PowerSetting as *const GUID;
+    let console_guid = &GUID_CONSOLE_DISPLAY_STATE as *const GUID;
+    let guid_size = std::mem::size_of::<GUID>();
+
+    if std::ptr::eq(setting_guid, console_guid)
+        || std::slice::from_raw_parts(setting_guid as *const u8, guid_size)
+            == std::slice::from_raw_parts(console_guid as *const u8, guid_size)
+    {
+        let data = (*setting).Data.as_ptr() as *const u32;
+        Ok(MonitorState::from(*data))
+    } else {
+        Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "非显示器状态事件",
+        ))
     }
 }
 
 pub fn monitor_lock_screen() {
-    // loop {
-    //     // Windows 平台下监听系统锁屏状态
-    //     // 这里使用 Windows API 监听系统电源状态变化
-    //     let mut msg = MSG::default();
-    //     unsafe {
-    //         if GetMessageW(&mut msg, None, 0, 0).as_bool() {
-    //             if msg.message == WM_POWERBROADCAST {
-    //                 let is_locked = match msg.wParam.0 as u32 {
-    //                     PBT_APMRESUMEAUTOMATIC => false,
-    //                     PBT_APMSUSPEND => true,
-    //                     _ => continue,
-    //                 };
-    //                 IS_RUNNING.store(!is_locked, Ordering::SeqCst);
-    //                 let (status, action) = if is_locked {
-    //                     ("锁屏", "停止")
-    //                 } else {
-    //                     ("解锁", "开始")
-    //                 };
-    //                 println!("系统{}，{}计时", status, action);
-    //             }
-    //         }
-    //     }
-    //     thread::sleep(Duration::from_secs(1));
-    // }
+    let class_name = match widestring::U16CString::from_str("ScreenMonitorClass") {
+        Ok(name) => name,
+        Err(e) => {
+            println!("创建窗口类名称失败: {}", e);
+            return;
+        }
+    };
+
+    let wnd_class = WNDCLASSEXW {
+        cbSize: std::mem::size_of::<WNDCLASSEXW>() as u32,
+        style: 0,
+        lpfnWndProc: Some(wnd_proc),
+        cbClsExtra: 0,
+        cbWndExtra: 0,
+        hInstance: unsafe { GetModuleHandleW(ptr::null()) },
+        hIcon: ptr::null_mut(),
+        hCursor: ptr::null_mut(),
+        hbrBackground: ptr::null_mut(),
+        lpszMenuName: ptr::null(),
+        lpszClassName: class_name.as_ptr(),
+        hIconSm: ptr::null_mut(),
+    };
+
+    unsafe {
+        if RegisterClassExW(&wnd_class) == 0 {
+            println!("注册窗口类失败");
+            return;
+        }
+
+        let window_name = match widestring::U16CString::from_str("Screen Monitor") {
+            Ok(name) => name,
+            Err(e) => {
+                println!("创建窗口名称失败: {}", e);
+                return;
+            }
+        };
+
+        let hwnd = CreateWindowExW(
+            WS_EX_OVERLAPPEDWINDOW,
+            class_name.as_ptr(),
+            window_name.as_ptr(),
+            0,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            wnd_class.hInstance,
+            ptr::null_mut(),
+        );
+
+        if hwnd.is_null() {
+            println!("创建窗口失败");
+            return;
+        }
+
+        // 注册会话通知
+        if unsafe {
+            WTSRegisterSessionNotification(
+                windows::Win32::Foundation::HWND(hwnd as isize),
+                NOTIFY_FOR_THIS_SESSION,
+            )
+            .as_bool()
+        } {
+            println!("监听已启动，尝试息屏/锁屏测试...");
+        } else {
+            println!("注册会话通知失败");
+            return;
+        }
+
+        // 注册电源通知
+        let _notification =
+            RegisterPowerSettingNotification(hwnd as *mut c_void, &GUID_CONSOLE_DISPLAY_STATE, 0);
+
+        println!("监听已启动，尝试息屏/锁屏测试...");
+
+        let mut msg = MSG::default();
+        while GetMessageW(&mut msg, ptr::null_mut(), 0, 0) > 0 {
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+    }
 }
