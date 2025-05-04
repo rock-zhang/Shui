@@ -13,32 +13,23 @@ pub fn run() {
 
     // 通用插件
     builder = builder
+        .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_store::Builder::new().build());
+        .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--test_args=1"]),
+        ));
 
     // macOS 特有插件
     #[cfg(target_os = "macos")]
     {
-        builder = builder
-            .plugin(tauri_nspanel::init())
-            .plugin(tauri_plugin_autostart::init(
-                MacosLauncher::LaunchAgent,
-                Some(vec!["--test_args=1"]),
-            ));
-    }
-
-    // Windows 特有插件
-    #[cfg(target_os = "windows")]
-    {
-        builder = builder.plugin(tauri_plugin_autostart::init(
-            MacosLauncher::LaunchAgent,
-            Some(vec!["--test_args=1"]),
-        ));
+        builder = builder.plugin(tauri_nspanel::init())
     }
 
     builder

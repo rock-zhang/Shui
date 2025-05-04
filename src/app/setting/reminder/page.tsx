@@ -30,6 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { platform } from "@tauri-apps/plugin-os";
 
 const goldList = ["1000", "1500", "2000", "2500", "3000", "3500", "4000"];
 const gapList = ["10", "20", "30", "45", "60"];
@@ -45,14 +46,22 @@ export default function Home() {
     weekdays: [] as number[],
     timeStart: "09:00",
     timeEnd: "18:00",
-    whitelist_apps: [] as string[], // 新增白名单配置
+    whitelist_apps: [] as string[],
   });
   const [installedApps, setInstalledApps] = useState<string[]>([]);
+  const [isWindows, setIsWindows] = useState(false);
 
   useEffect(() => {
+    // 检查操作系统
+    const currentPlatform = platform();
+    console.log(currentPlatform);
+    setIsWindows(currentPlatform === "windows");
+
     // 加载已安装应用列表
-    invoke<string[]>("get_installed_apps").then(setInstalledApps);
-  }, []);
+    if (!isWindows) {
+      invoke<string[]>("get_installed_apps").then(setInstalledApps);
+    }
+  }, [isWindows]);
 
   useTray();
 
@@ -260,73 +269,75 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
-        <div>
-          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            应用白名单
-          </label>
-          <p className="text-[0.8rem] text-muted-foreground">
-            在这些应用活跃时暂停提醒
-          </p>
-        </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className="w-[200px] h-auto min-h-[36px] justify-between"
+      {!isWindows && (
+        <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
+          <div>
+            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+              应用白名单
+            </label>
+            <p className="text-[0.8rem] text-muted-foreground">
+              在这些应用活跃时暂停提醒
+            </p>
+          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-[200px] h-auto min-h-[36px] justify-between"
+              >
+                <div className="flex flex-wrap gap-1 pr-2">
+                  {config.whitelist_apps.length > 0 ? (
+                    config.whitelist_apps.map((app) => (
+                      <Badge
+                        variant="secondary"
+                        key={app}
+                        className="truncate max-w-[120px]"
+                      >
+                        {app}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-muted-foreground">选择应用</span>
+                  )}
+                </div>
+                <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-[200px] p-0"
+              style={{ maxHeight: "300px" }}
             >
-              <div className="flex flex-wrap gap-1 pr-2">
-                {config.whitelist_apps.length > 0 ? (
-                  config.whitelist_apps.map((app) => (
-                    <Badge
-                      variant="secondary"
+              <Command>
+                <CommandInput placeholder="搜索应用..." />
+                <CommandEmpty>未找到应用</CommandEmpty>
+                <CommandGroup className="max-h-[250px] overflow-y-auto">
+                  {installedApps.map((app) => (
+                    <CommandItem
                       key={app}
-                      className="truncate max-w-[120px]"
+                      onSelect={() => {
+                        const newApps = config.whitelist_apps.includes(app)
+                          ? config.whitelist_apps.filter((a) => a !== app)
+                          : [...config.whitelist_apps, app];
+                        saveConfig("whitelist_apps", newApps);
+                      }}
                     >
+                      <Check
+                        className={cn(
+                          "mr-2 h-4 w-4",
+                          config.whitelist_apps.includes(app)
+                            ? "opacity-100"
+                            : "opacity-0"
+                        )}
+                      />
                       {app}
-                    </Badge>
-                  ))
-                ) : (
-                  <span className="text-muted-foreground">选择应用</span>
-                )}
-              </div>
-              <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            className="w-[200px] p-0"
-            style={{ maxHeight: "300px" }}
-          >
-            <Command>
-              <CommandInput placeholder="搜索应用..." />
-              <CommandEmpty>未找到应用</CommandEmpty>
-              <CommandGroup className="max-h-[250px] overflow-y-auto">
-                {installedApps.map((app) => (
-                  <CommandItem
-                    key={app}
-                    onSelect={() => {
-                      const newApps = config.whitelist_apps.includes(app)
-                        ? config.whitelist_apps.filter((a) => a !== app)
-                        : [...config.whitelist_apps, app];
-                      saveConfig("whitelist_apps", newApps);
-                    }}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        config.whitelist_apps.includes(app)
-                          ? "opacity-100"
-                          : "opacity-0"
-                      )}
-                    />
-                    {app}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </Command>
-          </PopoverContent>
-        </Popover>
-      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+      )}
 
       {/* <div className="flex justify-end">
         <Button

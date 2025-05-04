@@ -1,13 +1,9 @@
-use crate::core::store::settings::AppSettings;
-use crate::core::util::is_frontapp_in_whitelist;
 use crate::timer::IS_RUNNING;
-use tauri::Emitter;
 
 use std::thread::{self, sleep};
 use std::time::Duration;
 
 use std::sync::atomic::Ordering;
-use std::time::Instant;
 
 extern crate core_foundation;
 
