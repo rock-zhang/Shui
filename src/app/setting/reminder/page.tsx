@@ -13,7 +13,7 @@ import { useEffect, useState } from "react";
 import { load } from "@tauri-apps/plugin-store";
 import { useTray } from "@/hooks/use-tray";
 import { invoke } from "@tauri-apps/api/core";
-import { PLATFORM_OS, STORE_NAME } from "@/lib/constants";
+import { STORE_NAME } from "@/lib/constants";
 import {
   Command,
   CommandEmpty,
