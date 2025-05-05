@@ -43,8 +43,9 @@
 ### Platform Support
 
 - ✅ macOS
-- 🚧 Windows (coming soon)
+- ✅ Windows 
 - 🚧 Linux (coming soon)
+- 🚧 Android (coming soon)
 
 ### 下载安装
 
@@ -89,10 +90,10 @@ sudo xattr -r -d com.apple.quarantine /Applications/Shui.app
 
 ### 开发计划
 
-- [ ] Windows 适配
+- [x] Windows 适配
 - [ ] 多语言支持
 - [ ] Linux 适配
-- [ ] 自定义提醒音效
+- [x] 提醒音效
 - [ ] 数据统计与分析
   - [ ] 饮水量趋势图表
   - [ ] 休息时间统计
