@@ -6,6 +6,10 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { Toaster } from "@/components/ui/sonner";
 import { usePlatform } from "@/hooks/use-platform";
+import {
+  isSetFullScreen,
+  sendReminderNotification,
+} from "@/utils/notification";
 
 export default function RootLayout({
   children,
@@ -15,9 +19,15 @@ export default function RootLayout({
   const { isMacOS } = usePlatform();
 
   useEffect(() => {
-    const unlisten = listen("timer-complete", (event) => {
+    const unlisten = listen("timer-complete", async (event) => {
       console.log("Timer completed", event);
-      invoke("call_reminder");
+
+      if (await isSetFullScreen()) {
+        invoke("call_reminder");
+      } else {
+        sendReminderNotification();
+        invoke("reset_timer");
+      }
       // 这里可以添加倒计时结束后的处理逻辑
     });
 

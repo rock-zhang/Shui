@@ -13,6 +13,7 @@ export default function Home() {
   const [config, setConfig] = useState({
     isAutoStart: false,
     isCountDown: false,
+    isFullScreen: false, // 新增全屏提醒选项
   });
   const { isMacOS } = usePlatform();
   useTray();
@@ -24,12 +25,14 @@ export default function Home() {
         store.get<{
           isAutoStart: boolean;
           isCountDown: boolean;
+          isFullScreen: boolean; // 新增类型定义
         }>("general"),
         isEnabled(),
       ]);
       setConfig({
         ...config,
         isCountDown: generalSetting?.isCountDown || false,
+        isFullScreen: generalSetting?.isFullScreen || false, // 设置默认值
         isAutoStart,
       });
     }
@@ -87,7 +90,7 @@ export default function Home() {
         />
       </div>
 
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs">
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             倒计时
@@ -106,6 +109,26 @@ export default function Home() {
             await saveConfig("isCountDown", checked);
             // 重置计时器
             invoke("reset_timer");
+          }}
+        />
+      </div>
+
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs">
+        <div>
+          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+            全屏提醒
+          </label>
+          <p
+            id=":r233:-form-item-description"
+            className="text-[0.8rem] text-muted-foreground"
+          >
+            开启后将以全屏方式显示提醒，关闭则使用系统通知
+          </p>
+        </div>
+        <Switch
+          checked={config.isFullScreen}
+          onCheckedChange={async (checked) => {
+            await saveConfig("isFullScreen", checked);
           }}
         />
       </div>

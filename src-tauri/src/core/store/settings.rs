@@ -20,6 +20,7 @@ pub mod store_fields {
     pub const TIMESTART: &str = "timeStart";
     pub const TIMEEND: &str = "timeEnd";
     pub const ISCOUNTDOWN: &str = "isCountDown";
+    pub const ISFULLSCREEN: &str = "isFullScreen";
 }
 
 #[derive(Debug, Clone, Serialize)] // 添加 Serialize
@@ -74,7 +75,8 @@ impl AppSettings {
             config_store_category::GENERAL.to_string(),
             json!({
                 "isAutoStart": false,
-                "isCountDown": true
+                "isCountDown": true,
+                "isFullScreen": true
             }),
         );
         // 保存到文件
