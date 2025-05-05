@@ -45,7 +45,7 @@
 
 - ✅ macOS
 - ✅ Windows
-- 🚧 Linux (coming soon)
+- ✅ Linux (coming soon)
 - 🚧 Android (coming soon)
 
 ### 下载安装
@@ -62,6 +62,11 @@
 - 64 位系统：下载 `Shui_x.x.x_x64-setup.exe`
 - 32 位系统：下载 `Shui_x.x.x_x86-setup.exe`
 - ARM64 架构：下载 `Shui_x.x.x_arm64-setup.exe`
+
+#### Linux
+
+- x86_64 架构：下载 `Shui_x.x.x_amd64.deb`
+- ARM64 架构：下载 `Shui_x.x.x_arm64.deb`
 
 #### 注意
 
@@ -92,9 +97,9 @@ sudo xattr -r -d com.apple.quarantine /Applications/Shui.app
 ### 开发计划
 
 - [x] Windows 适配
-- [ ] 多语言支持
-- [ ] Linux 适配
+- [x] Linux 适配
 - [x] 提醒音效
+- [ ] 多语言支持
 - [ ] 数据统计与分析
   - [ ] 饮水量趋势图表
   - [ ] 休息时间统计
@@ -115,8 +120,8 @@ sudo xattr -r -d com.apple.quarantine /Applications/Shui.app
 
 欢迎 PR 和 Issue，一起探讨和改进 Shui！
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/rock-zhang/Shui)
-<picture>
 
+<picture>
   <source media="(prefers-color-scheme: dark)" srcset="public/qrcode_wechat_dark.png" />
   <source media="(prefers-color-scheme: light)" srcset="public/qrcode_wechat_light.png" />
   <img width="300px" src="public/qrcode_wechat_light.png" />

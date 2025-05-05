@@ -18,6 +18,7 @@ import {
 import "./index.css";
 import { currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 import { STORE_NAME } from "@/lib/constants";
+import { usePlatform } from "@/hooks/use-platform";
 
 function hideWindowAction() {
   invoke("hide_reminder_windows");
@@ -95,6 +96,7 @@ export default function ReminderPage() {
   });
   const [countdown, setCountdown] = useState(30);
   const [monitorName, setMonitorName] = useState("");
+  const { isLinux } = usePlatform();
   // 按天存储饮水量
   const todayDate = getTodayDate();
 
@@ -140,6 +142,27 @@ export default function ReminderPage() {
       unregisterAll();
     };
   }, []);
+
+  useEffect(() => {
+    // 添加键盘事件监听作为 Linux 下的备选方案
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        console.log("Esc key detected via keyboard event");
+        hideWindowAction();
+      }
+    };
+
+    // 在 Linux 系统上添加键盘事件监听
+    if (isLinux) {
+      document.addEventListener("keydown", handleKeyDown);
+    }
+
+    return () => {
+      if (isLinux) {
+        document.removeEventListener("keydown", handleKeyDown);
+      }
+    };
+  }, [isLinux]);
 
   useEffect(() => {
     if (!monitorName) return;
@@ -194,10 +217,13 @@ export default function ReminderPage() {
 
     // 添加关闭动画
     setIsClosing(true);
-    setTimeout(() => {
-      hideWindowAction();
-      setIsClosing(false);
-    }, 300); // 等待动画完成后关闭
+    setTimeout(
+      () => {
+        hideWindowAction();
+        setIsClosing(false);
+      },
+      isLinux ? 100 : 300
+    ); // Linux 系统下无透明度，设置延时为 0，其他系统为 300ms
   };
 
   const progress = (water.drink / water.gold) * 100;
@@ -215,7 +241,7 @@ export default function ReminderPage() {
         {countdown}s 后自动关闭
       </div>
       <div
-        className={`bg-white/30 backdrop-blur-sm p-8 rounded-2xl shadow-lg max-w-md w-full z-10 border border-white/20 transition-all duration-100 ${
+        className={`bg-white/30 backdrop-blur-sm p-8 rounded-2xl shadow-lg max-w-lg w-full z-10 border border-white/20 transition-all duration-100 ${
           isClosing ? "scale-95 opacity-0" : "scale-100 opacity-100"
         }`}
       >
