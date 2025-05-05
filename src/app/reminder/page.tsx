@@ -66,12 +66,7 @@ function getTodayDate() {
   )}${String(today.getDate()).padStart(2, "0")}`;
 }
 
-const waterOptions = [
-  { ml: 100, label: "中杯" },
-  { ml: 200, label: "大杯" },
-  { ml: 300, label: "超大杯" },
-  { ml: 50, label: "小杯" },
-];
+const waterOptions = [{ ml: 50 }, { ml: 100 }, { ml: 200 }, { ml: 300 }];
 
 const reminderTexts = [
   "补充一下能量吧，让身体充满活力 ✨",
@@ -242,10 +237,12 @@ export default function ReminderPage() {
               key={option.ml}
               tabIndex={-1}
               onClick={() => handleWaterSelection(option.ml)}
-              className="p-4 rounded-xl transition-all duration-200 cursor-pointer bg-blue-50 hover:bg-blue-100 hover:scale-105 active:scale-95 text-blue-700"
+              className="group relative p-6 rounded-xl transition-all duration-200 cursor-pointer bg-blue-50 hover:bg-blue-100 hover:scale-105 active:scale-95 text-blue-700 flex items-center justify-center"
             >
-              <div className="text-lg font-semibold">{option.label}</div>
-              <div className="text-sm">{option.ml}ml</div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-medium">{option.ml}</span>
+                <span className="text-lg text-blue-600/90">ml</span>
+              </div>
             </button>
           ))}
         </div>
