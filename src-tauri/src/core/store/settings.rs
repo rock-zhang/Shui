@@ -68,7 +68,8 @@ impl AppSettings {
                 "gold": "1000",
                 "weekdays": [1, 2, 3, 4, 5],
                 "timeStart": "09:00",
-                "timeEnd": "18:00"
+                "timeEnd": "18:00",
+                "whitelist_apps": ["腾讯会议", "Zoom", "Google Meet", "Microsoft Teams"]
             }),
         );
         store.set(

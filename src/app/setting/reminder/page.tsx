@@ -99,6 +99,10 @@ export default function Home() {
     invoke("reset_timer");
   };
 
+  const selectedApp = config.whitelist_apps.filter((app) =>
+    installedApps.includes(app)
+  );
+
   return (
     <div>
       <h3 className="mb-4 text-lg font-medium">提醒</h3>
@@ -281,8 +285,8 @@ export default function Home() {
                 className="w-[200px] h-auto min-h-[36px] justify-between"
               >
                 <div className="flex flex-wrap gap-1 pr-2">
-                  {config.whitelist_apps.length > 0 ? (
-                    config.whitelist_apps.map((app) => (
+                  {selectedApp.length > 0 ? (
+                    selectedApp.map((app) => (
                       <Badge
                         variant="secondary"
                         key={app}
@@ -310,16 +314,16 @@ export default function Home() {
                     <CommandItem
                       key={app}
                       onSelect={() => {
-                        const newApps = config.whitelist_apps.includes(app)
-                          ? config.whitelist_apps.filter((a) => a !== app)
-                          : [...config.whitelist_apps, app];
+                        const newApps = selectedApp.includes(app)
+                          ? selectedApp.filter((a) => a !== app)
+                          : [...selectedApp, app];
                         saveConfig("whitelist_apps", newApps);
                       }}
                     >
                       <Check
                         className={cn(
                           "mr-2 h-4 w-4",
-                          config.whitelist_apps.includes(app)
+                          selectedApp.includes(app)
                             ? "opacity-100"
                             : "opacity-0"
                         )}
