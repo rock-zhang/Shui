@@ -32,6 +32,13 @@ async function registerEscShortcut() {
   });
 }
 
+// 添加音效播放函数
+const playSound = () => {
+  const audio = new Audio("/sounds/water-drop.mp3");
+  audio.volume = 0.5; // 设置音量为 50%
+  audio.play().catch((err) => console.log("音频播放失败:", err));
+};
+
 const sendNativeNotification = async () => {
   let permissionGranted = await isPermissionGranted();
 
@@ -42,6 +49,8 @@ const sendNativeNotification = async () => {
 
   // Once permission has been granted we can send the notification
   if (permissionGranted) {
+    playSound(); // 添加音效
+
     sendNotification({
       title: "🎉 太棒了！完成今日喝水目标",
       body: "再接再厉，继续保持健康好习惯！",
@@ -57,12 +66,7 @@ function getTodayDate() {
   )}${String(today.getDate()).padStart(2, "0")}`;
 }
 
-const waterOptions = [
-  { ml: 100, label: "中杯" },
-  { ml: 200, label: "大杯" },
-  { ml: 300, label: "超大杯" },
-  { ml: 50, label: "小杯" },
-];
+const waterOptions = [{ ml: 50 }, { ml: 100 }, { ml: 200 }, { ml: 300 }];
 
 const reminderTexts = [
   "补充一下能量吧，让身体充满活力 ✨",
@@ -171,6 +175,8 @@ export default function ReminderPage() {
     storeUpdate();
   }, [countdown]);
 
+  const [isClosing, setIsClosing] = useState(false);
+
   const handleWaterSelection = async (ml: number) => {
     const totalDrink = water.drink + ml;
     setWater({
@@ -185,7 +191,12 @@ export default function ReminderPage() {
       sendNativeNotification();
     }
 
-    hideWindowAction();
+    // 添加关闭动画
+    setIsClosing(true);
+    setTimeout(() => {
+      hideWindowAction();
+      setIsClosing(false);
+    }, 800); // 等待动画完成后关闭
   };
 
   const progress = (water.drink / water.gold) * 100;
@@ -195,12 +206,18 @@ export default function ReminderPage() {
       onContextMenu={(e) => {
         if (process.env.NODE_ENV === "production") e.preventDefault();
       }}
-      className="reminder-page min-h-screen flex items-center justify-center relative"
+      className={`reminder-page min-h-screen flex items-center justify-center relative transition-opacity duration-800 ${
+        isClosing ? "opacity-0" : "opacity-100"
+      }`}
     >
-      <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/30 backdrop-blur-sm px-4 py-2 rounded-full text-gray-700 text-base font-medium shadow-sm border border-white/20">
+      <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/30 backdrop-blur-sm px-4 py-2 rounded-full text-gray-700 text-base font-medium shadow-sm border border-white/20 transition-transform duration-300">
         {countdown}s 后自动关闭
       </div>
-      <div className="bg-white/30 backdrop-blur-sm p-8 rounded-2xl shadow-lg max-w-md w-full z-10 border border-white/20">
+      <div
+        className={`bg-white/30 backdrop-blur-sm p-8 rounded-2xl shadow-lg max-w-md w-full z-10 border border-white/20 transition-all duration-300 ${
+          isClosing ? "scale-95 opacity-0" : "scale-100 opacity-100"
+        }`}
+      >
         <h2 className="text-2xl font-bold text-center mb-6 text-blue-600">
           喝了么
         </h2>
@@ -220,10 +237,12 @@ export default function ReminderPage() {
               key={option.ml}
               tabIndex={-1}
               onClick={() => handleWaterSelection(option.ml)}
-              className="p-4 rounded-xl transition-all duration-200 cursor-pointer bg-blue-50 hover:bg-blue-100 text-blue-700"
+              className="group relative p-6 rounded-xl transition-all duration-200 cursor-pointer bg-blue-50 hover:bg-blue-100 hover:scale-105 active:scale-95 text-blue-700 flex items-center justify-center"
             >
-              <div className="text-lg font-semibold">{option.label}</div>
-              <div className="text-sm">{option.ml}ml</div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-medium">{option.ml}</span>
+                <span className="text-lg text-blue-600/90">ml</span>
+              </div>
             </button>
           ))}
         </div>

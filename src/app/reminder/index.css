@@ -2,6 +2,13 @@ body {
   background: transparent;
 }
 .reminder-page {
+  /* &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-color: rgb(174 180 199 / 68%);
+    z-index: -1;
+  } */
   background: radial-gradient(circle at 60% 90%, #ff7eb3, #0000 10%),
     radial-gradient(circle at 20px 20px, #7afcff, #0000 15%),
     radial-gradient(circle at 80% 30%, #ffd65f, #0000 12%),
