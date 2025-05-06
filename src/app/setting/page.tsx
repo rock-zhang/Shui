@@ -8,6 +8,7 @@ import { enable, isEnabled, disable } from "@tauri-apps/plugin-autostart";
 import { invoke } from "@tauri-apps/api/core";
 import { STORE_NAME } from "@/lib/constants";
 import { usePlatform } from "@/hooks/use-platform";
+import { getGeneralConfig } from "@/utils/store";
 
 export default function Home() {
   const [config, setConfig] = useState({
@@ -20,15 +21,11 @@ export default function Home() {
 
   useEffect(() => {
     async function loadConfig() {
-      const store = await load(STORE_NAME.config, { autoSave: false });
       const [generalSetting, isAutoStart] = await Promise.all([
-        store.get<{
-          isAutoStart: boolean;
-          isCountDown: boolean;
-          isFullScreen: boolean; // 新增类型定义
-        }>("general"),
+        getGeneralConfig(),
         isEnabled(),
       ]);
+
       setConfig({
         ...config,
         isCountDown: generalSetting?.isCountDown || false,

@@ -6,10 +6,8 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { Toaster } from "@/components/ui/sonner";
 import { usePlatform } from "@/hooks/use-platform";
-import {
-  isSetFullScreen,
-  sendReminderNotification,
-} from "@/utils/notification";
+import { sendReminderNotification } from "@/utils/notification";
+import { getGeneralConfig } from "@/utils/store";
 
 export default function RootLayout({
   children,
@@ -22,7 +20,7 @@ export default function RootLayout({
     const unlisten = listen("timer-complete", async (event) => {
       console.log("Timer completed", event);
 
-      if (await isSetFullScreen()) {
+      if ((await getGeneralConfig()).isFullScreen) {
         invoke("call_reminder");
       } else {
         sendReminderNotification();

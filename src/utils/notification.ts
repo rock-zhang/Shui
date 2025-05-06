@@ -3,21 +3,6 @@ import {
   requestPermission,
   sendNotification,
 } from "@tauri-apps/plugin-notification";
-import { load } from "@tauri-apps/plugin-store";
-import { STORE_NAME } from "@/lib/constants";
-
-export async function isSetFullScreen() {
-  const store = await load(STORE_NAME.config, { autoSave: false });
-  const [generalSetting] = await Promise.all([
-    store.get<{
-      isAutoStart: boolean;
-      isCountDown: boolean;
-      isFullScreen: boolean;
-    }>("general"),
-  ]);
-
-  return generalSetting?.isFullScreen;
-}
 
 export const sendReminderNotification = async () => {
   let permissionGranted = await isPermissionGranted();

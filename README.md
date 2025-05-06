@@ -16,14 +16,15 @@
   - 工作日智能提醒
   - 自定义时间范围
 - 🔔 多样化提醒方式
+  - 全屏通知页面
   - 系统原生通知
   - 托盘实时倒计时
-  - 全局快捷键支持
+  - 目标完成音效提醒
 - 💡 智能且人性化
   - 自动识别工作日
   - 息屏、锁屏自动暂停
   - 托盘快捷操作
-  - 应用白名单（游戏、视频会议、看电影时暂停提醒）
+  - 应用白名单（默认：腾讯会议, Zoom, Google Meet, Microsoft Teams）
 - 📊 数据统计
   - 每日饮水量统计
   - 饮水习惯分析
@@ -43,7 +44,7 @@
 ### Platform Support
 
 - ✅ macOS
-- ✅ Windows 
+- ✅ Windows
 - 🚧 Linux (coming soon)
 - 🚧 Android (coming soon)
 
