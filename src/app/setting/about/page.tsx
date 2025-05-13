@@ -7,12 +7,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { toast } from "sonner";
 import { useUpdaterCheck, useUpdaterDownload } from "@/hooks/use-updater";
+import { useI18n } from "@/i18n/provider";
 
 export default function About() {
   const [version, setVersion] = useState("");
   const { checking, updateAvailable, updateInfo, checkForUpdate } =
     useUpdaterCheck();
   const { installing, progress, downloadAndInstall } = useUpdaterDownload();
+  const { t } = useI18n();
 
   useEffect(() => {
     getVersion().then(setVersion);
@@ -25,20 +27,20 @@ export default function About() {
   const handleCopyAppInfo = async () => {
     const appInfo = await invoke("get_app_runtime_info");
     await writeText(JSON.stringify(appInfo));
-    toast.success("复制成功");
+    toast.success(t("settings.about.copySuccess"));
   };
 
   const handleCheck = async () => {
     await checkForUpdate();
 
     if (updateAvailable && updateInfo) {
-      toast.success(`发现新版本: ${updateInfo.version}`);
+      toast.success(t("settings.about.newVersion", { version: updateInfo.version }));
     }
   };
 
   return (
     <div>
-      <h3 className="mb-4 text-lg font-medium">关于</h3>
+      <h3 className="mb-4 text-lg font-medium">{t("settings.about.title")}</h3>
 
       <div className="relative overflow-hidden rounded-lg border bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-3 shadow-xs mb-4">
         <div className="relative z-10 p-2">
@@ -57,14 +59,14 @@ export default function About() {
               />
             </svg>
             <label className="text-lg font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              关于项目
+              {t("settings.about.project.title")}
             </label>
           </div>
           <p className="text-sm leading-relaxed text-blue-800/70">
-            这是一个帮助你养成健康饮水习惯的小工具。它会根据你设定的目标，在合适的时间提醒你喝水，帮助你保持充足的水分摄入，提升身体健康。
+            {t("settings.about.project.description")}
           </p>
           <p className="text-sm leading-relaxed text-blue-800/70 mt-2">
-            如果你有任何想法或遇到问题，欢迎通过以下方式与我们联系。你的反馈将帮助我们做得更好！
+            {t("settings.about.project.feedback")}
           </p>
         </div>
       </div>
@@ -72,7 +74,7 @@ export default function About() {
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            版本
+            {t("settings.about.version.title")}
           </label>
           <p className="text-[0.8rem] text-muted-foreground">{version}</p>
         </div>
@@ -82,11 +84,13 @@ export default function About() {
             onClick={handleCheck}
             disabled={checking || installing}
           >
-            {checking ? "检查中..." : "检查更新"}
+            {checking ? t("settings.about.version.checking") : t("settings.about.version.check")}
           </Button>
           {updateAvailable && (
             <Button onClick={downloadAndInstall} disabled={installing}>
-              {installing ? `更新中 ${progress}%` : "立即更新"}
+              {installing
+                ? t("settings.about.version.installing", { progress })
+                : t("settings.about.version.update")}
             </Button>
           )}
         </div>
@@ -95,20 +99,20 @@ export default function About() {
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            软件信息
+            {t("settings.about.appInfo.title")}
           </label>
           <p
             id=":r233:-form-item-description"
             className="text-[0.8rem] text-muted-foreground"
           >
-            复制软件信息并提供给 Bug Issue
+            {t("settings.about.appInfo.description")}
           </p>
         </div>
-        <Button onClick={handleCopyAppInfo}>复制</Button>
+        <Button onClick={handleCopyAppInfo}>{t("settings.about.appInfo.copy")}</Button>
       </div>
 
       <div className="rounded-lg border p-3 shadow-xs space-y-4 mb-4">
-        <label className="block text-sm font-medium">联系我们</label>
+        <label className="block text-sm font-medium">{t("settings.about.contact.title")}</label>
 
         <div className="flex gap-4">
           <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 w-4/10">
@@ -124,7 +128,7 @@ export default function About() {
               </svg>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-muted-foreground">微信号：slash__z</p>
+              <p className="text-sm text-muted-foreground">{t("settings.about.contact.wechat")}</p>
             </div>
           </div>
           <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 w-6/10">
@@ -140,9 +144,7 @@ export default function About() {
               </svg>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-muted-foreground">
-                hey47_zhang@163.com
-              </p>
+              <p className="text-sm text-muted-foreground">{t("settings.about.contact.email")}</p>
             </div>
           </div>
         </div>
@@ -161,24 +163,9 @@ export default function About() {
             </svg>
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm text-muted-foreground">
-              https://github.com/rock-zhang/Shui
-            </p>
+            <p className="text-sm text-muted-foreground">{t("settings.about.contact.github")}</p>
           </div>
         </div>
-
-        {/* <div className="mt-4 flex justify-center space-x-6">
-          <div className="text-center">
-            <div className="mb-2">
-              <img
-                src="/qrcode.jpg"
-                alt="微信群"
-                className="w-[300px] rounded-lg border"
-              />
-            </div>
-            <p className="text-sm text-muted-foreground">加入微信群</p>
-          </div>
-        </div> */}
       </div>
     </div>
   );

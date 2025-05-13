@@ -1,0 +1,138 @@
+{
+  "common": {
+    "title": "Water Reminder",
+    "settings": "Settings",
+    "reminder": "Reminder",
+    "language": "Language"
+  },
+  "settings": {
+    "title": "General",
+    "autoStart": {
+      "title": "Auto Start",
+      "description": "Start countdown automatically after computer restart"
+    },
+    "countdown": {
+      "title": "Countdown",
+      "description": "Show countdown in menu bar (macOS only)"
+    },
+    "fullScreen": {
+      "title": "Full Screen Reminder",
+      "description": "Show reminder in full screen mode, otherwise use system notification"
+    },
+    "reminder": {
+      "title": "Reminders",
+      "dailyGoal": {
+        "title": "Daily Goal",
+        "description": "Will remind you until the goal is reached",
+        "placeholder": "Select goal",
+        "suggestion": "Recommended at least 1500ml"
+      },
+      "interval": {
+        "title": "Reminder Interval",
+        "placeholder": "Select interval",
+        "unit": "minutes"
+      },
+      "repeat": {
+        "title": "Repeat",
+        "description": "Remind by weekday",
+        "days": [
+          "Sun",
+          "Mon",
+          "Tue",
+          "Wed",
+          "Thu",
+          "Fri",
+          "Sat"
+        ]
+      },
+      "timeRange": {
+        "title": "Time Range",
+        "description": "Only remind during specified time period",
+        "start": "Start time",
+        "end": "End time",
+        "to": "to"
+      },
+      "whitelist": {
+        "title": "App Whitelist",
+        "description": "Pause reminders when these apps are active",
+        "placeholder": "Select apps",
+        "searchPlaceholder": "Search apps...",
+        "empty": "No apps found"
+      }
+    },
+    "shortcut": {
+      "title": "Shortcuts",
+      "exit": {
+        "title": "Exit",
+        "description": "Press Esc key to close the reminder window"
+      }
+    },
+    "about": {
+      "title": "About",
+      "project": {
+        "title": "About Project",
+        "description": "This is a tool to help you develop healthy drinking habits. It will remind you to drink water at appropriate times based on your goals, helping you maintain adequate hydration and improve your health.",
+        "feedback": "If you have any ideas or encounter issues, please feel free to contact us through the following methods. Your feedback will help us improve!"
+      },
+      "version": {
+        "title": "Version",
+        "check": "Check Update",
+        "checking": "Checking...",
+        "update": "Update Now",
+        "installing": "Installing {progress}%",
+        "newVersion": "New version found: {version}"
+      },
+      "appInfo": {
+        "title": "App Info",
+        "description": "Copy app info for Bug Issue",
+        "copy": "Copy"
+      },
+      "contact": {
+        "title": "Contact Us",
+        "wechat": "WeChat: slash__z",
+        "email": "hey47_zhang@163.com",
+        "github": "https://github.com/rock-zhang/Shui"
+      },
+      "copySuccess": "Copied successfully"
+    }
+  },
+  "reminder": {
+    "title": "Time to Drink!",
+    "autoClose": "Auto close in {countdown}s",
+    "skip": "Skip",
+    "today": {
+      "drunk": "Today: {amount}ml",
+      "target": "Target: {amount}ml"
+    },
+    "notification": {
+      "title": "🎉 Great job! Daily water goal achieved",
+      "body": "Keep up the good work and maintain your healthy habits!"
+    },
+    "waterNotification": {
+      "title": "⏰Time to Drink Water",
+      "body": "Stand up, have some water, and stretch your body!"
+    },
+    "messages": {
+      "0": "Let's stay hydrated! 💧",
+      "1": "Every sip counts towards your health ✨",
+      "2": "Time for a refreshing break 🌊",
+      "3": "Keep your body energized ⚡️",
+      "4": "Stay hydrated, stay happy 🎵",
+      "5": "Give your cells some energy 💪",
+      "6": "Eight glasses a day keeps the doctor away 🎯",
+      "7": "Time to recharge your body 🔋",
+      "8": "Water is life, don't let your body thirst 💎",
+      "9": "A cool drink for a clear mind 🧊",
+      "10": "Take a water break for better productivity ⭐️",
+      "11": "Every sip is self-care 💝",
+      "12": "Stay hydrated, stay beautiful ✨",
+      "13": "Let water nourish your day 🌈",
+      "14": "Time for a refreshing moment 🎐",
+      "15": "Best time to recharge ⚡️",
+      "16": "A sip of water for a better mood 🎵",
+      "17": "Every sip builds your health 🌱",
+      "18": "Stay hydrated, stay energetic 💫",
+      "19": "Let water boost your health 🎯"
+    }
+  }
+}
