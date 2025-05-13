@@ -113,7 +113,10 @@ sudo xattr -r -d com.apple.quarantine /Applications/Shui.app
 
 ## 社区交流
 
+欢迎 PR 和 Issue，一起探讨和改进 Shui！
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/rock-zhang/Shui)
 <picture>
+
   <source media="(prefers-color-scheme: dark)" srcset="public/qrcode_wechat_dark.jpg" />
   <source media="(prefers-color-scheme: light)" srcset="public/qrcode_wechat_light.jpg" />
   <img width="300px" src="public/qrcode_wechat_light.jpg" />
