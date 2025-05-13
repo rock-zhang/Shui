@@ -1,23 +1,16 @@
 "use client";
 import { invoke } from "@tauri-apps/api/core";
-import {
-  isRegistered,
-  register,
-  unregisterAll,
-} from "@tauri-apps/plugin-global-shortcut";
+import { isRegistered, register, unregisterAll } from "@tauri-apps/plugin-global-shortcut";
 import { useEffect, useState } from "react";
 import { listen, TauriEvent } from "@tauri-apps/api/event";
 import { Progress } from "@/components/ui/progress";
 import { ArrowRight } from "lucide-react";
 import { load } from "@tauri-apps/plugin-store";
-import {
-  isPermissionGranted,
-  requestPermission,
-  sendNotification,
-} from "@tauri-apps/plugin-notification";
+import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import "./index.css";
 import { currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 import { STORE_NAME } from "@/lib/constants";
+import { useI18n } from "@/i18n/provider";
 
 function hideWindowAction() {
   invoke("hide_reminder_windows");
@@ -32,66 +25,16 @@ async function registerEscShortcut() {
   });
 }
 
-// 添加音效播放函数
 const playSound = () => {
   const audio = new Audio("/sounds/water-drop.mp3");
-  audio.volume = 0.5; // 设置音量为 50%
+  audio.volume = 0.5;
   audio.play().catch((err) => console.log("音频播放失败:", err));
 };
 
-const sendNativeNotification = async () => {
-  let permissionGranted = await isPermissionGranted();
-
-  if (!permissionGranted) {
-    const permission = await requestPermission();
-    permissionGranted = permission === "granted";
-  }
-
-  // Once permission has been granted we can send the notification
-  if (permissionGranted) {
-    playSound(); // 添加音效
-
-    sendNotification({
-      title: "🎉 太棒了！完成今日喝水目标",
-      body: "再接再厉，继续保持健康好习惯！",
-    });
-  }
-};
-
-function getTodayDate() {
-  const today = new Date();
-  return `${today.getFullYear()}${String(today.getMonth() + 1).padStart(
-    2,
-    "0"
-  )}${String(today.getDate()).padStart(2, "0")}`;
-}
-
 const waterOptions = [{ ml: 50 }, { ml: 100 }, { ml: 200 }, { ml: 300 }];
 
-const reminderTexts = [
-  "补充一下能量吧，让身体充满活力 ✨",
-  "每一口水都是对健康的投资 💧",
-  "喝水时刻，让生活更有滋味 🌊",
-  "来杯水，让身体清爽一下 ⚡️",
-  "保持水分，保持好心情 🎵",
-  "给细胞们补充点能量吧 💪",
-  "每天八杯水，健康不用愁 🎯",
-  "喝水时间到，让身体充电啦 🔋",
-  "水是生命之源，别让身体缺水哦 💎",
-  "来一杯清凉，让大脑更清醒 🧊",
-  "喝水小憩，让工作更高效 ⭐️",
-  "每一口水都是对自己的关爱 💝",
-  "保持水分，保持美丽 ✨",
-  "让水分滋润你的一天 🌈",
-  "喝水时刻，让身体更轻松 🎐",
-  "补充能量的最佳时机 ⚡️",
-  "来杯水，让心情更舒畅 🎵",
-  "每一口水都是健康的积累 🌱",
-  "保持水分，保持活力 💫",
-  "让水分为你的健康加分 🎯",
-];
-
 export default function ReminderPage() {
+  const { t } = useI18n();
   const [reminderText, setReminderText] = useState("");
   const [water, setWater] = useState({
     gold: 0,
@@ -99,15 +42,12 @@ export default function ReminderPage() {
   });
   const [countdown, setCountdown] = useState(30);
   const [monitorName, setMonitorName] = useState("");
-  // 按天存储饮水量
   const todayDate = getTodayDate();
 
-  // 根据饮水量随机选择提醒文案
   useEffect(() => {
-    setReminderText(
-      reminderTexts[Math.floor(Math.random() * reminderTexts.length)]
-    );
-  }, [water.drink]);
+    const index = Math.floor(Math.random() * 20);
+    setReminderText(t(`reminder.messages.${index}`));
+  }, [water.drink, t]);
 
   useEffect(() => {
     registerEscShortcut();
@@ -119,13 +59,10 @@ export default function ReminderPage() {
       }
     });
 
-    // TODO:被其他窗口隐藏时，注销快捷键
-    // 待确认多屏场景下，是否需要注销快捷键
     listen("reminder_already_hidden", () => {
       unregisterAll();
     });
 
-    // 监听窗口显示事件
     listen(TauriEvent.WINDOW_FOCUS, () => {
       console.log("TauriEvent.WINDOW_FOCUS");
       registerEscShortcut();
@@ -146,7 +83,6 @@ export default function ReminderPage() {
       console.log("TauriEvent.WINDOW_MOVED", monitorName);
       const mo = await currentMonitor();
       if (mo?.name !== monitorName) {
-        // 外接屏幕变化时，隐藏窗口
         const win = await getCurrentWindow();
         invoke("hide_reminder_window", { label: win.label });
       }
@@ -188,15 +124,27 @@ export default function ReminderPage() {
     await store.save();
 
     if (totalDrink >= water.gold) {
-      sendNativeNotification();
+      let permissionGranted = await isPermissionGranted();
+
+      if (!permissionGranted) {
+        const permission = await requestPermission();
+        permissionGranted = permission === "granted";
+      }
+
+      if (permissionGranted) {
+        playSound();
+        sendNotification({
+          title: t("reminder.notification.title"),
+          body: t("reminder.notification.body"),
+        });
+      }
     }
 
-    // 添加关闭动画
     setIsClosing(true);
     setTimeout(() => {
       hideWindowAction();
       setIsClosing(false);
-    }, 800); // 等待动画完成后关闭
+    }, 800);
   };
 
   const progress = (water.drink / water.gold) * 100;
@@ -211,7 +159,7 @@ export default function ReminderPage() {
       }`}
     >
       <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/30 backdrop-blur-sm px-4 py-2 rounded-full text-gray-700 text-base font-medium shadow-sm border border-white/20 transition-transform duration-300">
-        {countdown}s 后自动关闭
+        {t("reminder.autoClose", { countdown })}
       </div>
       <div
         className={`bg-white/30 backdrop-blur-sm p-8 rounded-2xl shadow-lg max-w-md w-full z-10 border border-white/20 transition-all duration-300 ${
@@ -219,14 +167,14 @@ export default function ReminderPage() {
         }`}
       >
         <h2 className="text-2xl font-bold text-center mb-6 text-blue-600">
-          喝了么
+          {t("reminder.title")}
         </h2>
         <p className="text-gray-600 text-center mb-8">{reminderText}</p>
 
         <div className="mb-8">
           <div className="flex justify-between text-sm text-gray-600 mb-2">
-            <span>今日已喝: {water.drink}ml</span>
-            <span>目标: {water.gold}ml</span>
+            <span>{t("reminder.today.drunk", { amount: water.drink })}</span>
+            <span>{t("reminder.today.target", { amount: water.gold })}</span>
           </div>
           <Progress value={progress <= 100 ? progress : 100} className="h-2" />
         </div>
@@ -240,7 +188,7 @@ export default function ReminderPage() {
               className="group relative p-6 rounded-xl transition-all duration-200 cursor-pointer bg-blue-50 hover:bg-blue-100 hover:scale-105 active:scale-95 text-blue-700 flex items-center justify-center"
             >
               <div className="flex items-baseline gap-1">
-                <span className="text-3xl font-medium">{option.ml}</span>
+                <span className="text-4xl font-medium">{option.ml}</span>
                 <span className="text-lg text-blue-600/90">ml</span>
               </div>
             </button>
@@ -253,11 +201,19 @@ export default function ReminderPage() {
             tabIndex={-1}
             className="text-gray-500 hover:text-gray-700 text-sm inline-flex items-center gap-1.5 transition-colors duration-200 cursor-pointer"
           >
-            跳过
+            {t("reminder.skip")}
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       </div>
     </div>
   );
+}
+
+function getTodayDate() {
+  const today = new Date();
+  return `${today.getFullYear()}${String(today.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}${String(today.getDate()).padStart(2, "0")}`;
 }

@@ -1,13 +1,9 @@
-import type { NextConfig } from "next";
-import { version } from "./package.json";
-
-const nextConfig: NextConfig = {
-  output: "export",
-  distDir: "dist",
-  trailingSlash: true,
-  skipTrailingSlashRedirect: true,
-  env: {
-    APP_VERSION: version,
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: true,
+  swcMinify: true,
+  images: {
+    unoptimized: true,
   },
 };
 

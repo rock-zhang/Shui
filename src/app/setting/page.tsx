@@ -9,12 +9,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { STORE_NAME } from "@/lib/constants";
 import { usePlatform } from "@/hooks/use-platform";
 import { getGeneralConfig } from "@/utils/store";
+import { useI18n } from "@/i18n/provider";
+import { LanguageSwitcher } from "@/components/language-switcher";
 
 export default function Home() {
+  const { t } = useI18n();
   const [config, setConfig] = useState({
     isAutoStart: false,
     isCountDown: false,
-    isFullScreen: false, // 新增全屏提醒选项
+    isFullScreen: false,
   });
   const { isMacOS } = usePlatform();
   useTray();
@@ -29,7 +32,7 @@ export default function Home() {
       setConfig({
         ...config,
         isCountDown: generalSetting?.isCountDown || false,
-        isFullScreen: generalSetting?.isFullScreen || false, // 设置默认值
+        isFullScreen: generalSetting?.isFullScreen || false,
         isAutoStart,
       });
     }
@@ -67,18 +70,15 @@ export default function Home() {
 
   return (
     <div>
-      <h3 className="mb-4 text-lg font-medium">通用</h3>
+      <h3 className="mb-4 text-lg font-medium">{t("settings.title")}</h3>
 
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            开机自启动
+            {t("settings.autoStart.title")}
           </label>
-          <p
-            id=":r233:-form-item-description"
-            className="text-[0.8rem] text-muted-foreground"
-          >
-            电脑重启之后自动开始倒计时
+          <p className="text-[0.8rem] text-muted-foreground">
+            {t("settings.autoStart.description")}
           </p>
         </div>
         <Switch
@@ -90,13 +90,13 @@ export default function Home() {
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            倒计时
+            {t("settings.countdown.title")}
           </label>
           <p
             id=":r233:-form-item-description"
             className="text-[0.8rem] text-muted-foreground"
           >
-            开启后将在菜单栏显示倒计时，仅支持macOS
+            {t("settings.countdown.description")}
           </p>
         </div>
         <Switch
@@ -104,22 +104,21 @@ export default function Home() {
           checked={config.isCountDown}
           onCheckedChange={async (checked) => {
             await saveConfig("isCountDown", checked);
-            // 重置计时器
             invoke("reset_timer");
           }}
         />
       </div>
 
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs">
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            全屏提醒
+            {t("settings.fullScreen.title")}
           </label>
           <p
             id=":r233:-form-item-description"
             className="text-[0.8rem] text-muted-foreground"
           >
-            开启后将以全屏方式显示提醒，关闭则使用系统通知
+            {t("settings.fullScreen.description")}
           </p>
         </div>
         <Switch
@@ -128,6 +127,16 @@ export default function Home() {
             await saveConfig("isFullScreen", checked);
           }}
         />
+      </div>
+
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
+        <div>
+          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+            {t("common.language")}
+          </label>
+        </div>
+        {/* TODO: 切换语言之后要刷新【全屏提醒】页面，新语言才会生效 */}
+        <LanguageSwitcher />
       </div>
     </div>
   );

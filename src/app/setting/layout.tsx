@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { usePlatform } from "@/hooks/use-platform";
 import { sendReminderNotification } from "@/utils/notification";
 import { getGeneralConfig } from "@/utils/store";
+import { useI18n } from "@/i18n/provider";
 
 export default function RootLayout({
   children,
@@ -15,6 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const { isMacOS } = usePlatform();
+  const { t } = useI18n();
 
   useEffect(() => {
     const unlisten = listen("timer-complete", async (event) => {
@@ -23,7 +25,7 @@ export default function RootLayout({
       if ((await getGeneralConfig()).isFullScreen) {
         invoke("call_reminder");
       } else {
-        sendReminderNotification();
+        sendReminderNotification(t);
         invoke("reset_timer");
       }
       // 这里可以添加倒计时结束后的处理逻辑

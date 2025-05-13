@@ -1,37 +1,37 @@
-# Shui - Water Reminder Assistant
+# Shui - Smart Drink Water Reminder
 
 <p align="center">
   <img src="public/screenshot-0.png" alt="Shui Screenshot" width="350"/>
   <br/>
 </p>
 
-A cross-platform desktop app focused on water intake reminders, promoting office workers' health 💪 and improving your drinking habits.
+A cross-platform desktop app focused on drink water reminders, caring for your health 💪 and improving your hydration habits.
 
-## ✨ Key Features
+## ✨ Features
 
-- 🎯 Daily Water Intake Goals
-- 🖥️ Full-screen Reminders - Elegant and Unmissable Break Notifications
-- ⏰ Smart Time Management
-  - Customizable Reminder Intervals
-  - Smart Workday Reminders
-  - Custom Time Range
-- 🔔 Diverse Notification Methods
-  - Full-screen Notification Page
-  - Native System Notifications
-  - Tray Real-time Countdown
-  - Goal Completion Sound Effects
-- 💡 Smart and User-friendly
-  - Automatic Workday Recognition
-  - Auto-pause on Screen Lock/Sleep
-  - Tray Quick Actions
-  - App Whitelist (Default: Tencent Meeting, Zoom, Google Meet, Microsoft Teams)
-- 📊 Data Statistics
-  - Daily Water Intake Statistics
-  - Drinking Habit Analysis
-  - Break Reminder Statistics
-  - Data Visualization
+- 🎯 Daily water intake goal setting
+- 🖥️ Fullscreen reminders - Elegant and unmissable break notifications
+- ⏰ Smart time management
+  - Custom reminder intervals
+  - Workday-only reminders
+  - Custom time ranges
+- 🔔 Multiple reminder modes
+  - Fullscreen notification page
+  - Native system notifications
+  - Tray countdown display
+  - Goal completion sound effects
+- 💡 Smart and user-friendly
+  - Automatic workday detection
+  - Auto-pause when screen off/locked
+  - Quick actions in tray
+  - App whitelist (Default: Tencent Meeting, Zoom, Google Meet, Microsoft Teams)
+- 📊 Data tracking
+  - Daily water intake statistics
+  - Hydration habit analysis
+  - Break reminder statistics
+  - Visual data dashboard
 
-## 🖥 Application Interface
+## 🖥 App Interface
 
 <p align="center">
   <img src="public/screenshot-2.png" alt="Settings"/>
@@ -44,13 +44,12 @@ A cross-platform desktop app focused on water intake reminders, promoting office
 ### Platform Support
 
 - ✅ macOS
-- ✅ Windows
+- 🚧 Windows (coming soon)
 - 🚧 Linux (coming soon)
-- 🚧 Android (coming soon)
 
-### Download and Installation
+### Installation
 
-Download the latest version from the [Releases](https://github.com/rock-zhang/Shui/releases/) page.
+Download latest version from [Releases](https://github.com/rock-zhang/Shui/releases/)
 
 #### macOS
 
@@ -59,76 +58,49 @@ Download the latest version from the [Releases](https://github.com/rock-zhang/Sh
 
 #### Windows
 
-- 64-bit System: Download `Shui_x.x.x_x64-setup.exe`
-- 32-bit System: Download `Shui_x.x.x_x86-setup.exe`
-- ARM64 Architecture: Download `Shui_x.x.x_arm64-setup.exe`
+- 64-bit: Download `Shui_x.x.x_x64-setup.exe`
+- 32-bit: Download `Shui_x.x.x_x86-setup.exe`
+- ARM64: Download `Shui_x.x.x_arm64-setup.exe`
 
 #### Note
 
 <img src="public/install_error.png" />
 
-If you encounter the "Shui is damaged and can't be opened" message on `macOS`, please run the following command in Terminal:
+If seeing "Shui is damaged" warning on macOS, run:
 
-```shell
+```bash
 sudo xattr -r -d com.apple.quarantine /Applications/Shui.app
 ```
 
 ## 🛣 Development Roadmap
 
-### Implemented Features
+### Implemented
 
-- [x] Basic Reminder Functionality
-- [x] Customizable Reminder Intervals
-- [x] Smart Workday Reminders
-- [x] System Tray Support
-- [x] Global Hotkeys
-- [x] App Whitelist Management
-- [x] Auto-pause on Screen Lock/Sleep
-- [x] Tray Quick Actions
-- [x] Custom Time Range
-- [x] Native System Notifications
-- [x] Tray Real-time Countdown
+- [x] Core reminder system
+- [x] Custom intervals
+- [x] Workday detection
+- [x] System tray integration
+- [x] Global hotkeys
+- [x] App whitelist management
 
-### Development Plans
+### Planned
 
-- [x] Windows Support
-- [ ] Multi-language Support
-- [ ] Linux Support
-- [x] Reminder Sound Effects
-- [ ] Data Statistics and Analysis
-  - [ ] Water Intake Trend Charts
-  - [ ] Break Time Statistics
-  - [ ] Data Export Functionality
-  - [ ] Water Intake Time Distribution
-  - [ ] Water Intake Interval Analysis
-- [ ] Custom Themes
+- [ ] Custom notification sounds
+- [ ] Advanced analytics
+  - [ ] Hydration trends
+  - [ ] Break time reports
+  - [ ] Data export
+- [ ] Theme customization
+- [ ] Multilingual support
 
 ## 🛠 Tech Stack
 
-- [Tauri](https://tauri.app/) - Cross-platform Desktop App Framework
-- [Next.js](https://nextjs.org/) - React Application Framework
-- [React](https://reactjs.org/) - User Interface Framework
-- [Rust](https://www.rust-lang.org/) - Backend Logic Implementation
-- [shadcn/ui](https://ui.shadcn.com/) - UI Component Library
+- [Tauri](https://tauri.app/) - Cross-platform framework
+- [Next.js](https://nextjs.org/) - React framework
+- [React](https://reactjs.org/) - UI library
+- [Rust](https://www.rust-lang.org/) - Backend logic
+- [shadcn/ui](https://ui.shadcn.com/) - UI components
 
-## Community
+## 📝 License
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="public/qrcode_wechat_dark.jpg" />
-  <source media="(prefers-color-scheme: light)" srcset="public/qrcode_wechat_light.jpg" />
-  <img width="300px" src="public/qrcode_wechat_light.jpg" />
-</picture>
-
-## ☕ Support
-
-If you find this project helpful, please give the author a free Star. Thank you for your support!
-
-## Star History
-
-<a href="https://www.star-history.com/#rock-zhang/Shui&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=rock-zhang/Shui&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=rock-zhang/Shui&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=rock-zhang/Shui&type=Date" />
- </picture>
-</a>
+MIT License © 2024 [Slash]
