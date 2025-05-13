@@ -18,7 +18,11 @@ pub fn show_reminder(app_handle: &tauri::AppHandle) {
                 if let Ok(panel) = app_handle.get_webview_panel(&reminder_label) {
                     let win = app_handle.get_webview_window(&reminder_label).unwrap();
                     let position = monitor.position();
-                    let _ = win.set_position(LogicalPosition::new(position.x, position.y));
+                    let scale_factor = monitor.scale_factor();
+                    let _ = win.set_position(LogicalPosition::new(
+                        position.x as f64 / scale_factor,
+                        position.y as f64 / scale_factor,
+                    ));
                     panel.show();
                 } else {
                     // 接入新的外接屏幕，需要重新创建Window
@@ -64,9 +68,11 @@ fn show_or_create_reminder_window(app_handle: &tauri::AppHandle) {
             .transparent(true)
             .always_on_top(true)
             .visible_on_all_workspaces(true)
-            .focus()
             .inner_size(scaled_width as f64, scaled_height as f64)
-            .position(position.x as f64, position.y as f64)
+            .position(
+                position.x as f64 / scale_factor,
+                position.y as f64 / scale_factor,
+            )
             .build()
             .expect(&format!("failed to create reminder window {}", index));
 
