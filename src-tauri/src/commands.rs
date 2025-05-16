@@ -156,6 +156,6 @@ pub async fn get_app_runtime_info(
 }
 
 #[tauri::command]
-pub async fn get_installed_apps(app_handle: tauri::AppHandle) -> Vec<String> {
-    util::get_installed_apps(&app_handle)
+pub async fn get_installed_apps() -> Vec<String> {
+    util::get_installed_apps().await
 }
