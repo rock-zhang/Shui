@@ -34,11 +34,18 @@ export function useTray() {
       await MenuItem.new({
         text: "偏好设置",
         action: async () => {
-          console.log("打开设置");
+          // 尝试获取并显示主窗口
           const mainWindow = await WebviewWindow.getByLabel("main");
-          // mainWindow?.setDecorations(true);
-          mainWindow?.show();
-          mainWindow?.setFocus();
+
+          if (mainWindow) {
+            // 尝试取消最小化（如果窗口被最小化了）
+            const isMinimized = await mainWindow.isMinimized();
+            if (isMinimized) await mainWindow.unminimize();
+
+            // 显示窗口
+            await mainWindow.show();
+            await mainWindow.setFocus();
+          }
         },
       })
     );

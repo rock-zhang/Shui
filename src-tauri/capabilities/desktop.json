@@ -13,6 +13,8 @@
     "process:default",
     "process:allow-restart",
     "process:allow-exit",
-    "updater:default"
+    "updater:default",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-unminimize"
   ]
 }
