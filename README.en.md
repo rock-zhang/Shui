@@ -114,9 +114,9 @@ sudo xattr -r -d com.apple.quarantine /Applications/Shui.app
 ## Community
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="public/qrcode_wechat_dark.jpg" />
-  <source media="(prefers-color-scheme: light)" srcset="public/qrcode_wechat_light.jpg" />
-  <img width="300px" src="public/qrcode_wechat_light.jpg" />
+  <source media="(prefers-color-scheme: dark)" srcset="public/qrcode_wechat_dark.png" />
+  <source media="(prefers-color-scheme: light)" srcset="public/qrcode_wechat_light.png" />
+  <img width="300px" src="public/qrcode_wechat_light.png" />
 </picture>
 
 ## ☕ Support
