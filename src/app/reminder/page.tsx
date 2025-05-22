@@ -197,7 +197,7 @@ export default function ReminderPage() {
     setTimeout(() => {
       hideWindowAction();
       setIsClosing(false);
-    }, 800); // 等待动画完成后关闭
+    }, 300); // 等待动画完成后关闭
   };
 
   const progress = (water.drink / water.gold) * 100;
@@ -207,7 +207,7 @@ export default function ReminderPage() {
       onContextMenu={(e) => {
         if (process.env.NODE_ENV === "production") e.preventDefault();
       }}
-      className={`reminder-page min-h-screen flex items-center justify-center relative transition-opacity duration-800 ${
+      className={`reminder-page min-h-screen flex items-center justify-center relative transition-opacity duration-300 ${
         isClosing ? "opacity-0" : "opacity-100"
       }`}
     >
@@ -215,7 +215,7 @@ export default function ReminderPage() {
         {countdown}s 后自动关闭
       </div>
       <div
-        className={`bg-white/30 backdrop-blur-sm p-8 rounded-2xl shadow-lg max-w-md w-full z-10 border border-white/20 transition-all duration-300 ${
+        className={`bg-white/30 backdrop-blur-sm p-8 rounded-2xl shadow-lg max-w-md w-full z-10 border border-white/20 transition-all duration-100 ${
           isClosing ? "scale-95 opacity-0" : "scale-100 opacity-100"
         }`}
       >
@@ -238,7 +238,7 @@ export default function ReminderPage() {
               key={option.ml}
               tabIndex={-1}
               onClick={() => handleWaterSelection(option.ml)}
-              className="group relative p-6 rounded-xl transition-all duration-200 cursor-pointer bg-blue-50 hover:bg-blue-100 hover:scale-105 active:scale-95 text-blue-700 flex items-center justify-center"
+              className="group relative p-6 rounded-xl transition-all duration-300 cursor-pointer bg-blue-50 hover:bg-blue-100 hover:scale-105 active:scale-95 text-blue-700 flex items-center justify-center"
             >
               <div className="flex items-baseline gap-1">
                 <span className="text-3xl font-medium">{option.ml}</span>
@@ -252,7 +252,7 @@ export default function ReminderPage() {
           <button
             onClick={hideWindowAction}
             tabIndex={-1}
-            className="text-gray-500 hover:text-gray-700 text-sm inline-flex items-center gap-1.5 transition-colors duration-200 cursor-pointer"
+            className="text-gray-500 hover:text-gray-700 text-sm inline-flex items-center gap-1.5 transition-colors duration-300 cursor-pointer"
           >
             跳过
             <ArrowRight className="w-4 h-4" />

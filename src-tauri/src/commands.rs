@@ -138,6 +138,9 @@ pub struct AppRuntimeInfoResponse {
     is_running: bool,
     app_settings: AppSettings,
     version: String,
+    os_version: String,
+    os_arch: String,
+    chip_info: String,
 }
 
 #[tauri::command(async)]
@@ -148,10 +151,33 @@ pub async fn get_app_runtime_info(
     let is_running = IS_RUNNING.load(Ordering::SeqCst);
     let version = app_handle.package_info().version.to_string();
 
+    // 获取操作系统信息
+    let os_info = format!("{} {}", std::env::consts::OS, std::env::consts::ARCH);
+    let os_arch = std::env::consts::ARCH.to_string();
+
+    // 获取芯片信息
+    let chip_info = {
+        #[cfg(target_os = "macos")]
+        {
+            let output = std::process::Command::new("sysctl")
+                .args(["-n", "machdep.cpu.brand_string"])
+                .output()
+                .map_err(|e| e.to_string())?;
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            "Unknown".to_string()
+        }
+    };
+
     Ok(AppRuntimeInfoResponse {
         app_settings,
         is_running,
         version,
+        os_version: os_info,
+        os_arch,
+        chip_info,
     })
 }
 
