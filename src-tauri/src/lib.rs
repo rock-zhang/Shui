@@ -3,10 +3,9 @@ mod core;
 use core::setup;
 mod timer;
 use tauri::Manager;
-// #[cfg(target_os = "macos")]
 use tauri_plugin_autostart::MacosLauncher;
-// #[cfg(target_os = "windows")]
-// use tauri_plugin_autostart::WindowsLauncher;
+#[cfg(target_os = "windows")]
+use tauri_plugin_autostart::WindowsLauncher;
 
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -20,11 +19,15 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_store::Builder::new().build())
-        .plugin(tauri_plugin_autostart::init(
+        .plugin(tauri_plugin_store::Builder::new().build());
+
+    // 根据操作系统配置自启动
+  
+        builder = builder.plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
-            Some(vec!["--test_args=1"]),
+            Some(vec!["--silent"]),
         ));
+
 
     // macOS 特有插件
     #[cfg(target_os = "macos")]

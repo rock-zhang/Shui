@@ -1,0 +1,27 @@
+{
+  "app": {
+    "trayIcon": {
+      "iconPath": "icons/icon_32x32.png",
+      "iconAsTemplate": false,
+      "title": "Shui",
+      "id": "main-tray",
+      "showMenuOnLeftClick": true
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "Shui",
+        "url": "setting/",
+        "width": 680,
+        "height": 460,
+        "resizable": false,
+        "visible": true,
+        "maximizable": false,
+        "hiddenTitle": true,
+        "skipTaskbar": true,
+        "titleBarStyle": "Overlay",
+        "dragDropEnabled": false
+      }
+    ]
+  }
+}

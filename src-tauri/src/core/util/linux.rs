@@ -1,55 +1,67 @@
 use dbus::blocking::Connection;
 use std::process::Command;
+use tauri::{WebviewUrl, WebviewWindowBuilder, Manager};
 
 pub fn check_whitelist(whitelist_apps: &Vec<String>) -> bool {
-    #[cfg(target_os = "linux")]
+    // 使用xdotool获取当前活动窗口的应用信息
+    if let Ok(output) = Command::new("xdotool")
+        .args(["getactivewindow", "getwindowname"])
+        .output()
     {
-        // 使用 D-Bus 获取当前活动窗口的应用信息
-        if let Ok(conn) = Connection::new_session() {
-            let proxy = conn.with_proxy(
-                "org.freedesktop.DBus",
-                "/org/freedesktop/DBus",
-                std::time::Duration::from_millis(5000),
-            );
-
-            // 尝试获取活动窗口的应用名称
-            let result: Result<(String,), _> = proxy.method_call(
-                "org.freedesktop.DBus",
-                "GetNameOwner",
-                ("org.freedesktop.WindowManager",),
-            );
-
-            if let Ok((app_name,)) = result {
+        let window_title = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        
+        // 尝试获取当前窗口的WM_CLASS
+        if let Ok(class_output) = Command::new("sh")
+            .arg("-c")
+            .arg("xprop -id $(xdotool getactivewindow) WM_CLASS")
+            .output()
+        {
+            let class_output_str = String::from_utf8_lossy(&class_output.stdout);
+            if let Some(app_name) = class_output_str
+                .split('"')
+                .nth(3)
+                .map(|s| s.to_string())
+            {
+                println!("当前活动应用: {}", app_name);
                 return whitelist_apps.contains(&app_name);
             }
         }
+        
+        // 尝试根据窗口标题匹配应用
+        for app in whitelist_apps {
+            if window_title.contains(app) {
+                return true;
+            }
+        }
     }
+    
     false
 }
 
 pub fn get_local_installed_apps(app_handle: &tauri::AppHandle) -> Vec<String> {
-    let self_name = app_handle.package_info().name.clone();
-
-    // 获取常见应用目录下的 .desktop 文件
-    let paths = vec![
-        "/usr/share/applications",
-        "/usr/local/share/applications",
-        format!(
-            "/home/{}/.local/share/applications",
-            std::env::var("USER").unwrap_or_default()
-        ),
-    ];
-
     let mut apps = Vec::new();
-
+    let self_name = app_handle.package_info().name.clone();
+    
+    // 获取用户主目录
+    let home_dir = std::env::var("HOME").unwrap_or_else(|_| "/home".to_string());
+    
+    // 系统应用目录
+    let paths = vec![
+        "/usr/share/applications".to_string(),
+        "/usr/local/share/applications".to_string(),
+        format!("{}/.local/share/applications", home_dir),
+        // Flatpak应用目录
+        "/var/lib/flatpak/exports/share/applications".to_string(),
+        format!("{}/.local/share/flatpak/exports/share/applications", home_dir),
+    ];
+    
+    // 处理.desktop文件
     for path in paths {
-        if let Ok(entries) = std::fs::read_dir(path) {
+        if let Ok(entries) = std::fs::read_dir(&path) {
             for entry in entries.filter_map(Result::ok) {
                 if let Some(file_name) = entry.file_name().to_str() {
-                    if file_name.ends_with(".desktop")
-                        && !file_name.starts_with(&format!("{}.desktop", self_name))
-                    {
-                        // 读取 .desktop 文件获取应用名称
+                    if file_name.ends_with(".desktop") && !file_name.starts_with(&format!("{}.desktop", self_name)) {
+                        // 读取.desktop文件获取应用名称
                         if let Ok(content) = std::fs::read_to_string(entry.path()) {
                             if let Some(name) = content
                                 .lines()
@@ -64,7 +76,19 @@ pub fn get_local_installed_apps(app_handle: &tauri::AppHandle) -> Vec<String> {
             }
         }
     }
-
+    
+    // 添加Snap应用
+    if let Ok(output) = Command::new("snap").args(["list"]).output() {
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        for line in output_str.lines().skip(1) { // 跳过标题行
+            if let Some(app_name) = line.split_whitespace().next() {
+                if app_name != self_name {
+                    apps.push(app_name.to_string());
+                }
+            }
+        }
+    }
+    
     apps.sort();
     apps.dedup();
     apps

@@ -49,7 +49,7 @@ fn countdown_async(app_handle: tauri::AppHandle) {
     });
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[tauri::command]
 pub fn call_reminder(app_handle: tauri::AppHandle) -> bool {
     println!("call_reminder");

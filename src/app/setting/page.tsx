@@ -96,7 +96,7 @@ export default function Home() {
             id=":r233:-form-item-description"
             className="text-[0.8rem] text-muted-foreground"
           >
-            开启后将在菜单栏显示倒计时，仅支持macOS
+            开启后将在菜单栏显示倒计时，仅支持macOS和linux
           </p>
         </div>
         <Switch
