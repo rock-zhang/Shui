@@ -49,7 +49,7 @@ fn countdown_async(app_handle: tauri::AppHandle) {
     });
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 #[tauri::command]
 pub fn call_reminder(app_handle: tauri::AppHandle) -> bool {
     println!("call_reminder");
@@ -62,9 +62,9 @@ pub fn call_reminder(app_handle: tauri::AppHandle) -> bool {
     true
 }
 
-// TODO: windows的command居然要加async，笑死，浪费我2个晚上的时间
-// https://github.com/tauri-apps/wry/issues/583
 #[cfg(target_os = "windows")]
+// windows的command居然要加async，笑死，浪费我2个晚上的时间
+// https://github.com/tauri-apps/wry/issues/583
 #[tauri::command]
 pub async fn call_reminder(app_handle: tauri::AppHandle) -> bool {
     println!("call_reminder");

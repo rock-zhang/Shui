@@ -1,8 +1,8 @@
 [package]
 name = "shui"
-version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+version = "0.2.0"
+description = "一个专注喝水提醒的跨端桌面 App，关注打工人健康 💪 ，改善你的喝水习惯。"
+authors = ["Slash"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -74,7 +74,11 @@ features = [
     "Win32_System_Power",  # 添加这一行
 ]
 
-
+[target.'cfg(target_os = "linux")'.dependencies]
+dbus = "0.9.7"
+notify-rust = "4.9"
+x11-dl = "2.21.0"
+gtk = "0.18.1"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"
