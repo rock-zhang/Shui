@@ -89,6 +89,13 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04' && matrix.target == 'aarch64-unknown-linux-gnu'
         run: |
           sudo dpkg --add-architecture arm64
+          # 配置正确的 ARM64 源
+          sudo sed -i 's/^deb http:\/\/security.ubuntu.com\/ubuntu\//deb [arch=amd64,i386] http:\/\/security.ubuntu.com\/ubuntu\//' /etc/apt/sources.list
+          sudo sed -i 's/^deb http:\/\/archive.ubuntu.com\/ubuntu\//deb [arch=amd64,i386] http:\/\/archive.ubuntu.com\/ubuntu\//' /etc/apt/sources.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ jammy main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ jammy-updates main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ jammy-backports main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ jammy-security main restricted universe multiverse" | sudo tee -a /etc/apt/sources.list
           sudo apt-get update
 
       - name: Install cross-compilation dependencies (ARM64 Linux)
