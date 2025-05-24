@@ -20,6 +20,7 @@ pub mod store_fields {
     pub const TIMESTART: &str = "timeStart";
     pub const TIMEEND: &str = "timeEnd";
     pub const ISCOUNTDOWN: &str = "isCountDown";
+    pub const ISFULLSCREEN: &str = "isFullScreen";
 }
 
 #[derive(Debug, Clone, Serialize)] // 添加 Serialize
@@ -67,14 +68,16 @@ impl AppSettings {
                 "gold": "1000",
                 "weekdays": [1, 2, 3, 4, 5],
                 "timeStart": "09:00",
-                "timeEnd": "18:00"
+                "timeEnd": "18:00",
+                "whitelist_apps": ["腾讯会议", "Zoom", "Google Meet", "Microsoft Teams"]
             }),
         );
         store.set(
             config_store_category::GENERAL.to_string(),
             json!({
                 "isAutoStart": false,
-                "isCountDown": true
+                "isCountDown": true,
+                "isFullScreen": true
             }),
         );
         // 保存到文件

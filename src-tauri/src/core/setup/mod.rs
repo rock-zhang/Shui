@@ -152,7 +152,25 @@ fn run_timer(app_handle: &tauri::AppHandle, is_running: &std::sync::atomic::Atom
 // 提取托盘状态更新逻辑
 fn update_tray_status(tray: &mut Option<tauri::tray::TrayIcon>, status: &str, tooltip: &str) {
     if let Some(ref tray_handle) = tray {
-        let _ = tray_handle.set_title(Some(status));
+        let formatted_status = if !status.is_empty() {
+            // 使用等宽无衬线字体字符
+            let status = status
+                .replace("0", "𝟶")
+                .replace("1", "𝟷")
+                .replace("2", "𝟸")
+                .replace("3", "𝟹")
+                .replace("4", "𝟺")
+                .replace("5", "𝟻")
+                .replace("6", "𝟼")
+                .replace("7", "𝟽")
+                .replace("8", "𝟾")
+                .replace("9", "𝟿")
+                .replace(":", "∶");
+            format!("{}", status)
+        } else {
+            String::new()
+        };
+        let _ = tray_handle.set_title(Some(&formatted_status));
         let _ = tray_handle.set_tooltip(Some(tooltip));
     }
 }
