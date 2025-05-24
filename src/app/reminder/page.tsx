@@ -18,6 +18,7 @@ import {
 import "./index.css";
 import { currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 import { STORE_NAME } from "@/lib/constants";
+import { usePlatform } from "@/hooks/use-platform";
 
 function hideWindowAction() {
   invoke("hide_reminder_windows");
@@ -95,6 +96,7 @@ export default function ReminderPage() {
   });
   const [countdown, setCountdown] = useState(30);
   const [monitorName, setMonitorName] = useState("");
+  const { isLinux } = usePlatform();
   // 按天存储饮水量
   const todayDate = getTodayDate();
 
@@ -194,10 +196,13 @@ export default function ReminderPage() {
 
     // 添加关闭动画
     setIsClosing(true);
-    setTimeout(() => {
-      hideWindowAction();
-      setIsClosing(false);
-    }, 300); // 等待动画完成后关闭
+    setTimeout(
+      () => {
+        hideWindowAction();
+        setIsClosing(false);
+      },
+      isLinux ? 0 : 300
+    ); // Linux 系统下无透明度，设置延时为 0，其他系统为 300ms
   };
 
   const progress = (water.drink / water.gold) * 100;

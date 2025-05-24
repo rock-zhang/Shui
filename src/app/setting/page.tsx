@@ -16,7 +16,7 @@ export default function Home() {
     isCountDown: false,
     isFullScreen: false, // 新增全屏提醒选项
   });
-  const { isMacOS } = usePlatform();
+  const { isWindows } = usePlatform();
   useTray();
 
   useEffect(() => {
@@ -100,7 +100,7 @@ export default function Home() {
           </p>
         </div>
         <Switch
-          disabled={!isMacOS}
+          disabled={isWindows}
           checked={config.isCountDown}
           onCheckedChange={async (checked) => {
             await saveConfig("isCountDown", checked);
