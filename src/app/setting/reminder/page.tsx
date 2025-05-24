@@ -49,14 +49,14 @@ export default function Home() {
     whitelist_apps: [] as string[],
   });
   const [installedApps, setInstalledApps] = useState<string[]>([]);
-  const { isWindows } = usePlatform();
+  const { isMacOS } = usePlatform();
 
   useEffect(() => {
     // 加载已安装应用列表
-    if (!isWindows) {
+    if (isMacOS) {
       invoke<string[]>("get_installed_apps").then(setInstalledApps);
     }
-  }, [isWindows]);
+  }, [isMacOS]);
 
   useTray();
 
@@ -268,7 +268,7 @@ export default function Home() {
         </div>
       </div>
 
-      {!isWindows && (
+      {isMacOS && (
         <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
           <div>
             <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">

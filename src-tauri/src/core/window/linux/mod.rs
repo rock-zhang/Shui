@@ -1,2 +1,5 @@
-mod window_ext;
-pub use window_ext::LinuxWindowExt; 
+mod ext;
+mod window_impl;
+
+pub use ext::LinuxWindowExt;
+pub use window_impl::*;

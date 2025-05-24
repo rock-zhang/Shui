@@ -5,10 +5,7 @@ mod macos;
 mod windows;
 
 #[cfg(target_os = "linux")]
-mod linux_impl;
-
-#[cfg(target_os = "linux")]
-mod linux_utils;
+mod linux;
 
 #[cfg(target_os = "macos")]
 pub use macos::*;
@@ -17,7 +14,7 @@ pub use macos::*;
 pub use windows::*;
 
 #[cfg(target_os = "linux")]
-pub use linux_impl::*;
+pub use linux::*;
 
 pub fn show_reminder_windows(app_handle: &tauri::AppHandle) {
     show_reminder(&app_handle);
