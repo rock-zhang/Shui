@@ -16,7 +16,6 @@ use tauri::Emitter;
 #[cfg(target_os = "macos")]
 mod macos;
 
-
 #[cfg(target_os = "macos")]
 pub use macos::*;
 
@@ -24,7 +23,6 @@ pub use macos::*;
 mod windows;
 #[cfg(target_os = "windows")]
 pub use windows::*;
-
 
 #[cfg(target_os = "linux")]
 mod linux;
@@ -40,6 +38,16 @@ pub fn default(app_handle: &tauri::AppHandle) {
     #[cfg(target_os = "macos")]
     {
         let _ = app_handle.set_activation_policy(tauri::ActivationPolicy::Accessory);
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // 设置 Linux 应用图标
+        if let Some(main_window) = app_handle.get_webview_window("main") {
+            let _ = main_window.set_icon(tauri::Icon::File(std::path::PathBuf::from(
+                "icons/icon_512x512.png",
+            )));
+        }
     }
 
     let is_running = IS_RUNNING.clone();

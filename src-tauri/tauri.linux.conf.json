@@ -23,5 +23,19 @@
         "dragDropEnabled": false
       }
     ]
+  },
+  "bundle": {
+    "linux": {
+      "deb": {
+        "files": {
+          "/usr/share/pixmaps/shui.png": "icons/icon_512x512.png",
+          "/usr/share/icons/hicolor/16x16/apps/shui.png": "icons/icon_16x16.png",
+          "/usr/share/icons/hicolor/32x32/apps/shui.png": "icons/icon_32x32.png",
+          "/usr/share/icons/hicolor/128x128/apps/shui.png": "icons/icon_128x128.png",
+          "/usr/share/icons/hicolor/256x256/apps/shui.png": "icons/icon_256x256.png",
+          "/usr/share/icons/hicolor/512x512/apps/shui.png": "icons/icon_512x512.png"
+        }
+      }
+    }
   }
 }
