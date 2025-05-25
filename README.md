@@ -45,7 +45,7 @@
 
 - ✅ macOS
 - ✅ Windows
-- ✅ Linux (coming soon)
+- ✅ Linux
 - 🚧 Android (coming soon)
 
 ### 下载安装
