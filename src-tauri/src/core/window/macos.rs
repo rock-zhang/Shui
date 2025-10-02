@@ -1,8 +1,37 @@
-use tauri::{LogicalPosition, Manager};
+use tauri::{LogicalPosition, LogicalSize, Manager};
 use tauri_nspanel::cocoa::appkit::NSWindowCollectionBehavior;
 use tauri_nspanel::{ManagerExt, WebviewWindowExt};
 
 const NSWindowStyleMaskUtilityWindow: i32 = 1 << 7;
+
+// 窗口度量结构体
+#[derive(Debug, Clone)]
+struct WindowMetrics {
+    scaled_width: f64,
+    scaled_height: f64,
+    scaled_position: LogicalPosition<f64>,
+}
+
+// 统一的窗口度量计算函数，提供精确的缩放和舍入
+fn calculate_window_metrics(monitor: &tauri::Monitor) -> WindowMetrics {
+    let size = monitor.size();
+    let scale_factor = monitor.scale_factor();
+    let position = monitor.position();
+
+    // 添加舍入处理，确保像素对齐
+    let scaled_width = (size.width as f64 / scale_factor).round();
+    let scaled_height = (size.height as f64 / scale_factor).round();
+    let scaled_position = LogicalPosition::new(
+        (position.x as f64 / scale_factor).round(),
+        (position.y as f64 / scale_factor).round(),
+    );
+
+    WindowMetrics {
+        scaled_width,
+        scaled_height,
+        scaled_position,
+    }
+}
 
 pub fn show_reminder(app_handle: &tauri::AppHandle) {
     println!("[macos] show_reminder");
@@ -17,12 +46,24 @@ pub fn show_reminder(app_handle: &tauri::AppHandle) {
                 // 检查是否已存在提醒窗口
                 if let Ok(panel) = app_handle.get_webview_panel(&reminder_label) {
                     let win = app_handle.get_webview_window(&reminder_label).unwrap();
-                    let position = monitor.position();
-                    let scale_factor = monitor.scale_factor();
-                    let _ = win.set_position(LogicalPosition::new(
-                        position.x as f64 / scale_factor,
-                        position.y as f64 / scale_factor,
+
+                    // 使用统一的计算函数
+                    let metrics = calculate_window_metrics(monitor);
+
+                    println!(
+                        "更新窗口 {}: 新尺寸=({:.0}, {:.0}), 新位置={:?}",
+                        reminder_label,
+                        metrics.scaled_width,
+                        metrics.scaled_height,
+                        metrics.scaled_position
+                    );
+
+                    // 同时更新尺寸和位置，确保占满全屏
+                    let _ = win.set_size(LogicalSize::new(
+                        metrics.scaled_width,
+                        metrics.scaled_height,
                     ));
+                    let _ = win.set_position(metrics.scaled_position);
                     panel.show();
                 } else {
                     // 接入新的外接屏幕，需要重新创建Window
@@ -46,17 +87,13 @@ fn show_or_create_reminder_window(app_handle: &tauri::AppHandle) {
                 continue;
             }
 
-            let size = monitor.size();
-            let scale_factor = monitor.scale_factor();
-            let position = monitor.position();
-
-            // 根据缩放因子调整尺寸
-            let scaled_width = size.width as f64 / scale_factor;
-            let scaled_height = size.height as f64 / scale_factor;
+            // 使用统一的计算函数
+            let metrics = calculate_window_metrics(monitor);
 
             println!(
-                "Monitor {}: size={:?}, position={:?}, scale_factor={:?}, scaled_size=({:?}, {:?})",
-                index, size, position, scale_factor, scaled_width, scaled_height
+                "创建窗口 {}: size={:?}, position={:?}, scale_factor={:.2}, scaled_size=({:.0}, {:.0})",
+                index, monitor.size(), monitor.position(), monitor.scale_factor(), 
+                metrics.scaled_width, metrics.scaled_height
             );
 
             let window = tauri::WebviewWindowBuilder::new(
@@ -68,11 +105,8 @@ fn show_or_create_reminder_window(app_handle: &tauri::AppHandle) {
             .transparent(true)
             .always_on_top(true)
             .visible_on_all_workspaces(true)
-            .inner_size(scaled_width as f64, scaled_height as f64)
-            .position(
-                position.x as f64 / scale_factor,
-                position.y as f64 / scale_factor,
-            )
+            .inner_size(metrics.scaled_width, metrics.scaled_height)
+            .position(metrics.scaled_position.x, metrics.scaled_position.y)
             .build()
             .expect(&format!("failed to create reminder window {}", index));
 

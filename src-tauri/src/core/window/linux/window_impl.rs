@@ -1,6 +1,6 @@
 use super::ext::LinuxWindowExt;
 use gtk::prelude::*;
-use tauri::{LogicalPosition, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{LogicalPosition, LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder};
 
 pub fn show_reminder(app_handle: &tauri::AppHandle) {
     println!("[linux] show_reminder");
@@ -30,18 +30,21 @@ fn update_existing_windows(app_handle: &tauri::AppHandle, monitors: &Vec<tauri::
         let reminder_label = format!("reminder_{}", index);
 
         if let Some(window) = app_handle.get_webview_window(&reminder_label) {
-            let position = monitor.position();
-            let scale_factor = monitor.scale_factor();
-            let scaled_position = LogicalPosition::new(
-                position.x as f64 / scale_factor,
-                position.y as f64 / scale_factor,
-            );
+            // 重新计算窗口度量，确保占满全屏
+            let (scaled_width, scaled_height, scaled_position) = calculate_window_metrics(monitor);
+
+            // scaled_position 已经是缩放后的位置，直接转换为逻辑位置
+            let logical_position =
+                LogicalPosition::new(scaled_position.x as f64, scaled_position.y as f64);
 
             println!(
-                "position {:?}, scale_factor {}, scaled_position {:?}",
-                position, scale_factor, scaled_position
+                "更新窗口 {}: 新尺寸=({:.0}, {:.0}), 新位置={:?}",
+                reminder_label, scaled_width, scaled_height, logical_position
             );
-            let _ = window.set_position(scaled_position);
+
+            // 同时更新尺寸和位置，确保占满全屏
+            let _ = window.set_size(LogicalSize::new(scaled_width, scaled_height));
+            let _ = window.set_position(logical_position);
             let _ = window.show();
             set_window_always_on_top(&window);
 
@@ -71,12 +74,9 @@ fn show_or_create_reminder_window(app_handle: &tauri::AppHandle) {
             let (scaled_width, scaled_height, position) = calculate_window_metrics(monitor);
 
             println!(
-                "Monitor {}: position={:?}, scale_factor={:?}, scaled_size=({:?}, {:?})",
-                index,
-                position,
-                monitor.scale_factor(),
-                scaled_width,
-                scaled_height
+                "创建窗口 {}: size={:?}, position={:?}, scale_factor={:.2}, scaled_size=({:.0}, {:.0})",
+                index, monitor.size(), monitor.position(), monitor.scale_factor(),
+                scaled_width, scaled_height
             );
 
             create_reminder_window(
@@ -95,11 +95,12 @@ fn calculate_window_metrics(monitor: &tauri::Monitor) -> (f64, f64, tauri::Physi
     let scale_factor = monitor.scale_factor();
     let position = monitor.position();
 
-    let scaled_width = size.width as f64 / scale_factor;
-    let scaled_height = size.height as f64 / scale_factor;
+    // 添加舍入处理，确保像素对齐和更好的显示效果
+    let scaled_width = (size.width as f64 / scale_factor).round();
+    let scaled_height = (size.height as f64 / scale_factor).round();
     let scaled_position = tauri::PhysicalPosition::new(
-        (position.x as f64 / scale_factor) as i32,
-        (position.y as f64 / scale_factor) as i32,
+        ((position.x as f64 / scale_factor).round()) as i32,
+        ((position.y as f64 / scale_factor).round()) as i32,
     );
 
     (scaled_width, scaled_height, scaled_position)
