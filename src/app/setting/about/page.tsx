@@ -40,11 +40,11 @@ export default function About() {
     <div>
       <h3 className="mb-4 text-lg font-medium">关于</h3>
 
-      <div className="relative overflow-hidden rounded-lg border bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-3 shadow-xs mb-4">
+      <div className="relative overflow-hidden rounded-lg border bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-3 shadow-xs mb-4 dark:from-blue-950/50 dark:via-indigo-950/40 dark:to-purple-950/40">
         <div className="relative z-10 p-2">
           <div className="flex items-center gap-2 mb-2">
             <svg
-              className="h-5 w-5 text-blue-600"
+              className="h-5 w-5 text-blue-600 dark:text-blue-400"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -56,14 +56,14 @@ export default function About() {
                 d="M13 10V3L4 14h7v7l9-11h-7z"
               />
             </svg>
-            <label className="text-lg font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+            <label className="text-lg font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent dark:from-blue-300 dark:to-indigo-300">
               关于项目
             </label>
           </div>
-          <p className="text-sm leading-relaxed text-blue-800/70">
+          <p className="text-sm leading-relaxed text-blue-800/70 dark:text-blue-200/80">
             这是一个帮助你养成健康饮水习惯的小工具。它会根据你设定的目标，在合适的时间提醒你喝水，帮助你保持充足的水分摄入，提升身体健康。
           </p>
-          <p className="text-sm leading-relaxed text-blue-800/70 mt-2">
+          <p className="text-sm leading-relaxed text-blue-800/70 mt-2 dark:text-blue-200/80">
             如果你有任何想法或遇到问题，欢迎通过以下方式与我们联系。你的反馈将帮助我们做得更好！
           </p>
         </div>
