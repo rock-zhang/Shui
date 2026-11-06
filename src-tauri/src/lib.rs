@@ -1,7 +1,10 @@
 mod commands;
+mod drink_recording;
 mod core;
 use core::setup;
 mod timer;
+mod reminder_session;
+mod drink_store;
 use tauri::Manager;
 use tauri_plugin_autostart::MacosLauncher;
 
@@ -38,10 +41,14 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            crate::drink_recording::record_drink,
+            crate::drink_recording::undo_drink,
             commands::call_reminder,
             commands::setting,
             commands::hide_reminder_windows,
             commands::hide_reminder_window,
+            crate::reminder_session::get_reminder_session,
+            crate::reminder_session::record_reminder_drink,
             commands::reset_timer,
             commands::pause_timer,
             commands::start_timer,

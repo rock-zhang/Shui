@@ -1,6 +1,7 @@
 use crate::core::window;
 use crate::core::{store::settings::AppSettings, util};
 use crate::timer;
+use crate::reminder_session::{self, Outcome};
 use serde::Serialize;
 use std::sync::atomic::Ordering;
 
@@ -17,6 +18,7 @@ use tokio::sync::mpsc;
 static REMINDER_PAGE_COUNTDOWN_SENDER: Mutex<Option<mpsc::Sender<()>>> = Mutex::new(None);
 
 fn countdown_async(app_handle: tauri::AppHandle) {
+    let token = reminder_session::current_id();
     // 取消之前的倒计时
     if let Some(sender) = REMINDER_PAGE_COUNTDOWN_SENDER.lock().unwrap().take() {
         let _ = sender.try_send(());
@@ -41,6 +43,9 @@ fn countdown_async(app_handle: tauri::AppHandle) {
                     countdown -= 1;
                     let _ = app_handle.emit("countdown", countdown);
                     if countdown <= 0 {
+                        if reminder_session::close(&app_handle, token.as_deref(), Outcome::TimedOut) {
+                            reset_timer();
+                        }
                         break;
                     }
                 }
@@ -52,6 +57,7 @@ fn countdown_async(app_handle: tauri::AppHandle) {
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[tauri::command]
 pub fn call_reminder(app_handle: tauri::AppHandle) -> bool {
+    if !reminder_session::begin() { return true; }
     println!("call_reminder");
 
     pause_timer();
@@ -67,6 +73,7 @@ pub fn call_reminder(app_handle: tauri::AppHandle) -> bool {
 // https://github.com/tauri-apps/wry/issues/583
 #[tauri::command]
 pub async fn call_reminder(app_handle: tauri::AppHandle) -> bool {
+    if !reminder_session::begin() { return true; }
     println!("call_reminder");
 
     pause_timer();
@@ -79,8 +86,11 @@ pub async fn call_reminder(app_handle: tauri::AppHandle) -> bool {
 }
 
 #[tauri::command]
-pub fn hide_reminder_windows(app_handle: tauri::AppHandle) {
-    window::hide_reminder_windows(&app_handle);
+pub async fn hide_reminder_windows(app_handle: tauri::AppHandle, outcome: Option<Outcome>, expected_session: Option<String>) {
+    if !reminder_session::close(&app_handle, expected_session.as_deref(), outcome.unwrap_or(Outcome::Skipped)) {
+        return;
+    }
+    reset_timer();
 
     // 取消之前的倒计时
     if let Some(sender) = REMINDER_PAGE_COUNTDOWN_SENDER.lock().unwrap().take() {

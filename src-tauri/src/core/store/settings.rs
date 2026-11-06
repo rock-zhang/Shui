@@ -50,6 +50,13 @@ pub fn get_today_string() -> String {
     now.format("%Y%m%d").to_string()
 }
 
+fn drink_amount_from_value(value: &serde_json::Value) -> u64 {
+    value
+        .as_u64()
+        .or_else(|| value.get("total").and_then(|total| total.as_u64()))
+        .unwrap_or(0)
+}
+
 impl AppSettings {
     pub fn is_first_open<R: tauri::Runtime>(store: &Store<R>) -> bool {
         store.is_empty()
@@ -151,7 +158,7 @@ impl AppSettings {
 
         let drink_amount = drink_history_store
             .get(&get_today_string())
-            .and_then(|v| v.as_u64())
+            .map(|value| drink_amount_from_value(&value))
             .unwrap_or(0);
 
         let whitelist_apps = alert_config
@@ -201,5 +208,34 @@ impl AppSettings {
         } else {
             ("", "非工作日或非工作时间")
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::drink_amount_from_value;
+    use serde_json::json;
+
+    #[test]
+    fn reads_legacy_numeric_drink_amount() {
+        assert_eq!(drink_amount_from_value(&json!(850)), 850);
+    }
+
+    #[test]
+    fn reads_structured_drink_amount() {
+        assert_eq!(
+            drink_amount_from_value(&json!({
+                "schemaVersion": 1,
+                "total": 1050,
+                "goal": 1500,
+                "entries": []
+            })),
+            1050
+        );
+    }
+
+    #[test]
+    fn treats_invalid_drink_amount_as_zero() {
+        assert_eq!(drink_amount_from_value(&json!({ "total": "unknown" })), 0);
     }
 }
