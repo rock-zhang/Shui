@@ -9,6 +9,21 @@ import { invoke } from "@tauri-apps/api/core";
 import { STORE_NAME } from "@/lib/constants";
 import { usePlatform } from "@/hooks/use-platform";
 import { getGeneralConfig } from "@/utils/store";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useTheme } from "next-themes";
+
+const themeOptions = [
+  { value: "system", label: "跟随系统" },
+  { value: "light", label: "浅色" },
+  { value: "dark", label: "深色" },
+];
 
 export default function Home() {
   const [config, setConfig] = useState({
@@ -17,7 +32,11 @@ export default function Home() {
     isFullScreen: false, // 新增全屏提醒选项
   });
   const { isWindows } = usePlatform();
+  const { theme, setTheme } = useTheme();
+  const [themeMounted, setThemeMounted] = useState(false);
   useTray();
+
+  useEffect(() => setThemeMounted(true), []);
 
   useEffect(() => {
     async function loadConfig() {
@@ -110,7 +129,7 @@ export default function Home() {
         />
       </div>
 
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs">
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             全屏提醒
@@ -128,6 +147,33 @@ export default function Home() {
             await saveConfig("isFullScreen", checked);
           }}
         />
+      </div>
+
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs">
+        <div>
+          <label className="text-sm font-medium leading-none">外观主题</label>
+          <p className="text-[0.8rem] text-muted-foreground">
+            可选择浅色、深色或跟随系统外观
+          </p>
+        </div>
+        <Select
+          value={themeMounted ? theme : "system"}
+          disabled={!themeMounted}
+          onValueChange={setTheme}
+        >
+          <SelectTrigger className="w-[120px]">
+            <SelectValue placeholder="选择主题" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {themeOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

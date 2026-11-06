@@ -1,0 +1,43 @@
+name: Regression tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: regression-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+      - run: corepack yarn install --frozen-lockfile
+      - run: if [ -d tests ]; then node --test tests/*.test.cjs; fi
+      - run: corepack yarn eslint -c src/eslint.config.mjs src
+      - run: corepack yarn build
+
+  rust:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Tauri's generate_context embeds the exported frontend assets.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+      - run: corepack yarn install --frozen-lockfile
+      - run: corepack yarn build
+      - run: cargo test --workspace --locked
