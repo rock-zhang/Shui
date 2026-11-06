@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { ChartNoAxesCombined } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DatabaseBackup } from "lucide-react";
 
 import {
   Sidebar,
@@ -36,6 +37,11 @@ const items = [
     title: "快捷键",
     url: "/setting/shortcut/",
     icon: Keyboard, // 使用 Keyboard 图标替换 Search
+  },
+  {
+    title: "备份与导入",
+    url: "/setting/data/",
+    icon: DatabaseBackup,
   },
   {
     title: "关于",

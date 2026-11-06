@@ -36,6 +36,10 @@ A cross-platform desktop app focused on water intake reminders, promoting office
   - Drinking-time distribution and intervals between entries on the same day
   - Full-screen reminder counts, outcomes and display duration
   - CSV export of daily totals and individual entries across all dates
+- 💾 Drink History Backup and Import ([details](docs/data-backup.md))
+  - JSON backups preserve daily totals, historical goals, individual entries and revoked request IDs
+  - Preview before importing; confirmation only adds missing dates without overwriting existing days
+  - Repeated imports do not accumulate totals; failed saves can be retried
 
 ## 🖥 Application Interface
 
@@ -51,7 +55,7 @@ A cross-platform desktop app focused on water intake reminders, promoting office
 
 - ✅ macOS
 - ✅ Windows
-- 🚧 Linux (coming soon)
+- ✅ Linux
 - 🚧 Android (coming soon)
 
 ### Download and Installation
@@ -111,9 +115,9 @@ sudo xattr -r -d com.apple.quarantine /Applications/Shui.app
   - [x] Water Intake Time Distribution
   - [x] Water Intake Interval Analysis
 - [x] Appearance Theme Switching (Light, Dark and System)
-- [ ] Drink History Backup and Import (JSON)
+- [x] Drink History Backup and Import (JSON; see [details](docs/data-backup.md))
 
-Reminder display duration is not actual rest time. CSV is intended for viewing and analysis, not complete backups. JSON backup and import are not included in this branch.
+Reminder display duration is not actual rest time. CSV is for viewing and analysis; JSON preserves drink entries, historical goals and undo metadata for backup and import. Imports only add missing dates; CSV import is not supported.
 
 ## 🛠 Tech Stack
 
