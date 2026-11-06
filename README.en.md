@@ -25,11 +25,17 @@ A cross-platform desktop app focused on water intake reminders, promoting office
   - Auto-pause on Screen Lock/Sleep
   - Tray Quick Actions
   - App Whitelist (Default: Tencent Meeting, Zoom, Google Meet, Microsoft Teams)
-- 📊 Data Statistics
-  - Daily Water Intake Statistics
-  - Drinking Habit Analysis
-  - Break Reminder Statistics
-  - Data Visualization
+- 📝 Drink History ([details](docs/drink-records.md))
+  - Manually record 50/100/200/300 ml, including when native notifications are enabled
+  - View daily totals and individual entries for the last 7 or 30 days
+  - Confirm before undoing new entries; multi-monitor actions and retries do not duplicate drinks
+- 🎨 Appearance Themes ([details](docs/themes.md))
+  - Light, dark and system appearance, with persisted selection and same-origin window sync
+- 📊 Hydration Statistics and Analysis ([details](docs/hydration-statistics.md))
+  - 7/30-day intake trends, daily averages and goal-completion days
+  - Drinking-time distribution and intervals between entries on the same day
+  - Full-screen reminder counts, outcomes and display duration
+  - CSV export of daily totals and individual entries across all dates
 
 ## 🖥 Application Interface
 
@@ -88,20 +94,26 @@ sudo xattr -r -d com.apple.quarantine /Applications/Shui.app
 - [x] Custom Time Range
 - [x] Native System Notifications
 - [x] Tray Real-time Countdown
+- [x] Manual Drink Recording (50/100/200/300 ml)
+- [x] Drink History Details (Last 7 or 30 Days)
+- [x] Safe Drink Undo and Request Deduplication
 
 ### Development Plans
 
 - [x] Windows Support
-- [ ] Multi-language Support
-- [ ] Linux Support
+- [x] Linux Support
 - [x] Reminder Sound Effects
-- [ ] Data Statistics and Analysis
-  - [ ] Water Intake Trend Charts
-  - [ ] Break Time Statistics
-  - [ ] Data Export Functionality
-  - [ ] Water Intake Time Distribution
-  - [ ] Water Intake Interval Analysis
-- [ ] Custom Themes
+- [ ] Multi-language Support
+- [x] Data Statistics and Analysis
+  - [x] Water Intake Trend Charts (Last 7 or 30 Days)
+  - [x] Break Reminder Statistics (Counts and Display Duration)
+  - [x] Drink History Export (CSV)
+  - [x] Water Intake Time Distribution
+  - [x] Water Intake Interval Analysis
+- [x] Appearance Theme Switching (Light, Dark and System)
+- [ ] Drink History Backup and Import (JSON)
+
+Reminder display duration is not actual rest time. CSV is intended for viewing and analysis, not complete backups. JSON backup and import are not included in this branch.
 
 ## 🛠 Tech Stack
 

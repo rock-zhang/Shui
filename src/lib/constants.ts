@@ -1,4 +1,5 @@
 export const STORE_NAME = {
+  reminder_history: "reminder_history_store.json",
   config: "config_store.json",
   drink_history: "drink_history_store.json",
 };
