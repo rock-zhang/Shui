@@ -9,6 +9,7 @@ mod reminder_session;
 mod drink_store;
 use tauri::Manager;
 use tauri_plugin_autostart::MacosLauncher;
+mod data_backup;
 
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -38,6 +39,7 @@ pub fn run() {
     builder
         .setup(|app| {
             let app_handle = app.app_handle();
+            data_backup::init(&app_handle)?;
 
             reminder_history::init(&app_handle);
             setup::default(&app_handle);
@@ -55,6 +57,9 @@ pub fn run() {
             crate::reminder_session::record_reminder_drink,
             commands::reset_timer,
             commands::pause_timer,
+            crate::data_backup::export_drink_backup,
+            crate::data_backup::preview_drink_import,
+            crate::data_backup::confirm_drink_import,
             commands::start_timer,
             commands::get_app_runtime_info,
             commands::get_installed_apps,
