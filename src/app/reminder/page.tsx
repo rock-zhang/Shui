@@ -5,7 +5,7 @@ import {
   register,
   unregisterAll,
 } from "@tauri-apps/plugin-global-shortcut";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { listen, TauriEvent } from "@tauri-apps/api/event";
 import { Progress } from "@/components/ui/progress";
 import { ArrowRight } from "lucide-react";
@@ -19,17 +19,16 @@ import "./index.css";
 import { currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 import { STORE_NAME } from "@/lib/constants";
 import { usePlatform } from "@/hooks/use-platform";
+import { normalizeDrinkDay, type DrinkHistoryValue, type DrinkReceipt } from "@/lib/drink-day";
 
-function hideWindowAction() {
-  invoke("hide_reminder_windows");
-  invoke("reset_timer");
-  unregisterAll();
+async function hideWindowAction(outcome: "confirmed" | "skipped" = "confirmed", expectedSession?: string) {
+  await invoke("hide_reminder_windows", { outcome, expectedSession: expectedSession ?? null });
 }
 
 async function registerEscShortcut() {
   if (await isRegistered("Esc")) return;
   register("Esc", async () => {
-    hideWindowAction();
+    hideWindowAction("skipped");
   });
 }
 
@@ -97,6 +96,8 @@ export default function ReminderPage() {
   const [countdown, setCountdown] = useState(30);
   const [monitorName, setMonitorName] = useState("");
   const { isLinux } = usePlatform();
+  const saving = useRef(false);
+  const [saveError, setSaveError] = useState("");
   // 按天存储饮水量
   const todayDate = getTodayDate();
 
@@ -115,11 +116,8 @@ export default function ReminderPage() {
   useEffect(() => {
     registerEscShortcut();
 
-    listen("countdown", (event) => {
+    const countdownListener = listen("countdown", (event) => {
       setCountdown(event.payload as number);
-      if (event.payload === 0) {
-        setTimeout(hideWindowAction, 500);
-      }
     });
 
     // TODO:被其他窗口隐藏时，注销快捷键
@@ -139,6 +137,7 @@ export default function ReminderPage() {
     });
 
     return () => {
+      countdownListener.then(unlisten => unlisten());
       unregisterAll();
     };
   }, []);
@@ -148,7 +147,7 @@ export default function ReminderPage() {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         console.log("Esc key detected via keyboard event");
-        hideWindowAction();
+        hideWindowAction("skipped");
       }
     };
 
@@ -187,12 +186,12 @@ export default function ReminderPage() {
         config_store.get<{
           gold: number;
         }>("alert"),
-        drinkHistory.get<number>(todayDate),
+        drinkHistory.get<DrinkHistoryValue>(todayDate),
       ]);
 
       setWater({
-        gold: Number(goldSetting?.gold),
-        drink,
+        gold: Number(goldSetting?.gold) || 0,
+        drink: normalizeDrinkDay(drink, Number(goldSetting?.gold) || 0).total,
       });
     };
 
@@ -202,31 +201,31 @@ export default function ReminderPage() {
   const [isClosing, setIsClosing] = useState(false);
 
   const handleWaterSelection = async (ml: number) => {
-    const totalDrink = water.drink + ml;
-    setWater({
-      ...water,
-      drink: totalDrink,
-    });
-    const store = await load(STORE_NAME.drink_history, { autoSave: false });
-    await store.set(todayDate, totalDrink);
-    await store.save();
-
-    if (totalDrink >= water.gold) {
-      sendNativeNotification();
-    }
-
-    // 添加关闭动画
-    setIsClosing(true);
-    setTimeout(
-      () => {
-        hideWindowAction();
+    if (saving.current) return;
+    saving.current = true;
+    setSaveError("");
+    try {
+      // Refresh on click: a reused window can still hold the previous session
+      // before the first countdown event of its next presentation arrives.
+      const session = await invoke<string | null>("get_reminder_session");
+      if (!session) throw new Error("本次提醒已结束");
+      const updated = await invoke<DrinkReceipt>("record_reminder_drink", { amount: ml, session });
+      setWater({ gold: updated.goal, drink: updated.total });
+      if (updated.goalReached) sendNativeNotification().catch(console.error);
+      setIsClosing(true);
+      setTimeout(() => {
+        hideWindowAction("confirmed", session).catch(console.error);
         setIsClosing(false);
-      },
-      isLinux ? 100 : 300
-    ); // Linux 系统下无透明度，设置延时为 0，其他系统为 300ms
+        saving.current = false;
+      }, isLinux ? 100 : 300);
+    } catch (error) {
+      console.error("保存饮水记录失败:", error);
+      setSaveError("保存失败，请重试，或在饮水记录页添加");
+      saving.current = false;
+    }
   };
 
-  const progress = (water.drink / water.gold) * 100;
+  const progress = water.gold > 0 ? (water.drink / water.gold) * 100 : 0;
 
   return (
     <div
@@ -275,8 +274,9 @@ export default function ReminderPage() {
         </div>
 
         <div className="mt-6 text-center">
+          {saveError && <p role="alert" className="mb-2 text-red-600">{saveError}</p>}
           <button
-            onClick={hideWindowAction}
+            onClick={() => hideWindowAction("skipped")}
             tabIndex={-1}
             className="text-gray-500 hover:text-gray-700 text-sm inline-flex items-center gap-1.5 transition-colors duration-300 cursor-pointer"
           >
