@@ -80,6 +80,35 @@ jobs:
       - name: Install rust target
         run: rustup target add ${{ matrix.target }}
 
+      # 缓存打包工具（Wix / NSIS / AppImage），避免每次发布都要从 github.com 下载
+      # 而被其偶发 504 卡住打包阶段。
+      - name: Cache bundler tools (windows)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\tauri
+          key: tauri-tools-windows-${{ matrix.target }}
+          restore-keys: |
+            tauri-tools-windows-
+
+      - name: Cache bundler tools (linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/tauri
+          key: tauri-tools-linux-${{ matrix.target }}
+          restore-keys: |
+            tauri-tools-linux-
+
+      - name: Cache bundler tools (macos)
+        if: matrix.platform == 'macos-latest'
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/tauri
+          key: tauri-tools-macos-${{ matrix.target }}
+          restore-keys: |
+            tauri-tools-macos-
+
       - name: Install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
         run: |
