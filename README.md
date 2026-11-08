@@ -128,6 +128,36 @@ sudo xattr -r -d com.apple.quarantine /Applications/Shui.app
 - [Rust](https://www.rust-lang.org/) - 后端逻辑实现
 - [shadcn/ui](https://ui.shadcn.com/) - UI 组件库
 
+## 📦 发布流程
+
+推送 `v*` 标签会触发 [GitHub Actions](.github/workflows/publish.yaml)，自动完成多平台构建、创建 Release 并更新自动更新清单。
+
+### 1. 发布前检查
+
+- **版本号统一**：以 `src-tauri/tauri.conf.json` 的 `version` 为准，同步修改 `src-tauri/Cargo.toml` 和 `package.json`
+- **tag 与版本号一致**：`0.2.32` 对应标签 `v0.2.32`
+- **`updater` Release 已存在且已发布**：自动更新端点固定为 `https://github.com/rock-zhang/Shui/releases/download/updater/latest.json`
+- **Secrets 已配置**：`TAURI_SIGNING_PRIVATE_KEY`（更新签名私钥）；若私钥带密码，还需 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+
+### 2. 触发发布
+
+```shell
+git tag v0.2.32
+git push origin v0.2.32
+```
+
+### 3. 流水线说明
+
+| Job | 作用 |
+| --- | --- |
+| `create-release` | 通过 changelogithub 生成草稿 Release |
+| `release` | 矩阵构建 macOS（aarch64 / x86_64）、Windows（x64 / x86 / arm64）、Linux（x64 / arm64），上传安装包与 `.sig`，并生成包含全部平台的 `latest.json` |
+| `upload-assets` | 从当前 tag 的 Release 下载 `latest.json`，覆盖到 `updater` Release（仅正式标签执行，含 `test` / `beta` 的标签会跳过） |
+
+### 4. 发布后操作
+
+CI 创建的 Release 是**草稿**状态，草稿 Release 的资产外部无法下载，自动更新不会生效。需要在 GitHub 上手动 **Publish release** 后，客户端才能检测到新版本。
+
 ## 社区交流
 
 欢迎 PR 和 Issue，一起探讨和改进 Shui！
