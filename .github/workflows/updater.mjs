@@ -21,6 +21,39 @@ const getVersionRelease = async () => {
   return release;
 };
 
+// 获取或创建 updater tag 的 release。旧版本的更新端点固定指向
+// `releases/download/updater/latest.json`，因此该 release 必须始终存在且为
+// published 状态（draft 的 release 资产对未认证请求返回 404）。
+const getOrCreateUpdaterRelease = async () => {
+  try {
+    const { data: release } = await octokit.rest.repos.getReleaseByTag({
+      owner,
+      repo,
+      tag: "updater",
+    });
+    if (!release.draft) return release;
+    const { data: published } = await octokit.rest.repos.updateRelease({
+      owner,
+      repo,
+      release_id: release.id,
+      draft: false,
+    });
+    return published;
+  } catch (error) {
+    if (error.status !== 404) throw error;
+    const { data: release } = await octokit.rest.repos.createRelease({
+      owner,
+      repo,
+      tag_name: "updater",
+      name: "Updater",
+      body: "旧版本检查更新的固定端点；latest.json 由发布流程自动更新，请勿手动删除。",
+      draft: false,
+      prerelease: false,
+    });
+    return release;
+  }
+};
+
 const updateRelease = async () => {
   const versionRelease = await getVersionRelease();
   const latestAsset = versionRelease.assets.find(
@@ -42,12 +75,8 @@ const updateRelease = async () => {
   );
   const latestJson = Buffer.from(data);
 
-  // 获取updater tag的release
-  const { data: release } = await octokit.rest.repos.getReleaseByTag({
-    owner,
-    repo,
-    tag: "updater",
-  });
+  // 获取（不存在时创建）updater tag 的 release
+  const release = await getOrCreateUpdaterRelease();
 
   // 删除旧的的文件
   await Promise.all(
