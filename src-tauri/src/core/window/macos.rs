@@ -125,23 +125,37 @@ fn show_or_create_reminder_window(app_handle: &tauri::AppHandle) {
     }
 }
 
-pub fn hide_reminder(app_handle: &tauri::AppHandle) {
-    if let Ok(monitors) = app_handle.available_monitors() {
-        for (index, monitor) in monitors.iter().enumerate() {
-            let reminder_label = format!("reminder_{}", index);
-
-            println!("hide_reminder_windows: {}", reminder_label); // 打印 reminder_label 的值，以检查是否正确获取了窗口标签
-
-            // 检查是否已存在提醒窗口
-            if let Ok(panel) = app_handle.get_webview_panel(&reminder_label) {
-                panel.order_out(None);
-            }
-        }
+// AppKit 只允许在主线程操作窗口，而命令（如 hide_reminder_windows）可能是 async 的，
+// 会运行在 tokio 工作线程上，因此这里必须把 NSPanel 操作调度回主线程。
+fn on_main_thread(app_handle: &tauri::AppHandle, task: impl FnOnce(&tauri::AppHandle) + Send + 'static) {
+    let app = app_handle.clone();
+    if let Err(error) = app_handle.run_on_main_thread(move || task(&app)) {
+        eprintln!("[macos] 主线程调度失败: {}", error);
     }
 }
 
+pub fn hide_reminder(app_handle: &tauri::AppHandle) {
+    on_main_thread(app_handle, |app| {
+        if let Ok(monitors) = app.available_monitors() {
+            for (index, _monitor) in monitors.iter().enumerate() {
+                let reminder_label = format!("reminder_{}", index);
+
+                println!("hide_reminder_windows: {}", reminder_label); // 打印 reminder_label 的值，以检查是否正确获取了窗口标签
+
+                // 检查是否已存在提醒窗口
+                if let Ok(panel) = app.get_webview_panel(&reminder_label) {
+                    panel.order_out(None);
+                }
+            }
+        }
+    });
+}
+
 pub fn hide_reminder_single(app_handle: &tauri::AppHandle, label: &str) {
-    if let Ok(panel) = app_handle.get_webview_panel(&label) {
-        panel.order_out(None);
-    }
+    let label = label.to_string();
+    on_main_thread(app_handle, move |app| {
+        if let Ok(panel) = app.get_webview_panel(&label) {
+            panel.order_out(None);
+        }
+    });
 }
