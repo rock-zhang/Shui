@@ -1,6 +1,6 @@
 [package]
 name = "shui"
-version = "0.2.0"
+version = "0.2.32"
 description = "一个专注喝水提醒的跨端桌面 App，关注打工人健康 💪 ，改善你的喝水习惯。"
 authors = ["Slash"]
 edition = "2021"
