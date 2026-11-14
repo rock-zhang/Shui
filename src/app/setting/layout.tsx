@@ -27,6 +27,9 @@ export default function RootLayout({
         invoke("reset_timer");
       }
       // 这里可以添加倒计时结束后的处理逻辑
+    }).then((unsubscribe) => {
+      window.__SHUI_NATIVE_SMOKE__?.timerReady();
+      return unsubscribe;
     });
 
     return () => {

@@ -30,24 +30,22 @@ export function useTray() {
 
   const getMenu = useCallback(async () => {
     const menu = await Menu.new();
+    const openSettings = async () => {
+      const mainWindow = await WebviewWindow.getByLabel("main");
+      if (mainWindow) {
+        if (await mainWindow.isMinimized()) await mainWindow.unminimize();
+        await mainWindow.show();
+        await mainWindow.setFocus();
+      }
+    };
+    if (typeof window !== "undefined") {
+      window.__SHUI_NATIVE_SMOKE__?.setTrayAction(openSettings);
+    }
 
     await menu.append(
       await MenuItem.new({
         text: "偏好设置",
-        action: async () => {
-          // 尝试获取并显示主窗口
-          const mainWindow = await WebviewWindow.getByLabel("main");
-
-          if (mainWindow) {
-            // 尝试取消最小化（如果窗口被最小化了）
-            const isMinimized = await mainWindow.isMinimized();
-            if (isMinimized) await mainWindow.unminimize();
-
-            // 显示窗口
-            await mainWindow.show();
-            await mainWindow.setFocus();
-          }
-        },
+        action: openSettings,
       })
     );
     await menu.append(await PredefinedMenuItem.new({ item: "Separator" }));
@@ -115,7 +113,12 @@ export function useTray() {
       trayInstance = await TrayIcon.getById(TRAY_ID);
       console.log("trayInstance", trayInstance);
 
-      trayInstance?.setMenu(await getMenu());
+      if (trayInstance) {
+        await trayInstance.setMenu(await getMenu());
+        if (typeof window !== "undefined") {
+          window.__SHUI_NATIVE_SMOKE__?.trayReady();
+        }
+      }
       // trayInstance?.setIconAsTemplate(true);
     } catch (error) {
       console.error("创建托盘失败:", error);

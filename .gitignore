@@ -12,6 +12,8 @@ dist
 dist-ssr
 *.local
 /target/
+__pycache__/
+/artifacts/
 /.next/
 
 # Editor directories and files

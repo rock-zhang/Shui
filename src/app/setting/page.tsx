@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useTheme } from "next-themes";
+import { toast } from "sonner";
 
 const themeOptions = [
   { value: "system", label: "跟随系统" },
@@ -34,23 +35,31 @@ export default function Home() {
   const { isWindows } = usePlatform();
   const { theme, setTheme } = useTheme();
   const [themeMounted, setThemeMounted] = useState(false);
+  const [autoStartPending, setAutoStartPending] = useState(true);
   useTray();
 
   useEffect(() => setThemeMounted(true), []);
 
   useEffect(() => {
     async function loadConfig() {
-      const [generalSetting, isAutoStart] = await Promise.all([
-        getGeneralConfig(),
-        isEnabled(),
-      ]);
+      try {
+        const [generalSetting, isAutoStart] = await Promise.all([
+          getGeneralConfig(),
+          isEnabled(),
+        ]);
 
-      setConfig({
-        ...config,
-        isCountDown: generalSetting?.isCountDown || false,
-        isFullScreen: generalSetting?.isFullScreen || false, // 设置默认值
-        isAutoStart,
-      });
+        setConfig((current) => ({
+          ...current,
+          isCountDown: generalSetting?.isCountDown || false,
+          isFullScreen: generalSetting?.isFullScreen || false,
+          isAutoStart,
+        }));
+      } catch (error) {
+        console.error("读取通用设置失败:", error);
+        toast.error("读取通用设置失败，请重新打开设置");
+      } finally {
+        setAutoStartPending(false);
+      }
     }
 
     loadConfig();
@@ -60,10 +69,10 @@ export default function Home() {
     const store = await load(STORE_NAME.config, { autoSave: false });
     const oldConfig = await store.get<{ value: number }>("general");
 
-    setConfig({
-      ...config,
+    setConfig((current) => ({
+      ...current,
       [filed]: checked,
-    });
+    }));
 
     await store.set("general", {
       ...oldConfig,
@@ -73,14 +82,19 @@ export default function Home() {
   };
 
   const handleAutoStartChange = async (checked: boolean) => {
-    saveConfig("isAutoStart", checked);
-
-    if (checked) {
-      enable();
-      console.log("isAutoStart", await isEnabled());
-    } else {
-      disable();
-      console.log("isAutoStart", await isEnabled());
+    setAutoStartPending(true);
+    try {
+      if (checked) {
+        await enable();
+      } else {
+        await disable();
+      }
+      await saveConfig("isAutoStart", checked);
+    } catch (error) {
+      console.error("更新开机自启动失败:", error);
+      toast.error("更新开机自启动失败，请重试");
+    } finally {
+      setAutoStartPending(false);
     }
   };
 
@@ -97,11 +111,13 @@ export default function Home() {
             id=":r233:-form-item-description"
             className="text-[0.8rem] text-muted-foreground"
           >
-            电脑重启之后自动开始倒计时
+            登录后在后台开始倒计时，不弹出窗口；可从托盘打开偏好设置
           </p>
         </div>
         <Switch
           checked={config.isAutoStart}
+          disabled={autoStartPending}
+          aria-label="开机自启动"
           onCheckedChange={handleAutoStartChange}
         />
       </div>

@@ -21,6 +21,7 @@ A cross-platform desktop app focused on water intake reminders, promoting office
   - Tray Real-time Countdown
   - Goal Completion Sound Effects
 - 💡 Smart and User-friendly
+  - Silent autostart: count down in the background after login and open settings from the tray ([details](docs/silent-autostart.md))
   - Automatic Workday Recognition
   - Auto-pause on Screen Lock/Sleep
   - Tray Quick Actions

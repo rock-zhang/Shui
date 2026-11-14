@@ -16,6 +16,7 @@ concurrency:
 jobs:
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,18 +27,59 @@ jobs:
       - run: if [ -d tests ]; then node --test tests/*.test.cjs; fi
       - run: corepack yarn eslint -c src/eslint.config.mjs src
       - run: corepack yarn build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
+          retention-days: 3
 
   rust:
-    runs-on: macos-latest
+    name: Native tests (${{ matrix.os }})
+    needs: frontend
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-2022, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    env:
+      CARGO_BUILD_JOBS: 2
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libdbus-1-dev libx11-dev xvfb openbox dbus-x11 xdotool wmctrl
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      # Tauri's generate_context embeds the exported frontend assets.
-      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: yarn
-      - run: corepack yarn install --frozen-lockfile
-      - run: corepack yarn build
+          workspaces: '. -> target'
+          cache-on-failure: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
       - run: cargo test --workspace --locked
+      - name: Build the default application
+        run: cargo build --workspace --locked --features tauri/custom-protocol
+      - name: Native startup smoke (macOS / Windows)
+        if: runner.os != 'Linux'
+        run: python tests/native/startup_smoke.py --build --artifacts artifacts/native-smoke
+      - name: Native startup smoke (Linux X11)
+        if: runner.os == 'Linux'
+        env:
+          GDK_BACKEND: x11
+          WEBKIT_DISABLE_DMABUF_RENDERER: '1'
+        run: dbus-run-session -- xvfb-run -a -s '-screen 0 1280x1024x24' python tests/native/startup_smoke.py --build --window-manager openbox --artifacts artifacts/native-smoke
+      - name: Upload native smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-smoke-${{ matrix.os }}
+          path: artifacts/native-smoke
+          if-no-files-found: ignore
+          retention-days: 7
