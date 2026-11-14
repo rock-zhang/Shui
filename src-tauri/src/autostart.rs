@@ -99,13 +99,10 @@ fn desktop_command(executable: &str) -> Result<String, String> {
 
 #[cfg(target_os = "linux")]
 fn quote_registration(app: &tauri::AppHandle) -> Result<(), String> {
-    let executable = app
-        .env()
-        .appimage
-        .filter(|path| path.to_str().is_some())
-        .map(Ok)
-        .unwrap_or_else(std::env::current_exe)
-        .map_err(|e| e.to_string())?;
+    let executable = match app.env().appimage {
+        Some(path) if path.to_str().is_some() => std::path::PathBuf::from(path),
+        _ => std::env::current_exe().map_err(|e| e.to_string())?,
+    };
     let command = desktop_command(&executable.to_string_lossy())?;
     let path = app
         .path()
