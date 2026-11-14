@@ -8,6 +8,7 @@ mod timer;
 mod reminder_session;
 mod drink_store;
 mod startup;
+mod autostart;
 #[cfg(feature = "native-smoke")]
 mod native_smoke;
 use tauri::Manager;
@@ -79,6 +80,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            crate::autostart::enable_silent_autostart,
             crate::drink_recording::record_drink,
             crate::drink_recording::undo_drink,
             commands::call_reminder,

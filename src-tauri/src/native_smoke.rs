@@ -186,7 +186,7 @@ fn perform(app: &tauri::AppHandle, probe: &Probe, action: &str) -> Result<(), St
             crate::reminder_session::close(app, None, crate::reminder_session::Outcome::Skipped);
             crate::commands::reset_timer();
         }
-        "enable-autostart" => app.autolaunch().enable().map_err(|e| e.to_string())?,
+        "enable-autostart" => crate::autostart::enable(app)?,
         "disable-autostart" => app.autolaunch().disable().map_err(|e| e.to_string())?,
         "exit" => {
             app.exit(0);

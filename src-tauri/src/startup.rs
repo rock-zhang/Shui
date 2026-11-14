@@ -76,6 +76,18 @@ mod tests {
         ));
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn non_unicode_arguments_do_not_break_startup() {
+        use std::{ffi::OsString, os::windows::ffi::OsStringExt};
+
+        let args = vec![OsString::from("Shui"), OsString::from_wide(&[0xd800])];
+        assert!(!is_silent_launch(args.clone()));
+        assert!(is_silent_launch(
+            args.into_iter().chain([OsString::from(SILENT_ARG)])
+        ));
+    }
+
     #[test]
     fn all_desktop_configs_create_a_hidden_unfocused_main_window() {
         // Use Tauri's platform merge: Linux replaces the entire windows array.

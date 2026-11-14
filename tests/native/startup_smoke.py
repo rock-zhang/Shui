@@ -133,7 +133,8 @@ def main():
                     CFBundleVersion="0.2.32", NSHighResolutionCapable=True)
         (bundle / "Info.plist").write_bytes(plistlib.dumps(info))
     else:
-        binary_directory = app_directory
+        binary_directory = app_directory / "installed app"
+        binary_directory.mkdir()
     binary = binary_directory / executable.name
     shutil.copy2(executable, binary)
     if sys.platform == "darwin":

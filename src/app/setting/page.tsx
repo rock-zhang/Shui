@@ -4,7 +4,7 @@ import { Switch } from "@/components/ui/switch";
 import { useEffect, useState } from "react";
 import { load } from "@tauri-apps/plugin-store";
 import { useTray } from "@/hooks/use-tray";
-import { enable, isEnabled, disable } from "@tauri-apps/plugin-autostart";
+import { isEnabled, disable } from "@tauri-apps/plugin-autostart";
 import { invoke } from "@tauri-apps/api/core";
 import { STORE_NAME } from "@/lib/constants";
 import { usePlatform } from "@/hooks/use-platform";
@@ -85,7 +85,7 @@ export default function Home() {
     setAutoStartPending(true);
     try {
       if (checked) {
-        await enable();
+        await invoke("enable_silent_autostart");
       } else {
         await disable();
       }
