@@ -182,6 +182,14 @@ jobs:
           releaseBody: "Feature"
           releaseDraft: true
           prerelease: false
+          # 7 个 matrix job 并发写同名 latest.json 会互相覆盖，导致 platforms
+          # 残缺（macOS 缺 darwin-* 时客户端 check() 直接抛 TargetNotFound）。
+          # 关闭后只上传安装包与 .sig，latest.json 由 upload-assets 统一重建。
+          includeUpdaterJson: false
+          # tauri-bundler 打 MSI 要现下 WiX、打 AppImage 要现下 linuxdeploy，
+          # 从 github.com 下载偶发 504 会让整个 bundle 失败（产物全丢）。
+          # 失败时自动重试构建与资产上传，Rust 有缓存，重试开销很小。
+          retryAttempts: 2
           args: --target ${{ matrix.target }} ${{ matrix.target == 'aarch64-unknown-linux-gnu' && '--bundles deb,rpm' || '' }}
 
   upload-assets:
@@ -204,6 +212,9 @@ jobs:
       - name: install dependencies
         run: yarn install --frozen-lockfile
 
+      # 从版本 release 的 .sig / 安装包资产重建完整 latest.json，上传到
+      # updater release。主平台产物不齐时直接失败，避免再次发出残缺的更新清单。
+      # 临时热更新可加 env: UPDATER_ALLOW_MISSING_PLATFORMS=1 降级为警告。
       - name: Upload assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

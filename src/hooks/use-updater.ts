@@ -31,8 +31,11 @@ export function useUpdaterCheck() {
         toast("当前已是最新版本");
       }
     } catch (err) {
-      toast.error("检查更新失败");
-      console.error(err instanceof Error ? err.message : "检查更新失败");
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("检查更新失败:", err);
+      // 把 Tauri 的真实错误（例如 TargetNotFound: darwin-aarch64）露出来，
+      // 否则只能看到一句「检查更新失败」，排查得开 DevTools。
+      toast.error("检查更新失败", { description: message });
       setUpdateAvailable(false);
     } finally {
       setChecking(false);
@@ -85,10 +88,9 @@ export function useUpdaterDownload() {
       // 安装完成后重启应用
       await relaunch();
     } catch (err) {
-      toast.error("更新安装失败");
-      console.log(err);
-
-      console.error(err instanceof Error ? err.message : "更新安装失败");
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("更新安装失败:", err);
+      toast.error("更新安装失败", { description: message });
       setProgress(0);
     } finally {
       setInstalling(false);

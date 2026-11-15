@@ -16,6 +16,12 @@ __pycache__/
 /artifacts/
 /.next/
 
+# TypeScript incremental build
+*.tsbuildinfo
+
+# WorkBuddy project data
+/.workbuddy/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
