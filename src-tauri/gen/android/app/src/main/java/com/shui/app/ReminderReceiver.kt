@@ -50,10 +50,16 @@ object ReminderScheduler {
     private fun inWindow(value: Int, start: Int, end: Int) =
         if (end <= start) value >= start || value <= end else value in start..end
 
-    /** 今日已喝量：直接读 Tauri store 的落盘文件，避免 Kotlin 与 WebView 双写缓存。 */
+    /**
+     * 今日已喝量：直接读 Tauri store 的落盘文件，避免 Kotlin 与 WebView 双写缓存。
+     * Tauri 的 app_data_dir() 对应 Android 的 `dataDir`（应用私有根），不是
+     * `filesDir` 子目录；两边必须用同一个目录，否则 pending 记录永远回灌不了。
+     */
+    private fun appDataDir(context: Context): File = context.dataDir
+
     private fun todayAmount(context: Context): Long {
         return try {
-            val file = File(context.filesDir, "drink_history_store.json")
+            val file = File(appDataDir(context), "drink_history_store.json")
             if (!file.exists()) return 0
             val root = JSONObject(file.readText())
             val key = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
@@ -144,7 +150,7 @@ object ReminderScheduler {
     fun appendPendingDrink(context: Context, amount: Int) {
         synchronized(this) {
             try {
-                val file = File(context.filesDir, "pending_drinks.json")
+                val file = File(appDataDir(context), "pending_drinks.json")
                 val array = if (file.exists()) {
                     try {
                         JSONArray(file.readText())
