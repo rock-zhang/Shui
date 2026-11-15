@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /** Mobile design primitives. All colours come from the existing oklch tokens. */
@@ -136,6 +136,29 @@ export function MobileSegmented<T extends string>({
   );
 }
 
+/** 数字从旧值滚动到新值；撤销导致的减少同样平滑回落。 */
+function useCountUp(target: number, duration = 550) {
+  const [display, setDisplay] = useState(target);
+  const current = useRef(target);
+  useEffect(() => {
+    const from = current.current;
+    if (from === target) return;
+    let frame = 0;
+    const startedAt = performance.now();
+    const step = (now: number) => {
+      const progress = Math.min((now - startedAt) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const value = Math.round(from + (target - from) * eased);
+      current.current = value;
+      setDisplay(value);
+      if (progress < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [target, duration]);
+  return display;
+}
+
 export function ProgressRing({
   total,
   goal,
@@ -145,6 +168,15 @@ export function ProgressRing({
   goal: number;
   size?: number;
 }) {
+  const displayTotal = useCountUp(total);
+  const [pulseToken, setPulseToken] = useState(0);
+  const previousTotal = useRef(total);
+
+  useEffect(() => {
+    if (total > previousTotal.current) setPulseToken((token) => token + 1);
+    previousTotal.current = total;
+  }, [total]);
+
   const radius = 82;
   const circumference = 2 * Math.PI * radius;
   const ratio = goal > 0 ? Math.min(total / goal, 1) : 0;
@@ -157,6 +189,13 @@ export function ProgressRing({
       role="img"
       aria-label={`今日已喝 ${total} 毫升，目标 ${goal} 毫升`}
     >
+      {pulseToken > 0 && (
+        <span
+          key={pulseToken}
+          aria-hidden="true"
+          className="ring-pulse pointer-events-none absolute inset-[9%] rounded-full"
+        />
+      )}
       <svg viewBox="0 0 200 200" width={size} height={size}>
         <defs>
           <linearGradient id="mobile-ring" x1="0" y1="0" x2="1" y2="1">
@@ -188,7 +227,7 @@ export function ProgressRing({
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-4xl font-semibold tabular-nums tracking-tight">
-          {total}
+          {displayTotal}
         </span>
         <span className="mt-1 text-xs text-muted-foreground">
           / {goal || "--"} ml

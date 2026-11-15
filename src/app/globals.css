@@ -179,6 +179,29 @@ button:focus {
   user-select: text;
 }
 
+/* ---- 记录成功的就地反馈：卡片水位上涨 + ✓，进度环光晕扩散 ---- */
+@keyframes drink-wave {
+  0% { transform: translateY(100%); }
+  25% { transform: translateY(0); }
+  100% { transform: translateY(0); opacity: 0; }
+}
+
+@keyframes drink-done {
+  0% { opacity: 0; transform: scale(0.72) translateY(8px); }
+  22% { opacity: 1; transform: scale(1) translateY(0); }
+  75% { opacity: 1; transform: scale(1) translateY(0); }
+  100% { opacity: 0; transform: scale(0.96) translateY(-3px); }
+}
+
+@keyframes ring-pulse {
+  0% { transform: scale(0.94); opacity: 0.6; box-shadow: 0 0 0 0 rgb(56 189 248 / 45%); }
+  100% { transform: scale(1.08); opacity: 0; box-shadow: 0 0 0 16px rgb(56 189 248 / 0%); }
+}
+
+.drink-wave { animation: drink-wave 1.4s ease-out both; }
+.drink-done { animation: drink-done 1.4s ease-out both; }
+.ring-pulse { animation: ring-pulse 720ms ease-out both; }
+
 @media (prefers-reduced-motion: reduce) {
   .mobile-root *,
   .mobile-root *::before,
@@ -186,4 +209,9 @@ button:focus {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+
+  /* 成功反馈改为静态呈现，避免动画被压到 0.01ms 后直接消失。 */
+  .mobile-root .drink-wave { animation: none !important; opacity: 0.4 !important; }
+  .mobile-root .drink-done { animation: none !important; opacity: 1 !important; }
+  .mobile-root .ring-pulse { display: none !important; }
 }
