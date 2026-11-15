@@ -27,6 +27,14 @@ jobs:
         with:
           node-version: 20
 
+      # 发版门禁：tag 必须与 package.json / tauri.conf.json / Cargo.toml /
+      # Cargo.lock 四处版本号一致。create-release 是所有构建 job 的 needs，
+      # 放在这里能在 10 秒内拦住版本写错，不用白跑 7 个 matrix 编译才发现。
+      # beta / test tag 不发布更新清单，条件与 upload-assets 保持一致。
+      - name: Verify version matches tag
+        if: ${{ !contains(github.ref, 'test') && !contains(github.ref, 'beta') }}
+        run: node scripts/version.mjs check "$GITHUB_REF_NAME"
+
       # 发布 Release，使用自定义名称
       - name: Generate changelog
         id: create_release

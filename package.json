@@ -9,7 +9,9 @@
     "build": "next build",
     "build:dmg": "tauri build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "version:check": "node scripts/version.mjs check",
+    "release": "node scripts/version.mjs bump"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.10",

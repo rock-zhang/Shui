@@ -84,6 +84,23 @@ If you encounter the "Shui is damaged and can't be opened" message on `macOS`, p
 sudo xattr -r -d com.apple.quarantine /Applications/Shui.app
 ```
 
+## 📱 Android vs Desktop
+
+The Android build ships as a standalone app, so the UI no longer carries desktop-comparison notes. The mapping and trade-offs are kept here for maintainers.
+
+| Desktop | Android |
+| --- | --- |
+| Tray countdown | Today → "Reminder rhythm" card |
+| Global hotkeys | "Log a drink" action on system notifications |
+| Silent autostart | Alarms rebuilt after the boot broadcast |
+| App whitelist / lock-screen auto-pause | Quiet hours + manual pause |
+| In-app auto update | Play Store updates (in-app self-updates violate store policy) |
+| Installed-app list | Not collected (sensitive permission) |
+
+Unchanged: daily goal, reminder interval (minutes), repeat days, time range, full-screen reminders / system notifications / sound, drink logging and undo, trend and habit statistics, CSV export, JSON backup and import, appearance themes.
+
+Background delivery depends on system alarms, notification permission and the battery-optimization whitelist; some vendor ROMs also require autostart / background-lock permission. See `src-tauri/gen/android/` for the native implementation.
+
 ## 🛣 Development Roadmap
 
 ### Implemented Features
@@ -127,6 +144,36 @@ Reminder display duration is not actual rest time. CSV is for viewing and analys
 - [React](https://reactjs.org/) - User Interface Framework
 - [Rust](https://www.rust-lang.org/) - Backend Logic Implementation
 - [shadcn/ui](https://ui.shadcn.com/) - UI Component Library
+
+## 📦 Release Process
+
+Pushing a `v*` tag triggers the [publish workflow](.github/workflows/publish.yaml), which builds all platforms, creates a draft Release and refreshes the auto-update manifest.
+
+**Do not create tags manually.** Version numbers live in four files and are maintained by a single command that combines bumping, committing and tagging:
+
+```shell
+# On main with a clean index
+git switch main && git pull --ff-only
+yarn release 0.3.0          # bumps 4 files, creates a commit and tag v0.3.0
+git push origin HEAD        # push the version commit first
+git push origin v0.3.0      # pushing the tag triggers the workflow
+```
+
+`package.json` is the single source of truth. `yarn release <version>` also updates `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `Cargo.lock` (daily CI runs `cargo build --locked`, so the lockfile must match). It runs on `main` only, refuses a dirty index, and **never pushes**. Use `yarn version:check` to verify consistency without changing anything.
+
+Three version gates: `ci.yaml` checks the four files on every PR, `publish.yaml` fails within seconds if the tag doesn't match (before the 7 build jobs start), and `upload-assets` re-checks before uploading. `upload-assets` now **rebuilds** `latest.json` from the Release's `.sig` and installer assets, validating signatures and all 7 main platforms, then uploads it to the `updater` Release.
+
+Before releasing, make sure the `updater` Release exists and is published (`.../releases/download/updater/latest.json`) and `TAURI_SIGNING_PRIVATE_KEY` is configured. CI creates a **draft** Release — click **Publish release** on GitHub before clients can detect the update.
+
+If a run fails, delete the draft Release and the tag before retrying:
+
+```shell
+gh release delete v0.3.0 --repo rock-zhang/Shui --yes
+git push origin :refs/tags/v0.3.0
+git tag -d v0.3.0
+```
+
+Then either push the fix and re-tag (`git push origin HEAD && git tag v0.3.0 && git push origin v0.3.0`) if the version was already bumped — `yarn release 0.3.0` will refuse with "version unchanged" — or run `yarn release 0.3.0` if the version in code is still old.
 
 ## Community
 
