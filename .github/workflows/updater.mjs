@@ -10,7 +10,7 @@
 // 与 release 上的 .sig 一致。
 //
 // 注意：需要 devDependency @actions/github。
-import { readFileSync } from "node:fs";
+import { assertVersions } from "../../scripts/version.mjs";
 import { pathToFileURL } from "node:url";
 import { context, getOctokit } from "@actions/github";
 
@@ -192,14 +192,6 @@ export async function buildUpdaterJson({
 
 // ---------- GitHub Actions 入口 ----------
 
-const readAppVersion = () =>
-  JSON.parse(
-    readFileSync(
-      new URL("../../src-tauri/tauri.conf.json", import.meta.url),
-      "utf8",
-    ),
-  ).version;
-
 // tauri-action 上传到当前 tag 的 release 可能是草稿，getReleaseByTag 查不到，
 // 所以遍历 release 列表匹配
 const getVersionRelease = async (octokit, owner, repo, tag) => {
@@ -266,13 +258,9 @@ const updateRelease = async () => {
   const tag = process.env.GITHUB_REF_NAME;
 
   const versionRelease = await getVersionRelease(octokit, owner, repo, tag);
-  const version = readAppVersion();
-  const tagVersion = tag.replace(/^v/, "");
-  if (version !== tagVersion) {
-    throw new Error(
-      `版本号不一致：tag=${tag}(${tagVersion}) / tauri.conf.json=${version}`,
-    );
-  }
+  // 4 处版本号 + tag 一并校验。publish.yaml 的 Verify version matches tag
+  // 已在编译前拦过一次，这里是上传更新清单前的最后一道防线。
+  const { version } = assertVersions({ tag });
 
   const latestJson = await buildUpdaterJson({
     assets: versionRelease.assets,
