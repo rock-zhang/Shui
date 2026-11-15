@@ -1,0 +1,227 @@
+"use client";
+
+import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
+
+/** Mobile design primitives. All colours come from the existing oklch tokens. */
+export function MobileSection({
+  title,
+  description,
+  children,
+  className,
+}: {
+  title?: string;
+  description?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={cn(
+        "mb-3 rounded-2xl border border-border/70 bg-card p-4 shadow-sm",
+        className
+      )}
+    >
+      {title && (
+        <h2 className="mb-1 text-sm font-semibold tracking-tight">{title}</h2>
+      )}
+      {description && (
+        <p className="mb-3 text-xs leading-5 text-muted-foreground">
+          {description}
+        </p>
+      )}
+      {children}
+    </section>
+  );
+}
+
+export function MobileRow({
+  title,
+  description,
+  control,
+  className,
+}: {
+  title: string;
+  description?: string;
+  control?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex min-h-14 items-center justify-between gap-3 border-b border-border/50 py-2 last:border-0",
+        className
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium leading-5">{title}</p>
+        {description && (
+          <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+            {description}
+          </p>
+        )}
+      </div>
+      {control && <div className="shrink-0">{control}</div>}
+    </div>
+  );
+}
+
+export function MobileSegmented<T extends string>({
+  value,
+  options,
+  onChange,
+  className,
+  label,
+}: {
+  value: T;
+  options: ReadonlyArray<{ value: T; label: string }>;
+  onChange: (value: T) => void;
+  className?: string;
+  label?: string;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label={label}
+      className={cn("flex w-full rounded-xl bg-muted p-1", className)}
+    >
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          role="tab"
+          aria-selected={value === option.value}
+          onClick={() => onChange(option.value)}
+          className={cn(
+            "min-h-10 min-w-0 flex-1 rounded-lg px-1.5 text-xs font-medium leading-tight transition-colors",
+            value === option.value
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground"
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function ProgressRing({
+  total,
+  goal,
+  size = 208,
+}: {
+  total: number;
+  goal: number;
+  size?: number;
+}) {
+  const radius = 82;
+  const circumference = 2 * Math.PI * radius;
+  const ratio = goal > 0 ? Math.min(total / goal, 1) : 0;
+  const reached = goal > 0 && total >= goal;
+
+  return (
+    <div
+      className="relative mx-auto shrink-0"
+      style={{ width: size, height: size }}
+      role="img"
+      aria-label={`今日已喝 ${total} 毫升，目标 ${goal} 毫升`}
+    >
+      <svg viewBox="0 0 200 200" width={size} height={size}>
+        <defs>
+          <linearGradient id="mobile-ring" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#38bdf8" />
+            <stop offset="100%" stopColor="#6366f1" />
+          </linearGradient>
+        </defs>
+        <circle
+          cx="100"
+          cy="100"
+          r={radius}
+          fill="none"
+          stroke="var(--muted)"
+          strokeWidth="14"
+        />
+        <circle
+          cx="100"
+          cy="100"
+          r={radius}
+          fill="none"
+          stroke="url(#mobile-ring)"
+          strokeWidth="14"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - ratio)}
+          transform="rotate(-90 100 100)"
+          className="transition-[stroke-dashoffset] duration-500"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-4xl font-semibold tabular-nums tracking-tight">
+          {total}
+        </span>
+        <span className="mt-1 text-xs text-muted-foreground">
+          / {goal || "--"} ml
+        </span>
+        <span
+          className={cn(
+            "mt-3 rounded-full px-3 py-1 text-xs font-medium",
+            reached
+              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+              : "bg-muted text-muted-foreground"
+          )}
+        >
+          {reached ? "今日目标已达成" : `还差 ${Math.max(goal - total, 0)} ml`}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export function MobileStat({
+  label,
+  value,
+  unit,
+  icon,
+}: {
+  label: string;
+  value: string | number;
+  unit?: string;
+  icon?: ReactNode;
+}) {
+  return (
+    <div className="min-w-0 rounded-xl border border-border/70 bg-card p-3">
+      <div className="mb-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+        {icon}
+        <span className="truncate">{label}</span>
+      </div>
+      <p className="text-xl font-semibold tabular-nums">
+        {value}
+        {unit && (
+          <span className="ml-1 text-xs font-normal text-muted-foreground">
+            {unit}
+          </span>
+        )}
+      </p>
+    </div>
+  );
+}
+
+export function MobileEmpty({
+  title,
+  description,
+}: {
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="flex min-h-28 flex-col items-center justify-center rounded-xl border border-dashed border-border/70 px-4 text-center">
+      <p className="text-sm font-medium">{title}</p>
+      {description && (
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          {description}
+        </p>
+      )}
+    </div>
+  );
+}

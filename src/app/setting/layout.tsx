@@ -1,13 +1,15 @@
 "use client";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { Toaster } from "@/components/ui/sonner";
 import { usePlatform } from "@/hooks/use-platform";
 import { sendReminderNotification } from "@/utils/notification";
 import { getGeneralConfig } from "@/utils/store";
+import { MobileApp } from "@/components/mobile/mobile-app";
+import { detectPlatform } from "@/lib/mobile";
 
 export default function RootLayout({
   children,
@@ -15,8 +17,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const { isMacOS } = usePlatform();
+  // Belt and braces: Tauri mobile may resolve / or /setting/ as the entry URL.
+  // Both routes must land on the same 4-tab shell. Desktop starts as `false`
+  // so its first frame is byte-for-byte the same as before this change.
+  const [mobile, setMobile] = useState(false);
 
   useEffect(() => {
+    const kind = detectPlatform();
+    const isMobileHost = kind === "android" || kind === "ios";
+    setMobile(isMobileHost);
+    if (isMobileHost) return;
+
     const unlisten = listen("timer-complete", async (event) => {
       console.log("Timer completed", event);
 
@@ -26,7 +37,6 @@ export default function RootLayout({
         sendReminderNotification();
         invoke("reset_timer");
       }
-      // 这里可以添加倒计时结束后的处理逻辑
     }).then((unsubscribe) => {
       window.__SHUI_NATIVE_SMOKE__?.timerReady();
       return unsubscribe;
@@ -36,6 +46,8 @@ export default function RootLayout({
       unlisten.then((unsubscribe) => unsubscribe());
     };
   }, []);
+
+  if (mobile) return <MobileApp />;
 
   return (
     <SidebarProvider

@@ -132,3 +132,47 @@
 button:focus {
   outline: none;
 }
+
+/* ---- Mobile baseline (scoped: does not change desktop rendering) ---- */
+.mobile-root {
+  height: 100dvh;
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+.mobile-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+.mobile-tab-bar {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklch, var(--background) 88%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+/* Keep keyboard focus visible on mobile; the global rule above only targets mouse. */
+.mobile-root :focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.mobile-root input,
+.mobile-root textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-root *,
+  .mobile-root *::before,
+  .mobile-root *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
