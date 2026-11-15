@@ -14,7 +14,7 @@ class MainActivity : TauriActivity() {
 
         // 从通知冷启动时，把 Intent 交给 ReminderPlugin，在 WebView 就绪后
         // 转成 mobile-reminder 事件，让 App 内全屏提醒通道也能承接。
-        ReminderPlugin.pendingIntent = intent
+        ReminderPlugin.holdReminderIntent(intent)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)

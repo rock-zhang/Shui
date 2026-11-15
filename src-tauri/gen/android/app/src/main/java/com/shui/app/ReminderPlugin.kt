@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.webkit.WebView
 import androidx.activity.result.ActivityResult
@@ -34,22 +35,40 @@ import java.io.File
 @TauriPlugin
 class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
 
+    private var webView: WebView? = null
+
     init {
         instance = this
     }
 
     override fun load(webView: WebView) {
         super.load(webView)
+        this.webView = webView
+        // 冷启动时 WebView 还没执行到 JS 的监听注册，延后一拍再投事件；
+        // 即使这一步丢了，前端启动/恢复时还会主动查询 reminderPending。
         pendingIntent?.let { intent ->
             Handler(Looper.getMainLooper()).postDelayed({
-                deliverIntent(intent)
-                if (pendingIntent === intent) pendingIntent = null
+                if (reminderPending && pendingIntent === intent) deliverIntent(intent)
             }, 900)
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         deliverIntent(intent)
+    }
+
+    /**
+     * Plugin.trigger() 只发给 registerListener 注册的 Channel，
+     * 不会进入 Tauri 全局事件总线，JS 的 listen("mobile-reminder") 收不到。
+     * 改用 WebView 直接派发 DOM 事件，JS 收到后去 Rust 侧消费 pending 标志。
+     */
+    private fun dispatchCheckReminder() {
+        Handler(Looper.getMainLooper()).post {
+            webView?.evaluateJavascript(
+                "window.dispatchEvent(new Event('shui:check-reminder'));",
+                null
+            )
+        }
     }
 
     @Command
@@ -69,21 +88,76 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         invoke.resolve()
     }
 
+    /**
+     * 前台「测试通知」走这里，而不是 plugin-notification：
+     * tauri-plugin-notification 2.2.2 的 NotificationStorage.writeActionGroup
+     * 用 `type.id`（字符串）拼 key 写入，getActionGroup 却用 0..count 读取，
+     * 导致 Android 上注册的所有 Action 的 id/title 都是空串，点了不记水。
+     * 自定义通道没有这个问题，且 App 被杀时也能记账。
+     */
+    @Command
+    fun showNotification(invoke: Invoke) {
+        try {
+            ReminderReceiver().showNotification(activity)
+            invoke.resolve()
+        } catch (error: Exception) {
+            invoke.reject("发送通知失败：${error.message}")
+        }
+    }
+
+    /**
+     * 旧实现把 startActivity 的异常全部吞掉后仍然 resolve：某些 ROM 上
+     * ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS 静默不显示任何界面，
+     * 前端便看不到任何反馈，表现成「按钮点了没反应」。
+     * 现在先检查白名单状态，再按可用性依次降级，并把结果回传给前端。
+     */
     @Command
     fun openBatterySettings(invoke: Invoke) {
-        try {
-            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                data = Uri.parse("package:${activity.packageName}")
+        val power = activity.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val alreadyIgnored = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+            power?.isIgnoringBatteryOptimizations(activity.packageName) == true
+        val result = if (alreadyIgnored) {
+            "already"
+        } else {
+            val candidates = listOf(
+                "requested" to Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = Uri.parse("package:${activity.packageName}")
+                },
+                "list" to Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+                "details" to Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:${activity.packageName}")
+                }
+            )
+            var opened: String? = null
+            for ((name, intent) in candidates) {
+                if (intent.resolveActivity(activity.packageManager) == null) continue
+                try {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    activity.startActivity(intent)
+                    opened = name
+                    break
+                } catch (_: Exception) {
+                    // 换下一种入口，最后一档「应用详情」在所有 ROM 上都存在。
+                }
             }
-            activity.startActivity(intent)
-        } catch (_: Exception) {
-            try {
-                activity.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-            } catch (_: Exception) {
-                // 部分 ROM 没有该设置页，交由前端 toast 提示手动路径。
-            }
+            opened ?: "unavailable"
         }
-        invoke.resolve()
+        val payload = JSObject()
+        payload.put("result", result)
+        // resolve(JSObject) 走 PluginResult 的标准 JSON 路径；resolveObject 会
+        // 用 Jackson 序列化 org.json.JSONObject，字段结构不可控。
+        invoke.resolve(payload)
+    }
+
+    /** 供 Rust 侧消费「通知点击待弹提醒」标志，保证冷/热启动只弹一次。 */
+    @Command
+    fun consumePendingReminder(invoke: Invoke) {
+        val pending = reminderPending
+        reminderPending = false
+        if (pending) pendingIntent = null
+        val payload = JSObject()
+        payload.put("pending", pending)
+        invoke.resolve(payload)
     }
 
     @Command
@@ -182,12 +256,20 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         @Volatile
         var pendingIntent: Intent? = null
 
-        fun deliverIntent(intent: Intent?) {
-            if (intent?.getBooleanExtra(EXTRA_OPEN_REMINDER, false) != true) return
-            intent.removeExtra(EXTRA_OPEN_REMINDER)
-            Handler(Looper.getMainLooper()).post {
-                instance?.trigger("mobile-reminder", JSObject())
+        /** 只有真正由通知主体点进来的 Intent 才置位。 */
+        @Volatile
+        var reminderPending = false
+
+        fun holdReminderIntent(intent: Intent?) {
+            if (intent?.getBooleanExtra(EXTRA_OPEN_REMINDER, false) == true) {
+                reminderPending = true
+                pendingIntent = intent
             }
+        }
+
+        fun deliverIntent(intent: Intent?) {
+            holdReminderIntent(intent)
+            if (reminderPending) instance?.dispatchCheckReminder()
         }
     }
 }

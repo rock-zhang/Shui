@@ -7,11 +7,13 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useTheme } from "next-themes";
 import {
-  DatabaseBackup,
+  Copy,
   Download,
   ExternalLink,
   Github,
   Info,
+  Mail,
+  MessageCircle,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,6 +26,7 @@ import {
   previewDrinkImport,
   type ImportPreview,
 } from "@/lib/data-backup";
+import { emitRefresh } from "@/lib/mobile";
 import { MobileRow, MobileSection, MobileSegmented } from "./ui";
 
 const THEME_OPTIONS = [
@@ -82,6 +85,8 @@ export function MeTab() {
       setMessage(
         `${receipt.alreadyImported ? "本次导入已完成" : "导入完成"}：新增 ${receipt.importedDays} 天，共 ${receipt.importedAmount} ml；跳过 ${receipt.skippedDays} 个已有日期。`
       );
+      // Tabs stay mounted; broadcast so Today / Data pick up the imported days.
+      emitRefresh();
     });
 
   const openExternal = async (url: string) => {
@@ -99,6 +104,15 @@ export function MeTab() {
       toast.success("软件信息已复制");
     } catch {
       toast.error("复制失败，请稍后重试");
+    }
+  };
+
+  const copyContact = async (label: string, value: string) => {
+    try {
+      await writeText(value);
+      toast.success(`${label}已复制`);
+    } catch {
+      toast.error("复制失败，请长按手动复制");
     }
   };
 
@@ -231,7 +245,7 @@ export function MeTab() {
         <MobileRow title="当前版本" description={version || "—"} />
         <MobileRow
           title="检查更新"
-          description="Android 版通过应用商店更新（应用内自更新不符合商店政策）"
+          description="前往应用商店查看最新版本"
           control={
             <Button
               variant="outline"
@@ -267,17 +281,53 @@ export function MeTab() {
           <Github className="h-4 w-4 shrink-0" />
           <span className="min-w-0 flex-1 truncate">{GITHUB_URL}</span>
         </button>
-        <p className="mt-3 text-xs leading-5 text-muted-foreground">
-          反馈：微信号 slash__z · hey47_zhang@163.com
-        </p>
       </MobileSection>
 
-      <MobileSection title="移动端与桌面端的差异">
-        <p className="text-xs leading-5 text-muted-foreground">
-          为符合 Android 权限与商店政策，「已安装应用列表」不采集，「应用白名单」改为勿扰时段，
-          「开机自启」改为系统闹钟开机重建，「应用内更新」改为商店更新。
-          其余目标、间隔、星期、时段、饮水记录、撤销、统计、CSV、备份导入与主题均与桌面端一致。
-        </p>
+      <MobileSection
+        title="反馈与联系"
+        description="遇到问题或有建议，欢迎通过以下任一方式联系我"
+      >
+        <div className="overflow-hidden rounded-xl border border-border/70">
+          <button
+            type="button"
+            onClick={() => copyContact("微信号", "slash__z")}
+            className="flex min-h-14 w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/50 active:bg-muted"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <MessageCircle className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[11px] leading-4 text-muted-foreground">
+                微信号
+              </span>
+              <span className="block select-text truncate text-sm font-medium">
+                slash__z
+              </span>
+            </span>
+            <Copy className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <span className="shrink-0 text-[11px] text-muted-foreground">复制</span>
+          </button>
+          <div className="mx-3 h-px bg-border/70" />
+          <button
+            type="button"
+            onClick={() => copyContact("邮箱", "hey47_zhang@163.com")}
+            className="flex min-h-14 w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/50 active:bg-muted"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Mail className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[11px] leading-4 text-muted-foreground">
+                邮箱
+              </span>
+              <span className="block select-text truncate text-sm font-medium">
+                hey47_zhang@163.com
+              </span>
+            </span>
+            <Copy className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <span className="shrink-0 text-[11px] text-muted-foreground">复制</span>
+          </button>
+        </div>
       </MobileSection>
     </>
   );

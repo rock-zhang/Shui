@@ -27,6 +27,12 @@ object ReminderScheduler {
     const val NOTIFICATION_ID = 2001
     const val ALARM_REQUEST_CODE = 3101
 
+    /**
+     * 与桌面 `registerActionTypes` 的档位保持一致（见 utils/notification.ts）。
+     * Android 的闹钟通知与「测试通知」共用这一份配置，只有一套档位。
+     */
+    val DRINK_ACTIONS = listOf(200, 100, 50)
+
     private fun config(context: Context): JSONObject? {
         val raw = context.getSharedPreferences(ReminderPlugin.PREFS, Context.MODE_PRIVATE)
             .getString(ReminderPlugin.KEY_CONFIG, null) ?: return null
@@ -200,7 +206,11 @@ class ReminderReceiver : BroadcastReceiver() {
         manager.cancel(ReminderScheduler.NOTIFICATION_ID)
     }
 
-    private fun showNotification(context: Context) {
+    /**
+     * 非 private：自定义插件的「测试通知」命令会复用同一条通知构建逻辑，
+     * 保证测试通知与闹钟通知的图标、渠道、Action 完全一致。
+     */
+    fun showNotification(context: Context) {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -218,27 +228,40 @@ class ReminderReceiver : BroadcastReceiver() {
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         val content = PendingIntent.getActivity(context, 1, open, flags)
 
-        fun drinkAction(amount: Int, label: String, requestCode: Int): PendingIntent {
+        fun drinkAction(amount: Int, requestCode: Int): PendingIntent {
             val broadcast = Intent(context, ReminderReceiver::class.java)
                 .setAction("${ReminderScheduler.ACTION_DRINK_PREFIX}$amount")
             return PendingIntent.getBroadcast(context, requestCode, broadcast, flags)
         }
 
-        val notification = NotificationCompat.Builder(context, ReminderScheduler.CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+        val builder = NotificationCompat.Builder(context, ReminderScheduler.CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_water)
+            .setColor(0xFF3B82F6.toInt())
             .setContentTitle("该喝水啦")
             .setContentText("站起来喝杯水，顺便活动一下身体吧")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(content)
-            .addAction(R.mipmap.ic_launcher, "喝一杯 200ml", drinkAction(200, "200ml", 2))
-            .addAction(R.mipmap.ic_launcher, "100ml", drinkAction(100, "100ml", 3))
-            .addAction(R.mipmap.ic_launcher, "稍后再说", PendingIntent.getBroadcast(
-                context, 4,
+
+        ReminderScheduler.DRINK_ACTIONS.forEachIndexed { index, amount ->
+            val label = if (index == 0) "喝一杯 ${amount}ml" else "${amount}ml"
+            builder.addAction(
+                R.drawable.ic_stat_water,
+                label,
+                drinkAction(amount, 2 + index)
+            )
+        }
+        builder.addAction(
+            R.drawable.ic_stat_water,
+            "稍后再说",
+            PendingIntent.getBroadcast(
+                context, 2 + ReminderScheduler.DRINK_ACTIONS.size,
                 Intent(context, ReminderReceiver::class.java).setAction(ReminderScheduler.ACTION_SKIP),
                 flags
-            ))
-            .build()
+            )
+        )
+
+        val notification = builder.build()
 
         try {
             manager.notify(ReminderScheduler.NOTIFICATION_ID, notification)

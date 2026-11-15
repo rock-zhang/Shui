@@ -78,6 +78,9 @@ pub fn setup(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                     IS_RUNNING.store(false, Ordering::SeqCst);
                     reminder_session::begin();
                     let _ = timer_handle.emit("timer-complete", ());
+                    // 前台已经弹出全屏提醒，把原生闹钟重排到 now+gap，避免同一
+                    // 时刻再补一条系统通知。双通道是保底关系，不是并列触发。
+                    sync_schedule(&timer_handle);
                     break;
                 }
                 std::thread::sleep(Duration::from_secs(1));
@@ -190,6 +193,14 @@ pub fn start_timer(app: tauri::AppHandle) {
     sync_schedule(&app);
 }
 
+/// 提醒页「测试通知」：Android 统一走自定义原生插件。
+/// `plugin-notification 2.2.2` 在 Android 上注册的 Action 会丢失 id/title，
+/// 因此不能让 JS 通道发出一条「按钮点不动」的通知。
+#[tauri::command]
+pub fn send_mobile_notification(app: tauri::AppHandle) -> Result<(), String> {
+    native::<Value>(&app, "showNotification", json!({})).map(|_| ())
+}
+
 /// 设置页保存配置后显式重建原生闹钟。
 #[tauri::command]
 pub fn sync_reminder_schedule(app: tauri::AppHandle) -> Result<(), String> {
@@ -197,9 +208,31 @@ pub fn sync_reminder_schedule(app: tauri::AppHandle) -> Result<(), String> {
     native::<Value>(&app, "schedule", payload).map(|_| ())
 }
 
+#[derive(Debug, Deserialize)]
+struct BatterySettingsResult {
+    result: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct PendingReminderFlag {
+    pending: bool,
+}
+
 #[tauri::command]
-pub fn open_battery_settings(app: tauri::AppHandle) -> Result<(), String> {
-    native::<Value>(&app, "openBatterySettings", json!({})).map(|_| ())
+pub fn open_battery_settings(app: tauri::AppHandle) -> Result<String, String> {
+    native::<BatterySettingsResult>(&app, "openBatterySettings", json!({}))
+        .map(|value| value.result)
+}
+
+/// 通知主体被点击后 Kotlin 只记一个标志；前端在启动 / 恢复 / 收到
+/// `shui:check-reminder` 时来消费它。冷启动时 WebView 尚未注册监听也不会丢，
+/// 且标志被消费后一次点击只会弹一次全屏提醒。
+/// 这里刻意不 emit 全局事件：JS 直接拿返回值弹窗，避免 listen 注册时序竞争。
+#[tauri::command]
+pub fn consume_pending_reminder(app: tauri::AppHandle) -> bool {
+    native::<PendingReminderFlag>(&app, "consumePendingReminder", json!({}))
+        .map(|value| value.pending)
+        .unwrap_or(false)
 }
 
 #[tauri::command]

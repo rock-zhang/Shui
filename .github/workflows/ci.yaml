@@ -23,6 +23,8 @@ jobs:
         with:
           node-version: 20
           cache: yarn
+      # 4 处版本号必须一致：cargo build --locked 会因 Cargo.lock 没同步而直接失败
+      - run: node scripts/version.mjs check
       - run: corepack yarn install --frozen-lockfile
       - run: if [ -d tests ]; then node --test tests/*.test.cjs; fi
       - run: corepack yarn eslint -c src/eslint.config.mjs src
@@ -83,3 +85,52 @@ jobs:
           path: artifacts/native-smoke
           if-no-files-found: ignore
           retention-days: 7
+
+  # Android 的 Rust 侧按 target 隔离了桌面插件；这条门禁保证以后改动不会
+  # 悄悄把 desktop-only crate 混回移动目标。完整 APK/AAB 由 android-release.yml 产出。
+  android-check:
+    name: Android cross-compile (aarch64)
+    needs: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+      - run: corepack enable
+      - run: corepack yarn install --frozen-lockfile
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: '. -> target'
+          cache-on-failure: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK components
+        run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0" "ndk;27.1.12297006" > /dev/null
+      - name: Export NDK toolchain paths
+        run: |
+          NDK="$ANDROID_HOME/ndk/27.1.12297006"
+          TC="$NDK/toolchains/llvm/prebuilt/linux-x86_64"
+          test -x "$TC/bin/aarch64-linux-android24-clang" || { echo "NDK clang 不存在: $TC"; exit 1; }
+          {
+            echo "NDK_HOME=$NDK"
+            echo "ANDROID_NDK_HOME=$NDK"
+            echo "CC_aarch64_linux_android=$TC/bin/aarch64-linux-android24-clang"
+            echo "CXX_aarch64_linux_android=$TC/bin/aarch64-linux-android24-clang++"
+            echo "AR_aarch64_linux_android=$TC/bin/llvm-ar"
+            echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$TC/bin/aarch64-linux-android24-clang"
+          } >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
+      - name: Cross-compile Rust for Android
+        run: cargo check --locked --target aarch64-linux-android --manifest-path src-tauri/Cargo.toml

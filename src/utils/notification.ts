@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import {
   Importance,
   Visibility,
@@ -9,11 +10,18 @@ import {
   sendNotification,
   type Options,
 } from "@tauri-apps/plugin-notification";
-import { emitRefresh, emitShowReminder } from "@/lib/mobile";
+import { PLATFORM_OS } from "@/lib/constants";
+import { detectPlatform, emitRefresh, emitShowReminder } from "@/lib/mobile";
 import { recordDrink } from "@/utils/record-drink";
 
 export const REMINDER_CHANNEL_ID = "reminder";
 export const REMINDER_ACTION_TYPE = "shui-reminder";
+
+/**
+ * 桌面通知（plugin-notification）的水量档位，与 Android 原生通知的
+ * ReminderScheduler.DRINK_ACTIONS 保持一致。App 内全屏提醒额外提供 300ml。
+ */
+export const DRINK_ACTION_AMOUNTS = [200, 100, 50] as const;
 
 let actionTypesReady = false;
 
@@ -32,9 +40,10 @@ async function setupReminderActions() {
       {
         id: REMINDER_ACTION_TYPE,
         actions: [
-          { id: "drink-200", title: "喝一杯 200ml" },
-          { id: "drink-100", title: "100ml" },
-          { id: "drink-50", title: "50ml" },
+          ...DRINK_ACTION_AMOUNTS.map((amount, index) => ({
+            id: `drink-${amount}`,
+            title: index === 0 ? `喝一杯 ${amount}ml` : `${amount}ml`,
+          })),
           { id: "skip", title: "稍后再说" },
         ],
       },
@@ -79,6 +88,16 @@ async function setupReminderActions() {
 }
 
 export const sendReminderNotification = async () => {
+  // Android 上不能用 plugin-notification 发带 Action 的通知：
+  // 2.2.2 的 NotificationStorage.writeActionGroup 把 key 写成 `id${type.id}`，
+  // getActionGroup 却按 `id0..idN` 读，结果每个 Action 的 id/title 都是空串，
+  // 用户看到一排无文字按钮，点了也不会记水。统一改走自定义原生插件，
+  // 与后台闹钟是同一条通道，图标、渠道、三档 Action 完全一致。
+  if (detectPlatform() === PLATFORM_OS.ANDROID) {
+    await invoke("send_mobile_notification");
+    return;
+  }
+
   let permissionGranted = await isPermissionGranted();
 
   if (!permissionGranted) {

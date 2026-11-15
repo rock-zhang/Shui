@@ -22,6 +22,11 @@ __pycache__/
 # WorkBuddy project data
 /.workbuddy/
 
+# Android release signing material — never commit keystores or key.properties
+*.jks
+*.keystore
+key.properties
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
