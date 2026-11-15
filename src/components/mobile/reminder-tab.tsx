@@ -9,68 +9,81 @@ import {
 import { BatteryCharging, BellRing, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import {
-  DEFAULT_ALERT,
-  DEFAULT_GENERAL,
   GAP_OPTIONS,
   GOLD_OPTIONS,
   WEEKDAY_LABELS,
   emitShowReminder,
-  readConfig,
-  rescheduleReminders,
-  writeConfig,
-  type AlertConfig,
-  type GeneralConfig,
 } from "@/lib/mobile";
 import { cn } from "@/lib/utils";
 import { sendReminderNotification } from "@/utils/notification";
-import { MobileRow, MobileSection } from "./ui";
+import { useMobileConfig } from "./config-context";
+import { MobileRow, MobileSection, MobileTimeInput } from "./ui";
 
 function Chip({
   selected,
   onClick,
   children,
+  sublabel,
+  className,
+  label,
 }: {
   selected: boolean;
   onClick: () => void;
   children: React.ReactNode;
+  sublabel?: string;
+  className?: string;
+  label?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={selected}
+      aria-label={label}
       className={cn(
-        "min-h-11 shrink-0 rounded-xl px-4 text-sm font-medium tabular-nums transition-colors",
+        "flex min-h-11 shrink-0 flex-col items-center justify-center rounded-xl px-4 text-sm font-medium tabular-nums transition-colors",
         selected
           ? "bg-primary text-primary-foreground shadow-sm"
-          : "bg-muted text-muted-foreground"
+          : "bg-muted text-muted-foreground",
+        className
       )}
     >
       {children}
+      {sublabel && (
+        <span className="mt-0.5 text-[10px] font-normal leading-none opacity-75">
+          {sublabel}
+        </span>
+      )}
     </button>
   );
 }
 
+/** Stable placeholder: never paints DEFAULT_ALERT before the stored config arrives. */
+function ReminderSkeleton() {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="正在读取提醒设置">
+      {[96, 96, 96, 96, 224, 168, 180].map((height, index) => (
+        <Skeleton key={index} className="rounded-2xl" style={{ height }} />
+      ))}
+    </div>
+  );
+}
+
 export function ReminderTab() {
-  const [alert, setAlert] = useState<AlertConfig>(DEFAULT_ALERT);
-  const [general, setGeneral] = useState<GeneralConfig>(DEFAULT_GENERAL);
+  const { alert, general, hydrated, patchAlert, patchGeneral } =
+    useMobileConfig();
   const [permission, setPermission] = useState<"unknown" | "granted" | "denied">(
+    "unknown"
+  );
+  const [exactAlarm, setExactAlarm] = useState<"unknown" | "granted" | "denied">(
     "unknown"
   );
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      readConfig<AlertConfig>("alert", DEFAULT_ALERT),
-      readConfig<GeneralConfig>("general", DEFAULT_GENERAL),
-    ]).then(([alertConfig, generalConfig]) => {
-      if (!cancelled) {
-        setAlert(alertConfig);
-        setGeneral(generalConfig);
-      }
-    });
     isPermissionGranted()
       .then((granted) => !cancelled && setPermission(granted ? "granted" : "denied"))
       .catch(() => {});
@@ -79,34 +92,36 @@ export function ReminderTab() {
     };
   }, []);
 
-  async function persist(key: "alert" | "general", value: AlertConfig | GeneralConfig) {
-    try {
-      await writeConfig(key, value);
-      await rescheduleReminders();
-    } catch (failure) {
-      console.error("保存提醒配置失败", failure);
-      toast.error("设置未能保存，请重试");
-    }
-  }
-
-  const patchAlert = (patch: Partial<AlertConfig>) => {
-    const next = { ...alert, ...patch };
-    setAlert(next);
-    void persist("alert", next);
-  };
-
-  const patchGeneral = (patch: Partial<GeneralConfig>) => {
-    const next = { ...general, ...patch };
-    setGeneral(next);
-    void persist("general", next);
-  };
+  // Android 12+ 精确闹钟是独立权限；用户从系统设置返回后自动复查。
+  useEffect(() => {
+    let cancelled = false;
+    const check = () => {
+      invoke<boolean>("is_exact_alarm_granted")
+        .then((granted) => {
+          if (!cancelled) setExactAlarm(granted ? "granted" : "denied");
+        })
+        .catch(() => {
+          // 桌面预览 / Android 11 以下无此权限概念，按已满足处理。
+          if (!cancelled) setExactAlarm("granted");
+        });
+    };
+    check();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") check();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
 
   const toggleWeekday = (day: number) => {
     const weekdays = alert.weekdays ?? [];
     patchAlert({
       weekdays: weekdays.includes(day)
         ? weekdays.filter((value) => value !== day)
-        : [...weekdays, day].sort(),
+        : [...weekdays, day].sort((a, b) => a - b),
     });
   };
 
@@ -128,11 +143,28 @@ export function ReminderTab() {
     }
   }
 
-  async function openBatterySettings() {
+  async function openExactAlarmSettings() {
     try {
-      await invoke("open_battery_settings");
+      await invoke("open_exact_alarm_settings");
+      toast.info("请允许「闹钟和提醒」权限，返回后状态会自动刷新");
     } catch {
-      toast.info("请到 系统设置 → 应用 → 电池 中关闭本应用的电池优化");
+      toast.info("请在 系统设置 → 应用 → Shui → 闹钟和提醒 中手动开启");
+    }
+  }
+
+  async function openBatterySettings() {
+    const manual = "请到 系统设置 → 应用 → Shui → 电池 中关闭电池优化";
+    try {
+      const result = await invoke<string>("open_battery_settings");
+      if (result === "already") {
+        toast.success("已在电池优化白名单中，无需重复设置");
+      } else if (result === "unavailable") {
+        toast.info(`当前系统未开放该设置页，${manual}`);
+      } else {
+        toast.info("已打开系统设置，请把 Shui 设为「不优化」");
+      }
+    } catch {
+      toast.info(manual);
     }
   }
 
@@ -145,18 +177,21 @@ export function ReminderTab() {
     }
   }
 
+  if (!hydrated) return <ReminderSkeleton />;
+
   return (
     <>
       <MobileSection
         title="每日目标"
         description="达成目标后不再重复提醒，建议不低于 1500ml"
       >
-        <div className="mobile-scroll flex gap-2 overflow-x-auto pb-1">
+        <div className="mobile-scroll-x flex gap-2 overflow-x-auto overflow-y-hidden pb-1">
           {GOLD_OPTIONS.map((value) => (
             <Chip
               key={value}
               selected={alert.gold === value}
               onClick={() => patchAlert({ gold: value })}
+              label={`每日目标 ${value} 毫升`}
             >
               {value} ml
             </Chip>
@@ -164,15 +199,21 @@ export function ReminderTab() {
         </div>
       </MobileSection>
 
-      <MobileSection title="提醒间隔" description="按你设定的节奏循环提醒">
-        <div className="flex gap-2">
+      <MobileSection
+        title="提醒间隔"
+        description="每隔设定时间提醒一次，单位为分钟"
+      >
+        <div className="grid grid-cols-5 gap-1.5">
           {GAP_OPTIONS.map((value) => (
             <Chip
               key={value}
               selected={alert.gap === value}
               onClick={() => patchAlert({ gap: value })}
+              sublabel="分钟"
+              label={`每 ${value} 分钟提醒一次`}
+              className="w-full shrink px-0"
             >
-              {value}′
+              {value}
             </Chip>
           ))}
         </div>
@@ -204,20 +245,16 @@ export function ReminderTab() {
 
       <MobileSection title="时间范围" description="00:00 作为结束时间表示次日零点">
         <div className="flex items-center gap-2">
-          <input
-            type="time"
-            aria-label="开始时间"
+          <MobileTimeInput
+            label="开始时间"
             value={alert.timeStart}
-            onChange={(event) => patchAlert({ timeStart: event.target.value })}
-            className="min-h-11 min-w-0 flex-1 rounded-xl border border-input bg-background px-3 text-sm"
+            onChange={(value) => patchAlert({ timeStart: value })}
           />
           <span className="shrink-0 text-xs text-muted-foreground">至</span>
-          <input
-            type="time"
-            aria-label="结束时间"
+          <MobileTimeInput
+            label="结束时间"
             value={alert.timeEnd}
-            onChange={(event) => patchAlert({ timeEnd: event.target.value })}
-            className="min-h-11 min-w-0 flex-1 rounded-xl border border-input bg-background px-3 text-sm"
+            onChange={(value) => patchAlert({ timeEnd: value })}
           />
         </div>
       </MobileSection>
@@ -239,7 +276,7 @@ export function ReminderTab() {
         />
         <MobileRow
           title="全屏提醒"
-          description="复用桌面版彩虹渐变提醒页，30 秒倒计时"
+          description="打开 App 时显示彩虹渐变提醒页，30 秒倒计时"
           control={
             <Switch
               checked={general.isFullScreen}
@@ -272,10 +309,9 @@ export function ReminderTab() {
         />
       </MobileSection>
 
-      {/* Mobile equivalent of the desktop app whitelist + lock-screen pause. */}
       <MobileSection
         title="勿扰时段"
-        description="对应桌面端「应用白名单 / 锁屏暂停」：在该时段内不发送提醒"
+        description="在该时段内不发送提醒，适合午休或夜间"
       >
         <MobileRow
           title="启用勿扰"
@@ -290,20 +326,16 @@ export function ReminderTab() {
         />
         {general.quietEnabled && (
           <div className="flex items-center gap-2 pb-1 pt-2">
-            <input
-              type="time"
-              aria-label="勿扰开始时间"
+            <MobileTimeInput
+              label="勿扰开始时间"
               value={general.quietStart}
-              onChange={(event) => patchGeneral({ quietStart: event.target.value })}
-              className="min-h-11 min-w-0 flex-1 rounded-xl border border-input bg-background px-3 text-sm"
+              onChange={(value) => patchGeneral({ quietStart: value })}
             />
             <span className="shrink-0 text-xs text-muted-foreground">至</span>
-            <input
-              type="time"
-              aria-label="勿扰结束时间"
+            <MobileTimeInput
+              label="勿扰结束时间"
               value={general.quietEnd}
-              onChange={(event) => patchGeneral({ quietEnd: event.target.value })}
-              className="min-h-11 min-w-0 flex-1 rounded-xl border border-input bg-background px-3 text-sm"
+              onChange={(value) => patchGeneral({ quietEnd: value })}
             />
           </div>
         )}
@@ -331,6 +363,27 @@ export function ReminderTab() {
             >
               <ShieldCheck className="mr-1 h-3.5 w-3.5" />
               检查
+            </Button>
+          }
+        />
+        <MobileRow
+          title="精确闹钟权限"
+          description={
+            exactAlarm === "granted"
+              ? "已开启，后台提醒可准时到达"
+              : exactAlarm === "denied"
+                ? "未开启，后台提醒会被系统延迟或不触发"
+                : "点击右侧检查"
+          }
+          control={
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-h-10"
+              onClick={openExactAlarmSettings}
+            >
+              <BellRing className="mr-1 h-3.5 w-3.5" />
+              {exactAlarm === "denied" ? "去开启" : "检查"}
             </Button>
           }
         />
@@ -367,14 +420,6 @@ export function ReminderTab() {
           发送测试通知
         </Button>
       </div>
-
-      <MobileSection title="桌面能力在手机上的对应">
-        <p className="text-xs leading-5 text-muted-foreground">
-          托盘倒计时 → 今日页「提醒节奏」；全局快捷键 → 通知快捷操作；
-          开机自启 → 系统闹钟开机重建；应用白名单 / 锁屏暂停 → 勿扰时段与手动暂停；
-          应用内自动更新 → 应用商店。桌面「已安装应用列表」涉及敏感权限，移动端不采集。
-        </p>
-      </MobileSection>
     </>
   );
 }

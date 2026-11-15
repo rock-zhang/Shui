@@ -49,7 +49,7 @@ function TrendChart({
   const width = Math.max(days.length * 20, 320);
 
   return (
-    <div className="mobile-scroll -mx-1 overflow-x-auto px-1 pb-2">
+    <div className="mobile-scroll-x -mx-1 overflow-x-auto overflow-y-hidden px-1 pb-2">
       <div className="relative h-44" style={{ width }}>
         <div className="absolute inset-x-0 bottom-6 border-b border-border" />
         <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-border/70" />
@@ -217,6 +217,10 @@ export function DataTab() {
     reload,
     goal,
   } = useDrinkData(period);
+  // 全新安装每天都会写入当天目标；只有从桌面导入的旧格式数字总量才缺少它。
+  const hasLegacyData = days.some(
+    (day) => day.total > 0 && !day.hasHistoricalGoal
+  );
   const [exporting, setExporting] = useState(false);
 
   async function handleExport() {
@@ -308,8 +312,13 @@ export function DataTab() {
           </MobileSection>
           <PatternCards analysis={analysis} />
           <ReminderStats reminders={reminders} error={reminderError} />
+          {hasLegacyData && (
+            <p className="px-1 text-[11px] leading-5 text-muted-foreground">
+              部分导入记录未保存当天目标，达标结果按当前目标 {goal || "--"}ml 估算。
+            </p>
+          )}
           <p className="px-1 pb-2 text-[11px] leading-5 text-muted-foreground">
-            旧版记录未保存当天目标，达标结果按当前目标估算；时间分析仅包含有时间信息的记录，间隔不跨日。
+            时间分析仅包含有时间信息的记录；间隔不跨日，相同时间的记录不产生间隔。
           </p>
         </>
       )}

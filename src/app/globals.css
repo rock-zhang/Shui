@@ -149,6 +149,17 @@ button:focus {
   overscroll-behavior-y: contain;
 }
 
+/* Horizontal carousels: only X is scrollable here. `overflow-x: auto` would
+   otherwise compute overflow-y to `auto` too, and combined with the old
+   `overscroll-behavior-y: contain` it swallowed vertical swipes instead of
+   letting the parent tab scroll. */
+.mobile-scroll-x {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
+  touch-action: pan-x pan-y;
+}
+
 .mobile-tab-bar {
   padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
   border-top: 1px solid var(--border);

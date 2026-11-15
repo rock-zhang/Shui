@@ -28,8 +28,10 @@ export const viewport: Viewport = {
   userScalable: false,
   viewportFit: "cover",
   themeColor: [
+    // 必须与 globals.css 的 --background、Android colors.xml 保持一致：
+    // oklch(1 0 0) = #ffffff，oklch(0.129 0.042 264.695) = #020618。
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b1220" },
+    { media: "(prefers-color-scheme: dark)", color: "#020618" },
   ],
 };
 

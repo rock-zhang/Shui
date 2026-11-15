@@ -101,6 +101,8 @@ Unchanged: daily goal, reminder interval (minutes), repeat days, time range, ful
 
 Background delivery depends on system alarms, notification permission and the battery-optimization whitelist; some vendor ROMs also require autostart / background-lock permission. See `src-tauri/gen/android/` for the native implementation.
 
+**System bars**: the status bar and gesture navigation bar share the page background, with icon contrast inverted per theme. Colours come from the `background` token in `src/app/globals.css` (light `#ffffff` / dark `#020618`) and are declared in `res/values/colors.xml`. `values/themes.xml` and `values-night/themes.xml` cover the cold-start frame; at runtime the `set_system_bar_theme` command follows the resolved next-themes theme, which the user can set independently of the OS. `tests/system-bars.test.cjs` asserts that the CSS, Android colours and `themeColor` stay in sync.
+
 ## 🛣 Development Roadmap
 
 ### Implemented Features

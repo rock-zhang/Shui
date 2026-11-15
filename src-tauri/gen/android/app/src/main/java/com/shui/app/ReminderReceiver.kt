@@ -64,6 +64,32 @@ object ReminderScheduler {
      */
     private fun appDataDir(context: Context): File = context.dataDir
 
+    /** 与 Rust mobile.rs 共享的「上次提醒时间」账本，避免前台全屏与后台通知重复触发。 */
+    private fun ledgerFile(context: Context): File = File(appDataDir(context), "last_reminder_at.txt")
+
+    fun lastReminderAt(context: Context): Long = try {
+        ledgerFile(context).readText().trim().toLongOrNull() ?: 0L
+    } catch (_: Exception) {
+        0L
+    }
+
+    fun markReminder(context: Context) {
+        synchronized(this) {
+            try {
+                val file = ledgerFile(context)
+                val tmp = File(file.parentFile, "last_reminder_at.tmp")
+                tmp.writeText(System.currentTimeMillis().toString())
+                tmp.renameTo(file)
+            } catch (_: Exception) {
+                // 账本写失败不影响本次提醒到达，下一轮仍能靠闹钟兜底。
+            }
+        }
+    }
+
+    fun gapMinutes(context: Context): Long =
+        (config(context)?.optJSONObject("alert")?.optString("gap", "30")?.toLongOrNull() ?: 30L)
+            .coerceIn(1, 720)
+
     private fun todayAmount(context: Context): Long {
         return try {
             val file = File(appDataDir(context), "drink_history_store.json")
@@ -195,7 +221,16 @@ class ReminderReceiver : BroadcastReceiver() {
                 ReminderScheduler.scheduleNext(context)
             }
             else -> {
-                if (ReminderScheduler.shouldNotify(context)) showNotification(context)
+                val now = System.currentTimeMillis()
+                val last = ReminderScheduler.lastReminderAt(context)
+                val gapMs = ReminderScheduler.gapMinutes(context) * 60_000L
+                // 前台 timer 刚弹过全屏并写了账本时，闹钟这一路不再补通知，
+                // 避免「进 App 后通知 + 全屏同时弹」。首启/账本缺失时 last=0，
+                // 视为该提醒一次，正常发通知并落账本。
+                if (now - last >= gapMs) {
+                    ReminderScheduler.markReminder(context)
+                    if (ReminderScheduler.shouldNotify(context)) showNotification(context)
+                }
                 // 无论是否展示，都要安排下一次，保证达标/勿扰结束后能自动恢复。
                 ReminderScheduler.scheduleNext(context)
             }

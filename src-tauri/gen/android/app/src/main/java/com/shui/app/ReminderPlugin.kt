@@ -2,9 +2,11 @@ package com.shui.app
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -16,6 +18,7 @@ import androidx.activity.result.ActivityResult
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.view.WindowInsetsControllerCompat
 import app.tauri.annotation.ActivityCallback
 import app.tauri.annotation.Command
 import app.tauri.annotation.TauriPlugin
@@ -89,11 +92,13 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     /**
-     * 前台「测试通知」走这里，而不是 plugin-notification：
-     * tauri-plugin-notification 2.2.2 的 NotificationStorage.writeActionGroup
-     * 用 `type.id`（字符串）拼 key 写入，getActionGroup 却用 0..count 读取，
-     * 导致 Android 上注册的所有 Action 的 id/title 都是空串，点了不记水。
-     * 自定义通道没有这个问题，且 App 被杀时也能记账。
+     * 前台「测试通知」与后台闹钟共用这一条自定义通道，保证图标、渠道、
+     * 三档 Action 完全一致，且点 Action 时静默落盘、不拉起 App，进程被杀后也能记账。
+     *
+     * 注：plugin-notification 2.2.2 的 writeActionGroup 曾按 type.id 拼 key 写入
+     * （读侧按 0..count），导致 Action 的 id/title 为空；该缺陷已在 2.4.0 修复。
+     * 升级到 2.8.1+ 后可评估切回官方通道，但官方 Action 基于 getActivity，
+     * 点击会拉起界面且依赖 WebView 启动后的 onAction 回调，行为并不等价。
      */
     @Command
     fun showNotification(invoke: Invoke) {
@@ -229,6 +234,20 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
+    /**
+     * 系统栏颜色与图标明暗跟随 App 内主题（next-themes 的 resolvedTheme），
+     * 而不是只跟随系统深浅色：用户在 App 里手动选「深色」但系统是亮色时，
+     * 仅靠 values-night 资源是错的一档。
+     */
+    @Command
+    fun setSystemBarTheme(invoke: Invoke) {
+        val dark = invoke.getArgs().optBoolean("dark", false)
+        systemBarThemeFromWeb = true
+        systemBarDark = dark
+        activity.runOnUiThread { applySystemBarTheme(activity) }
+        invoke.resolve()
+    }
+
     @Suppress("UNUSED_PARAMETER")
     @Command
     fun requestNotificationPermission(invoke: Invoke) {
@@ -241,6 +260,44 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
                 arrayOf(Manifest.permission.POST_NOTIFICATIONS),
                 1001
             )
+        }
+        invoke.resolve()
+    }
+
+    /**
+     * Android 12+ (API 31) 起，setExact 需要 ACTION_REQUEST_SCHEDULE_EXACT_ALARM
+     * 特殊权限。未授权时调度器只能降级到非精确闹钟，Doze / 国产 ROM 下会被
+     * 大幅延迟甚至不触发——这正是「后台收不到通知」的主因之一。低版本恒为 true。
+     */
+    @Suppress("UNUSED_PARAMETER")
+    @Command
+    fun isExactAlarmGranted(invoke: Invoke) {
+        val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val manager = activity.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+            manager?.canScheduleExactAlarms() == true
+        } else {
+            true
+        }
+        val payload = JSObject()
+        payload.put("granted", granted)
+        invoke.resolve(payload)
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    @Command
+    fun openExactAlarmSettings(invoke: Invoke) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                    data = Uri.parse("package:${activity.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                if (intent.resolveActivity(activity.packageManager) != null) {
+                    activity.startActivity(intent)
+                }
+            } catch (_: Exception) {
+                // 部分 ROM 无此设置页，前端提示用户手动开启。
+            }
         }
         invoke.resolve()
     }
@@ -259,6 +316,42 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         /** 只有真正由通知主体点进来的 Intent 才置位。 */
         @Volatile
         var reminderPending = false
+
+        /** Web 端是否已锁定主题；false 时按系统 uiMode 走。 */
+        @Volatile
+        var systemBarThemeFromWeb = false
+
+        @Volatile
+        var systemBarDark = false
+
+        fun isNightMode(configuration: Configuration): Boolean =
+            (configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
+
+        /**
+         * 必须在主线程调用。manifest 的 configChanges 含 uiMode，系统切深浅色
+         * 不会重建 Activity，AppCompat 可能按旧主题重绘系统栏；从系统设置页 /
+         * 分享页返回时部分 ROM 也会重置。因此 onCreate / onResume /
+         * onConfigurationChanged 各重应用一次，成本只是设两个颜色。
+         */
+        fun applySystemBarTheme(activity: Activity) {
+            val color = ContextCompat.getColor(
+                activity,
+                if (systemBarDark) R.color.shui_surface_dark else R.color.shui_surface_light
+            )
+            val window = activity.window
+            window.statusBarColor = color
+            window.navigationBarColor = color
+            WindowInsetsControllerCompat(window, window.decorView).apply {
+                isAppearanceLightStatusBars = !systemBarDark
+                isAppearanceLightNavigationBars = !systemBarDark
+            }
+            // API 29+ 会给浅色系统栏压一层半透明遮罩，会把纯白染成灰白。
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                window.isStatusBarContrastEnforced = false
+                window.isNavigationBarContrastEnforced = false
+            }
+        }
 
         fun holdReminderIntent(intent: Intent?) {
             if (intent?.getBooleanExtra(EXTRA_OPEN_REMINDER, false) == true) {

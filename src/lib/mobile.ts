@@ -56,7 +56,7 @@ export interface GeneralConfig {
   isNotification: boolean;
   isSound: boolean;
   isPaused: boolean;
-  /** Mobile equivalent of the desktop app whitelist / lock-screen pause. */
+  /** No reminders are sent between quietStart and quietEnd when enabled. */
   quietEnabled: boolean;
   quietStart: string;
   quietEnd: string;
@@ -171,6 +171,16 @@ export function onRefresh(callback: () => void) {
   if (typeof window === "undefined") return () => {};
   window.addEventListener(REFRESH_EVENT, callback);
   return () => window.removeEventListener(REFRESH_EVENT, callback);
+}
+
+/** Native WebView event: a notification tap asked the front end to check for a
+ * pending reminder. The actual pop-up is driven by the Rust command result. */
+export const CHECK_REMINDER_EVENT = "shui:check-reminder";
+
+export function onCheckReminder(callback: () => void) {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(CHECK_REMINDER_EVENT, callback);
+  return () => window.removeEventListener(CHECK_REMINDER_EVENT, callback);
 }
 
 export const SHOW_REMINDER_EVENT = "shui:show-reminder";

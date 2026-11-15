@@ -1,112 +1,154 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Clock3, RefreshCw, Undo2 } from "lucide-react";
+import {
+  Clock3,
+  CupSoda,
+  Droplet,
+  Droplets,
+  GlassWater,
+  Plus,
+  RefreshCw,
+  Undo2,
+  type LucideIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useDrinkData } from "@/hooks/use-drink-data";
 import { getLocalDateKey } from "@/lib/drink-history";
 import type { DrinkReceipt } from "@/lib/drink-day";
+import { emitRefresh, formatTimeLabel } from "@/lib/mobile";
 import {
-  DEFAULT_ALERT,
-  DEFAULT_GENERAL,
-  formatTimeLabel,
-  readConfig,
-  type AlertConfig,
-  type GeneralConfig,
-} from "@/lib/mobile";
+  describeNextReminder,
+  findNextReminder,
+} from "@/lib/reminder-schedule";
+import { useMobileConfig } from "./config-context";
 import { MobileEmpty, MobileSection, ProgressRing } from "./ui";
 
-const AMOUNTS = [50, 100, 200, 300];
+const QUICK_AMOUNTS: Array<{
+  amount: number;
+  hint: string;
+  Icon: LucideIcon;
+}> = [
+  { amount: 50, hint: "小口", Icon: Droplet },
+  { amount: 100, hint: "几口", Icon: Droplets },
+  { amount: 200, hint: "一杯", Icon: GlassWater },
+  { amount: 300, hint: "大杯", Icon: CupSoda },
+];
 
-function nextCupLabel(gap: number) {
-  const next = new Date(Date.now() + Math.max(gap, 1) * 60_000);
-  return next.toLocaleTimeString("zh-CN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-}
+type SaveStatus = {
+  phase: "idle" | "saving" | "done" | "error";
+  text: string;
+};
+
+const IDLE_STATUS: SaveStatus = { phase: "idle", text: "" };
+
+/** 同一金额在该窗口内的重复点击复用同一 requestId，交给 Rust 幂等去重。 */
+const QUICK_DEDUPE_MS = 1200;
 
 export function TodayTab() {
   const { today, goal, loading, error, reload } = useDrinkData(7);
-  const [alert, setAlert] = useState<AlertConfig>(DEFAULT_ALERT);
-  const [general, setGeneral] = useState<GeneralConfig>(DEFAULT_GENERAL);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [failureText, setFailureText] = useState("");
-  const [pending, setPending] = useState<{
-    amount: number;
-    requestId: string;
-  } | null>(null);
+  const { alert, general, hydrated } = useMobileConfig();
+  const [status, setStatus] = useState<SaveStatus>(IDLE_STATUS);
   const [confirmUndo, setConfirmUndo] = useState<string | null>(null);
   const busy = useRef(false);
+  const pending = useRef<{ amount: number; requestId: string } | null>(null);
+  const lastQuick = useRef<{ amount: number; requestId: string; expiresAt: number } | null>(
+    null
+  );
 
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      readConfig<AlertConfig>("alert", DEFAULT_ALERT),
-      readConfig<GeneralConfig>("general", DEFAULT_GENERAL),
-    ]).then(([alertConfig, generalConfig]) => {
-      if (!cancelled) {
-        setAlert(alertConfig);
-        setGeneral(generalConfig);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const nextReminderText = hydrated
+    ? describeNextReminder(
+        findNextReminder({
+          gap: alert.gap,
+          weekdays: alert.weekdays,
+          timeStart: alert.timeStart,
+          timeEnd: alert.timeEnd,
+          quietEnabled: general.quietEnabled,
+          quietStart: general.quietStart,
+          quietEnd: general.quietEnd,
+          isPaused: general.isPaused,
+          goal: goal || today.goal,
+          todayTotal: today.total,
+        })
+      )
+    : "";
 
   async function submit(amount: number) {
+    // `busy` is a ref: repeated taps are dropped without disabling (and hence
+    // dimming) all four cards, which was the visible "flash" on every record.
     if (busy.current) return;
     busy.current = true;
-    setSaving(true);
-    setFailureText("");
-    setMessage("");
+    setStatus({ phase: "saving", text: "正在保存…" });
     try {
-      // A failed/uncertain response keeps its id, so a retry cannot double count.
-      const draft = pending ?? { amount, requestId: crypto.randomUUID() };
-      setPending(draft);
+      // 失败重试沿用 pending 的 id；正常连点则在同一金额的冷却窗内复用 id，
+      // 让 Rust 侧 requestId 幂等去重，避免本地 store 写入太快而记成两笔。
+      let draft = pending.current;
+      if (!draft) {
+        const now = Date.now();
+        const last = lastQuick.current;
+        if (last && last.amount === amount && now < last.expiresAt) {
+          draft = { amount, requestId: last.requestId };
+        } else {
+          draft = { amount, requestId: crypto.randomUUID() };
+          lastQuick.current = {
+            amount,
+            requestId: draft.requestId,
+            expiresAt: now + QUICK_DEDUPE_MS,
+          };
+        }
+      }
+      pending.current = draft;
       const receipt = await invoke<DrinkReceipt>("record_drink", {
         amount: draft.amount,
         requestId: draft.requestId,
       });
-      setPending(null);
-      setMessage(
-        `${receipt.added ? "已记录" : "这笔已记过"} · 今日累计 ${receipt.total} ml`
-      );
+      pending.current = null;
+      setStatus({
+        phase: "done",
+        text: `${receipt.added ? "已记录" : "这笔已记过"} · 今日累计 ${receipt.total} ml`,
+      });
       if (receipt.goalReached) toast.success("🎉 今日目标已完成");
-      reload();
+      // Broadcast, not local reload: the Data tab stays mounted now and must
+      // refresh its statistics too.
+      emitRefresh();
     } catch (failure) {
       console.error("记录饮水失败", failure);
-      setFailureText("未能确认保存，请再点一次原按钮重试（不会重复累加）");
+      setStatus({
+        phase: "error",
+        text: "未能确认保存，请再点一次原按钮重试（不会重复累加）",
+      });
     } finally {
       busy.current = false;
-      setSaving(false);
     }
   }
 
   async function undo(requestId: string) {
     if (busy.current) return;
     busy.current = true;
-    setFailureText("");
+    setStatus({ phase: "saving", text: "正在撤销…" });
     try {
       await invoke("undo_drink", {
         date: getLocalDateKey(new Date()),
         requestId,
       });
       setConfirmUndo(null);
-      setMessage("已撤销这笔记录");
-      reload();
+      setStatus({ phase: "done", text: "已撤销这笔记录" });
+      emitRefresh();
     } catch (failure) {
       console.error("撤销失败", failure);
-      setFailureText("撤销未确认，请重试（重复撤销不会重复扣减）");
+      setStatus({
+        phase: "error",
+        text: "撤销未确认，请重试（重复撤销不会重复扣减）",
+      });
     } finally {
       busy.current = false;
     }
   }
+
+  const saving = status.phase === "saving";
 
   return (
     <>
@@ -118,47 +160,77 @@ export function TodayTab() {
       </MobileSection>
 
       <MobileSection title="记录刚喝的水" description="点一下就记，重复点击同一笔不会累加">
-        <div className="grid grid-cols-2 gap-3">
-          {AMOUNTS.map((amount) => (
+        <div className="grid grid-cols-2 gap-2.5">
+          {QUICK_AMOUNTS.map(({ amount, hint, Icon }) => (
             <button
               key={amount}
               type="button"
-              disabled={saving}
+              aria-disabled={saving}
+              aria-busy={saving}
               onClick={() => submit(amount)}
-              className="flex min-h-16 flex-col items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm transition-transform active:scale-95 disabled:opacity-60"
+              aria-label={`记录 ${amount} 毫升饮水`}
+              className="group relative flex min-h-[108px] flex-col justify-between overflow-hidden rounded-2xl border border-border/70 bg-card p-3.5 text-left shadow-sm transition-all duration-150 hover:border-primary/40 hover:shadow-md active:scale-[0.97]"
             >
-              <span className="text-xl font-semibold tabular-nums leading-none">
-                +{amount}
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -right-5 -top-6 h-20 w-20 rounded-full bg-primary/5 transition-colors group-hover:bg-primary/10"
+              />
+              <span className="relative flex items-start justify-between">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Icon className="h-4 w-4" strokeWidth={1.8} />
+                </span>
+                <Plus className="h-3.5 w-3.5 text-muted-foreground/50 transition-colors group-hover:text-primary" />
               </span>
-              <span className="mt-1 text-[11px] opacity-80">ml</span>
+              <span className="relative block">
+                <span className="block text-[22px] font-semibold leading-none tabular-nums tracking-tight">
+                  +{amount}
+                  <span className="ml-1 text-[11px] font-medium tracking-normal text-muted-foreground">
+                    ml
+                  </span>
+                </span>
+                <span className="mt-1.5 block text-[11px] text-muted-foreground">
+                  {hint}
+                </span>
+              </span>
             </button>
           ))}
         </div>
-        {(message || failureText) && (
-          <p
-            role={failureText ? "alert" : "status"}
-            className={`mt-3 text-xs leading-5 ${failureText ? "text-destructive" : "text-muted-foreground"}`}
-          >
-            {saving ? "正在保存…" : failureText || message}
-          </p>
-        )}
+        {/* Always present so the section height never jumps when a message
+            appears/disappears during a save. */}
+        <p
+          role={status.phase === "error" ? "alert" : "status"}
+          aria-live="polite"
+          className={`mt-3 min-h-5 text-xs leading-5 ${
+            status.phase === "error"
+              ? "text-destructive"
+              : "text-muted-foreground"
+          }`}
+        >
+          {status.text}
+        </p>
       </MobileSection>
 
-      {/* Mobile equivalent of the desktop tray countdown: always visible here. */}
       <MobileSection title="提醒节奏">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
             <Clock3 className="h-5 w-5 text-muted-foreground" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">
-              每 {alert.gap} 分钟 · {alert.timeStart}–{alert.timeEnd}
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {general.isPaused
-                ? "提醒已暂停"
-                : `预计下一杯约 ${nextCupLabel(Number(alert.gap) || 30)}`}
-            </p>
+            {hydrated ? (
+              <>
+                <p className="text-sm font-medium">
+                  每 {alert.gap} 分钟 · {alert.timeStart}–{alert.timeEnd}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {nextReminderText}
+                </p>
+              </>
+            ) : (
+              <>
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="mt-2 h-3 w-28" />
+              </>
+            )}
           </div>
         </div>
       </MobileSection>

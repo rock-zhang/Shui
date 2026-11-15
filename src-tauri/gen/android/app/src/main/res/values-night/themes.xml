@@ -1,6 +1,12 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Theme.shui" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <!-- Customize your theme here. -->
+    <!-- 深色模式：系统栏底色 / 图标明暗与亮色模式互为 inverted。 -->
+    <style name="Theme.shui" parent="Theme.MaterialComponents.DayNight.NoActionBar" tools:targetApi="27">
+        <item name="android:windowBackground">@color/shui_surface_dark</item>
+        <item name="android:statusBarColor">@color/shui_surface_dark</item>
+        <item name="android:navigationBarColor">@color/shui_surface_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowTranslucentStatus">false</item>
+        <item name="android:windowTranslucentNavigation">false</item>
     </style>
 </resources>

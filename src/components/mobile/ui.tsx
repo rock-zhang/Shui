@@ -66,6 +66,36 @@ export function MobileRow({
   );
 }
 
+/**
+ * Android WebView paints the native time-picker drop arrow at the input's own
+ * right edge and ignores `padding-right`, so a bordered input shows the arrow
+ * flush against the frame. The wrapper owns the border/background and insets
+ * the input, which guarantees a right gutter on every WebView build.
+ * Keep `-webkit-appearance` untouched: resetting it also kills the native
+ * picker dialog on Android.
+ */
+export function MobileTimeInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex min-h-11 min-w-0 flex-1 items-stretch rounded-xl border border-input bg-background pl-3 pr-4">
+      <input
+        type="time"
+        aria-label={label}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-foreground"
+      />
+    </div>
+  );
+}
+
 export function MobileSegmented<T extends string>({
   value,
   options,

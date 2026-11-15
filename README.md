@@ -106,6 +106,8 @@ Android 版作为独立 App 发布，界面里不再保留与桌面端对照的�
 
 后台到达依赖系统闹钟 + 通知权限 + 电池优化白名单；部分国产 ROM 还需在「自启动 / 后台锁定」中允许本应用。原生实现见 `src-tauri/gen/android/`。
 
+**系统栏样式**：状态栏与手势导航条和页面同色，图标明暗随主题反转。颜色取自 `src/app/globals.css` 的 `background` token（亮 `#ffffff` / 暗 `#020618`），Android 侧定义在 `res/values/colors.xml`；`values/themes.xml` 与 `values-night/themes.xml` 负责冷启动首帧，运行时由 `set_system_bar_theme` 命令跟随 App 内 next-themes 的实际主题（用户可独立于系统选深色）。`tests/system-bars.test.cjs` 会校验 CSS、Android 颜色与 `themeColor` 三处一致，改主题 token 时必须同步。
+
 ## 🛣 开发路线
 
 ### 已实现功能
