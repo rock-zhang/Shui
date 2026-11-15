@@ -4,6 +4,7 @@ use chrono::Local;
 use serde::{Deserialize, Serialize};
 use std::{sync::Mutex, time::Instant};
 use tauri::{AppHandle, Emitter};
+#[cfg(not(target_os = "android"))]
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
@@ -111,6 +112,7 @@ pub fn close(app: &AppHandle, expected: Option<&str>, outcome: Outcome) -> bool 
     // Never hold TRACKER while calling native window/shortcut APIs: these can
     // wait on the UI thread, which can itself be handling a session command.
     crate::core::window::hide_reminder_windows(app);
+    #[cfg(not(target_os = "android"))]
     let _ = app.global_shortcut().unregister("Esc");
     let _ = app.emit("reminder_already_hidden", ());
     let _ = app.emit("reminder-session-closed", closed);

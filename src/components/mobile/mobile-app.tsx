@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Toaster } from "@/components/ui/sonner";
 import { usePlatform } from "@/hooks/use-platform";
@@ -43,7 +44,11 @@ export function MobileApp() {
 
     // `mobile-reminder` is emitted by the Android alarm bridge; `timer-complete`
     // keeps the desktop timer working when the mobile shell is previewed there.
-    bind("mobile-reminder", () => setReminderSession(null));
+    bind("mobile-reminder", () => {
+      // 原生闹钟 / 通知唤醒 App 时开启会话，让通知这一路也计入提醒统计。
+      invoke("begin_mobile_reminder").catch(() => {});
+      setReminderSession(null);
+    });
     bind("timer-complete", () => setReminderSession(null));
     // A drink recorded from a notification action happens on the native side.
     bind("drink-recorded-from-notification", emitRefresh);

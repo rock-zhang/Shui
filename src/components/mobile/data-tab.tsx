@@ -196,7 +196,7 @@ function ReminderStats({
       )}
       {reminders.completed === 0 && !error && (
         <p className="mt-3 text-xs leading-5 text-muted-foreground">
-          此时间范围内暂无已结束提醒。通知 Action 的计数由原生侧在阶段 2 接入。
+          此时间范围内暂无已结束提醒。全屏提醒和通知里的快捷操作都会计入统计。
         </p>
       )}
     </MobileSection>
@@ -245,7 +245,7 @@ export function DataTab() {
       if (saved) toast.success("饮水记录已导出");
     } catch (failure) {
       console.error("导出饮水记录失败", failure);
-      toast.error("导出失败：Android 需接入系统文件选择器（阶段 2）");
+      toast.error("导出失败，请稍后重试或检查系统分享是否可用");
     } finally {
       setExporting(false);
     }

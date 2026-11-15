@@ -119,7 +119,7 @@ export function MeTab() {
       >
         <MobileRow
           title="导出备份"
-          description="通过系统文件选择器保存到你指定的位置"
+          description="生成 JSON 后通过系统分享保存到文件应用或发给自己"
           control={
             <Button
               variant="outline"
@@ -218,7 +218,7 @@ export function MeTab() {
           </p>
         )}
         <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
-          移动端的文件选择器需通过系统 SAF / 分享接入，当前复用桌面命令，阶段 2 完成原生改造。
+          导出文件先写入应用缓存再调用系统分享；导入使用系统文件选择器（SAF），已有日期整体跳过、绝不覆盖。
         </p>
       </MobileSection>
 

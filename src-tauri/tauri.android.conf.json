@@ -1,5 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "com.shui.app",
   "bundle": {
     "createUpdaterArtifacts": false
   },

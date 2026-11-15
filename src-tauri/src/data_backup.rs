@@ -338,28 +338,33 @@ fn apply_import(
     Ok(result)
 }
 
+/// 生成备份字节。桌面走系统保存对话框，Android 走 SAF 分享，共用同一份数据口径。
+pub fn build_backup_bytes(app_handle: &AppHandle) -> Result<Vec<u8>, String> {
+    let _writer = WRITER.lock().map_err(|_| "饮水数据暂不可用")?;
+    let store = app_handle.store(HISTORY).map_err(|e| e.to_string())?;
+    let days = snapshot(store.as_ref());
+    if days.is_empty() {
+        return Err("还没有可备份的饮水记录".into());
+    }
+    validate_days(&days)?;
+    let bytes = serde_json::to_vec_pretty(&Backup {
+        format: FORMAT.into(),
+        version: 1,
+        exported_at: Local::now().to_rfc3339(),
+        drink_history: days,
+    })
+    .map_err(|e| e.to_string())?;
+    if bytes.len() as u64 > MAX_BYTES {
+        return Err("备份超过 16 MB，暂不支持导出".into());
+    }
+    Ok(bytes)
+}
+
+// Android 同名命令在 mobile.rs：写缓存文件 + 系统分享，不走桌面保存对话框。
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub async fn export_drink_backup(app_handle: AppHandle) -> Result<Option<String>, String> {
-    let bytes = {
-        let _writer = WRITER.lock().map_err(|_| "饮水数据暂不可用")?;
-        let store = app_handle.store(HISTORY).map_err(|e| e.to_string())?;
-        let days = snapshot(store.as_ref());
-        if days.is_empty() {
-            return Err("还没有可备份的饮水记录".into());
-        }
-        validate_days(&days)?;
-        let bytes = serde_json::to_vec_pretty(&Backup {
-            format: FORMAT.into(),
-            version: 1,
-            exported_at: Local::now().to_rfc3339(),
-            drink_history: days,
-        })
-        .map_err(|e| e.to_string())?;
-        if bytes.len() as u64 > MAX_BYTES {
-            return Err("备份超过 16 MB，暂不支持导出".into());
-        }
-        bytes
-    };
+    let bytes = build_backup_bytes(&app_handle)?;
     let file = app_handle
         .dialog()
         .file()
@@ -385,6 +390,7 @@ pub async fn export_drink_backup(app_handle: AppHandle) -> Result<Option<String>
     Ok(Some(path.to_string_lossy().into_owned()))
 }
 
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub async fn preview_drink_import(app_handle: AppHandle) -> Result<Option<ImportPreview>, String> {
     *PENDING.lock().map_err(|_| "导入状态不可用")? = None;
@@ -398,6 +404,15 @@ pub async fn preview_drink_import(app_handle: AppHandle) -> Result<Option<Import
         return Ok(None);
     };
     let path = file.into_path().map_err(|e| e.to_string())?;
+    preview_backup_from_path(&app_handle, path)
+}
+
+/// 从指定路径预览导入。Android 用系统文件选择器拿到 content URI 后复制到
+/// 缓存目录，再复用这段校验 / 合并逻辑，避免两套数据口径。
+pub fn preview_backup_from_path(
+    app_handle: &AppHandle,
+    path: std::path::PathBuf,
+) -> Result<Option<ImportPreview>, String> {
     let backup = parse_backup(&read_limited(&path)?)?;
     let (_, result) = {
         let _writer = WRITER.lock().map_err(|_| "饮水数据暂不可用")?;

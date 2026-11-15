@@ -10,49 +10,61 @@ edition = "2021"
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
-# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/crates.io/issues/8519
 name = "shui_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+# ---------------------------------------------------------------------------
+# 平台无关依赖。Android 与桌面共用同一套业务代码（饮水记录 / 统计 / 备份 /
+# 提醒会话），只有窗口、托盘、快捷键、自启等外壳被 cfg 隔离。
+# ---------------------------------------------------------------------------
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 lazy_static = "1.4.0"
 parking_lot = "0.12"
-tauri = { version = "2", features = [ "tray-icon", "macos-private-api", "image-ico" ] }
+tauri = { version = "2", features = [ "tray-icon", "macos-private-api", "image-ico"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+chrono = { version = "0.4", features = ["serde"] }
+scopeguard = "1.2"
+tauri-plugin-os = "2"
+tauri-plugin-store = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-clipboard-manager = "2"
+
+# ---------------------------------------------------------------------------
+# 桌面专属。resolver = "2" 保证 target 专属依赖（含 tauri 的 tray-icon
+# feature）不会在 Android 编译时被拉进来。
+# ---------------------------------------------------------------------------
+[target.'cfg(not(target_os = "android"))'.dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 tauri-plugin-log = "2"
 tauri-plugin-global-shortcut = "2"
-tauri-plugin-os = "2"
-tauri-plugin-dialog = "2"   
 tauri-plugin-fs = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 tauri-plugin-drag = "2"
 tauri-plugin-macos-permissions = "2"
-tauri-plugin-store = "2"
-tauri-plugin-opener = "2"
-tauri-plugin-notification = "2"
-chrono = { version = "0.4", features = ["serde"] }
-tauri-plugin-clipboard-manager = "2"
-scopeguard = "1.2"
 winapi = { version = "0.3", features = [ "wtsapi32", "winuser", "winbase", "libloaderapi", "winnt", "powersetting"] }
-widestring = "1.0"  # 用于处理Windows宽字符
-# tauri-plugin-fs-pro.workspace = true
-# tauri-plugin-eco-window.workspace = true
-# tauri-plugin-eco-locale.workspace = true
-# tauri-plugin-eco-clipboard.workspace = true
-# tauri-plugin-eco-ocr.workspace = true
-# tauri-plugin-eco-paste.workspace = true
-# tauri-plugin-eco-autostart.workspace = true
-
-# [target."cfg(target_os = \"macos\")".dependencies]
+widestring = "1.0"
+windows = { version = "0.48", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Threading",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Registry",
+    "Win32_System_LibraryLoader",
+    "Win32_System_RemoteDesktop",
+    "Win32_System_Power",
+] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel.workspace = true
@@ -61,29 +73,11 @@ core-graphics = "0.23.1"
 objc = "0.2.7"          # Objective-C 运行时绑定
 objc-foundation = "0.1" # Foundation 框架支持
 
-[dependencies.windows]
-version = "0.48"
-features = [
-    "Win32_Foundation",
-    "Win32_UI_WindowsAndMessaging",
-    "Win32_System_Threading",
-    "Win32_System_ProcessStatus",
-    "Win32_System_Registry",
-    "Win32_System_LibraryLoader",
-    "Win32_System_RemoteDesktop",
-    "Win32_System_Power",  # 添加这一行
-]
-
 [target.'cfg(target_os = "linux")'.dependencies]
 dbus = "0.9.7"
 notify-rust = "4.9"
 x11-dl = "2.21.0"
 gtk = "0.18.1"
-
-[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-autostart = "2"
-tauri-plugin-global-shortcut = "2"
-tauri-plugin-updater = "2"
 
 [features]
 cargo-clippy = []

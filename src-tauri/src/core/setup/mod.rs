@@ -1,3 +1,7 @@
+// 桌面专属：托盘倒计时 + 锁屏/前台应用监听 + 主窗口关闭拦截。
+// Android 由 Kotlin AlarmManager 驱动，整个模块不参与编译。
+#![cfg(not(target_os = "android"))]
+
 use crate::commands::pause_timer;
 // mod timer;
 use crate::timer::IS_RUNNING;
