@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import org.json.JSONArray
@@ -236,6 +237,8 @@ class ReminderReceiver : BroadcastReceiver() {
 
         val builder = NotificationCompat.Builder(context, ReminderScheduler.CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_water)
+            // 下拉大图标用桌面版「水」字 logo；状态栏小图标受系统限制只能单色剪影。
+            .setLargeIcon(BitmapFactory.decodeResource(context.resources, R.drawable.ic_notification_large))
             .setColor(0xFF3B82F6.toInt())
             .setContentTitle("该喝水啦")
             .setContentText("站起来喝杯水，顺便活动一下身体吧")
