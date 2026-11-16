@@ -1,4 +1,5 @@
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
@@ -35,12 +36,16 @@ val hasReleaseSigning = releaseStoreFile != null && releaseStorePassword != null
     releaseKeyAlias != null && releaseKeyPassword != null
 
 android {
-    compileSdk = 34
+    // AGP 9.3 要求 compileSdk >= 36；这里跟模板取 37。
+    compileSdk = 37
     namespace = "com.shui.app"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         applicationId = "com.shui.app"
         minSdk = 24
+        // targetSdk 刻意留在 34：升到 35+ 会触发 Android 15 强制 edge-to-edge，
+        // statusBarColor / navigationBarColor 被忽略，现有「系统栏跟随主题」要
+        // 整体改写成 insets 注入。那是独立的一次改造，不混在框架升级里做。
         targetSdk = 34
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
@@ -80,11 +85,21 @@ android {
             }
         }
     }
-    kotlinOptions {
-        jvmTarget = "1.8"
-    }
     buildFeatures {
         buildConfig = true
+    }
+    // AGP 9 把 Java 默认 target 抬到 11，Kotlin 必须跟着对齐，否则
+    // compileUniversalDebugKotlin 会因 JVM-target 不一致直接失败。
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+}
+
+// Kotlin 2.2 移除了 `android.kotlinOptions`，jvmTarget 改由 Kotlin DSL 配置。
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_11
     }
 }
 
@@ -93,11 +108,14 @@ rust {
 }
 
 dependencies {
-    implementation("androidx.webkit:webkit:1.6.1")
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.activity:activity:1.8.2")
-    implementation("com.google.android.material:material:1.8.0")
+    // 版本跟随 Tauri 2.12 CLI 生成的模板；tauri-android 2.12 依赖
+    // activity-ktx 1.10 / lifecycle 2.10，旧版本会因 API 缺失编译失败。
+    implementation("androidx.webkit:webkit:1.14.0")
+    implementation("androidx.appcompat:appcompat:1.7.1")
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.activity:activity-ktx:1.10.1")
+    implementation("com.google.android.material:material:1.12.0")
+    implementation("androidx.lifecycle:lifecycle-process:2.10.0")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.4")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.0")

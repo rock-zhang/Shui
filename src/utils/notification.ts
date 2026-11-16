@@ -66,12 +66,10 @@ async function setupReminderActions() {
   }
 
   try {
-    await onAction((notification) => {
-      const payload = notification as Options & { actionId?: string };
-      const actionId =
-        payload.actionId ??
-        (payload.extra?.actionId as string | undefined) ??
-        "";
+    await onAction((event) => {
+      // plugin-notification 2.3+ 把回调参数从 `Options` 收窄成 `ActionPerformed`：
+      // actionId 直接挂在顶层（点击通知主体时为 `tap`），不再藏在 extra 里。
+      const actionId = event.actionId ?? "";
       const match = /^drink-(\d+)$/.exec(actionId);
       if (match) {
         // requestId keeps a retried tap from double counting.

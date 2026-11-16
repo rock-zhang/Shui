@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import org.json.JSONArray
@@ -20,8 +21,17 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 
+
 /** 后台保底通道：精确闹钟 + 带「喝一杯」快捷操作的系统通知。 */
 object ReminderScheduler {
+    /**
+     * 通知全链路的诊断日志统一走这个 TAG：
+     * `adb logcat -s ShuiReminder` 就能看到「闹钟有没有排上、到期有没有触发、
+     * 为什么没发通知」。此前所有失败分支都是 catch 吞掉，用户侧只能看到
+     * 「到点没反应」，无法判断断在系统权限、渠道还是调度。
+     */
+    const val TAG = "ShuiReminder"
+
     const val ACTION_REMINDER = "com.shui.app.REMINDER"
     const val ACTION_SKIP = "com.shui.app.SKIP"
     const val ACTION_DRINK_PREFIX = "com.shui.app.DRINK_"
@@ -129,9 +139,29 @@ object ReminderScheduler {
     /**
      * 系统是否还允许本应用发通知。Android 13+ 由 POST_NOTIFICATIONS 决定，
      * 低版本恒为 true（用户仍可在系统设置里整个关掉）。
+     *
+     * 注意：`areNotificationsEnabled()` 只看应用级开关。用户把「喝水提醒」这个
+     * 渠道单独关掉（或降到「静音/不显示」）时它仍返回 true，notify() 会被系统
+     * 静默丢弃——账本却已经盖上戳，前台 timer 随后也不会补全屏提醒，最终表现
+     * 就是「权限都开着，但一条都没有」。所以这里必须再查一次渠道 importance。
      */
-    fun canPostNotifications(context: Context): Boolean =
-        NotificationManagerCompat.from(context).areNotificationsEnabled()
+    fun canPostNotifications(context: Context): Boolean {
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+            Log.w(TAG, "canPostNotifications=false：应用级通知开关已关闭")
+            return false
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channelId = if (isSoundEnabled(context)) CHANNEL_ID else CHANNEL_ID_SILENT
+        // 渠道尚未创建时视为可用：首次 notify 会顺带创建。
+        val importance = manager.getNotificationChannel(channelId)?.importance
+            ?: return true
+        if (importance == NotificationManager.IMPORTANCE_NONE) {
+            Log.w(TAG, "canPostNotifications=false：通知渠道 $channelId 已被单独关闭")
+            return false
+        }
+        return true
+    }
 
     fun cancel(context: Context) {
         val manager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -145,7 +175,10 @@ object ReminderScheduler {
     }
 
     fun scheduleNext(context: Context) {
-        val root = config(context) ?: return
+        val root = config(context) ?: run {
+            Log.w(TAG, "scheduleNext 跳过：SharedPreferences 里没有配置，说明 schedule 命令从未到达原生层")
+            return
+        }
         val alert = root.optJSONObject("alert") ?: JSONObject()
         val general = root.optJSONObject("general") ?: JSONObject()
         if (general.optBoolean("isPaused", false)) {
@@ -183,11 +216,19 @@ object ReminderScheduler {
             candidate.add(Calendar.MINUTE, gap)
             attempts += gap
         }
-        if (!found) return
+        if (!found) {
+            Log.w(TAG, "scheduleNext 跳过：未来 8 天内没有落在提醒时段/工作日且避开勿扰的时刻")
+            return
+        }
 
         val manager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val pending = alarmIntent(context, ACTION_REMINDER, ALARM_REQUEST_CODE)
         val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || manager.canScheduleExactAlarms()
+        Log.i(
+            TAG,
+            "scheduleNext：下次闹钟 ${SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(candidate.time)}，" +
+                "精确=${canExact}（Android 14+ 新装应用默认不授予 SCHEDULE_EXACT_ALARM）"
+        )
         try {
             if (canExact) {
                 manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, candidate.timeInMillis, pending)
@@ -195,6 +236,7 @@ object ReminderScheduler {
                 manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, candidate.timeInMillis, pending)
             }
         } catch (_: SecurityException) {
+            Log.w(TAG, "setExact 被系统拒绝，降级为非精确闹钟")
             manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, candidate.timeInMillis, pending)
         }
     }
@@ -244,6 +286,10 @@ class ReminderReceiver : BroadcastReceiver() {
                 val now = System.currentTimeMillis()
                 val last = ReminderScheduler.lastReminderAt(context)
                 val gapMs = ReminderScheduler.gapMinutes(context) * 60_000L
+                Log.i(
+                    ReminderScheduler.TAG,
+                    "闹钟触发：距上次提醒 ${(now - last) / 60_000} 分钟 / 间隔阈值 ${gapMs / 60_000} 分钟"
+                )
                 // 前台 timer 刚弹过全屏并写了账本时，闹钟这一路不再补通知，
                 // 避免「进 App 后通知 + 全屏同时弹」。首启/账本缺失时 last=0，
                 // 视为该提醒一次，正常发通知并落账本。
@@ -254,8 +300,14 @@ class ReminderReceiver : BroadcastReceiver() {
                     // 失败。不盖章，让下次进 App 时补一次全屏提醒。
                     if (ReminderScheduler.canPostNotifications(context)) {
                         ReminderScheduler.markReminder(context)
-                        if (ReminderScheduler.shouldNotify(context)) showNotification(context)
+                        if (ReminderScheduler.shouldNotify(context)) {
+                            showNotification(context)
+                        } else {
+                            Log.i(ReminderScheduler.TAG, "不发通知：已暂停或今日饮水量已达标")
+                        }
                     }
+                } else {
+                    Log.i(ReminderScheduler.TAG, "不发通知：间隔内已提醒过（前台全屏承接）")
                 }
                 // 无论是否展示，都要安排下一次，保证达标/勿扰结束后能自动恢复。
                 ReminderScheduler.scheduleNext(context)
@@ -347,8 +399,10 @@ class ReminderReceiver : BroadcastReceiver() {
 
         try {
             manager.notify(ReminderScheduler.NOTIFICATION_ID, notification)
-        } catch (_: SecurityException) {
+            Log.i(ReminderScheduler.TAG, "通知已投递：渠道=$channelId id=${ReminderScheduler.NOTIFICATION_ID}")
+        } catch (error: SecurityException) {
             // 未授予 POST_NOTIFICATIONS：App 前台的 timer-complete 通道仍然可用。
+            Log.w(ReminderScheduler.TAG, "通知投递被拒绝（POST_NOTIFICATIONS 未授予）", error)
         }
     }
 }

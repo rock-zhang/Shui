@@ -42,7 +42,7 @@ tauri-plugin-clipboard-manager = "2"
 # feature）不会在 Android 编译时被拉进来。
 # ---------------------------------------------------------------------------
 [target.'cfg(not(target_os = "android"))'.dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["macos-private-api", "tray-icon"] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
