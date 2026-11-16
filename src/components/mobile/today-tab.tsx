@@ -27,6 +27,7 @@ import {
   findNextReminder,
 } from "@/lib/reminder-schedule";
 import { useMobileConfig } from "./config-context";
+import { NotificationNudge } from "./notification-nudge";
 import { MobileEmpty, MobileSection, ProgressRing } from "./ui";
 
 const QUICK_AMOUNTS: Array<{
@@ -40,13 +41,6 @@ const QUICK_AMOUNTS: Array<{
   { amount: 300, hint: "大杯", Icon: CupSoda },
 ];
 
-type SaveStatus = {
-  phase: "idle" | "saving" | "done" | "error";
-  text: string;
-};
-
-const IDLE_STATUS: SaveStatus = { phase: "idle", text: "" };
-
 /** 同一金额在该窗口内的重复点击复用同一 requestId，交给 Rust 幂等去重。 */
 const QUICK_DEDUPE_MS = 1200;
 /** 按钮「水位上涨 + ✓」就地反馈的持续时间。 */
@@ -57,7 +51,6 @@ type Celebration = { amount: number; token: number };
 export function TodayTab() {
   const { today, goal, loading, error, reload } = useDrinkData(7);
   const { alert, general, hydrated } = useMobileConfig();
-  const [status, setStatus] = useState<SaveStatus>(IDLE_STATUS);
   const [confirmUndo, setConfirmUndo] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<Celebration | null>(null);
   const busy = useRef(false);
@@ -108,7 +101,6 @@ export function TodayTab() {
     // dimming) all four cards, which was the visible "flash" on every record.
     if (busy.current) return;
     busy.current = true;
-    setStatus({ phase: "saving", text: "正在保存…" });
     try {
       // 失败重试沿用 pending 的 id；正常连点则在同一金额的冷却窗内复用 id，
       // 让 Rust 侧 requestId 幂等去重，避免本地 store 写入太快而记成两笔。
@@ -133,10 +125,8 @@ export function TodayTab() {
         requestId: draft.requestId,
       });
       pending.current = null;
-      setStatus({
-        phase: "done",
-        text: `${receipt.added ? "已记录" : "这笔已记过"} · 今日累计 ${receipt.total} ml`,
-      });
+      // 成功不弹提示：卡片动画、进度环和「今日明细」已经反馈了结果。
+      // 失败才需要 toast（见 catch），避免整页唯一的反馈渠道被噪声占用。
       // 仅真正新增时播放就地庆祝；幂等命中的重复点击不重复播放动画。
       if (receipt.added) celebrate(draft.amount);
       if (receipt.goalReached) toast.success("🎉 今日目标已完成");
@@ -145,10 +135,7 @@ export function TodayTab() {
       emitRefresh();
     } catch (failure) {
       console.error("记录饮水失败", failure);
-      setStatus({
-        phase: "error",
-        text: "未能确认保存，请再点一次原按钮重试（不会重复累加）",
-      });
+      toast.error("保存未确认，请再点一次原按钮（不会重复累加）");
     } finally {
       busy.current = false;
     }
@@ -157,7 +144,6 @@ export function TodayTab() {
   async function undo(requestId: string) {
     if (busy.current) return;
     busy.current = true;
-    setStatus({ phase: "saving", text: "正在撤销…" });
     try {
       await invoke("undo_drink", {
         date: getLocalDateKey(new Date()),
@@ -165,23 +151,20 @@ export function TodayTab() {
       });
       setConfirmUndo(null);
       setCelebration(null);
-      setStatus({ phase: "done", text: "已撤销这笔记录" });
+      toast.success("已撤销这笔记录");
       emitRefresh();
     } catch (failure) {
       console.error("撤销失败", failure);
-      setStatus({
-        phase: "error",
-        text: "撤销未确认，请重试（重复撤销不会重复扣减）",
-      });
+      toast.error("撤销未确认，请再试一次（重复撤销不会重复扣减）");
     } finally {
       busy.current = false;
     }
   }
 
-  const saving = status.phase === "saving";
-
   return (
     <>
+      <NotificationNudge />
+
       <MobileSection className="pt-5">
         <ProgressRing total={today.total} goal={goal || today.goal} />
         <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
@@ -197,8 +180,6 @@ export function TodayTab() {
               <button
                 key={amount}
                 type="button"
-                aria-disabled={saving}
-                aria-busy={saving}
                 onClick={() => submit(amount)}
                 aria-label={`记录 ${amount} 毫升饮水`}
                 className={cn(
@@ -256,25 +237,6 @@ export function TodayTab() {
             );
           })}
         </div>
-        {/* Always present so the section height never jumps when a message
-            appears/disappears during a save. */}
-        <p
-          role={status.phase === "error" ? "alert" : "status"}
-          aria-live="polite"
-          className={cn(
-            "mt-3 flex min-h-5 items-center gap-1.5 text-xs leading-5",
-            status.phase === "error"
-              ? "text-destructive"
-              : status.phase === "done"
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-muted-foreground"
-          )}
-        >
-          {status.phase === "done" && (
-            <Check className="h-3.5 w-3.5 shrink-0" />
-          )}
-          {status.text}
-        </p>
       </MobileSection>
 
       <MobileSection title="提醒节奏">

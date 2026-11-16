@@ -14,6 +14,7 @@ import {
 } from "@/lib/mobile";
 import { MOBILE_TABS, MobileTabBar } from "./mobile-tab-bar";
 import { MobileConfigProvider, useMobileConfig } from "./config-context";
+import { NotificationPermissionProvider } from "./notification-permission-context";
 import { TodayTab } from "./today-tab";
 import { ReminderTab } from "./reminder-tab";
 import { DataTab } from "./data-tab";
@@ -169,63 +170,65 @@ export function MobileApp() {
 
   return (
     <MobileConfigProvider>
-      <ReminderEvents openReminder={openReminder} />
-      <div className="mobile-root flex flex-col overflow-hidden bg-background text-foreground">
-        <header className="shrink-0 px-5 pb-3 pt-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            Shui · 喝水提醒
-          </p>
-          <div className="mt-1 flex items-baseline justify-between gap-2">
-            <h1 className="text-[26px] font-semibold leading-tight tracking-tight">
-              {header.title}
-            </h1>
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {dateLabel}
-            </span>
-          </div>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {header.subtitle}
-          </p>
-        </header>
-
-        <main className="relative min-h-0 flex-1">
-          {MOBILE_TABS.map(({ id }) => (
-            <div
-              key={id}
-              ref={(node) => {
-                scrollNodes.current[id] = node;
-              }}
-              aria-label={HEADERS[id].title}
-              aria-hidden={tab !== id}
-              style={{ display: tab === id ? "block" : "none" }}
-              onScroll={(event) => {
-                if (tab === id) {
-                  scrollOffsets.current[id] = event.currentTarget.scrollTop;
-                }
-              }}
-              className="mobile-scroll absolute inset-0 overflow-y-auto px-4 pb-6"
-            >
-              {id === "today" && <TodayTab />}
-              {id === "reminder" && <ReminderTab />}
-              {id === "data" && <DataTab />}
-              {id === "me" && <MeTab />}
+      <NotificationPermissionProvider>
+        <ReminderEvents openReminder={openReminder} />
+        <div className="mobile-root flex flex-col overflow-hidden bg-background text-foreground">
+          <header className="shrink-0 px-5 pb-3 pt-4">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Shui · 喝水提醒
+            </p>
+            <div className="mt-1 flex items-baseline justify-between gap-2">
+              <h1 className="text-[26px] font-semibold leading-tight tracking-tight">
+                {header.title}
+              </h1>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {dateLabel}
+              </span>
             </div>
-          ))}
-        </main>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {header.subtitle}
+            </p>
+          </header>
 
-        <MobileTabBar active={tab} onChange={changeTab} />
-        <Toaster position="top-center" richColors />
+          <main className="relative min-h-0 flex-1">
+            {MOBILE_TABS.map(({ id }) => (
+              <div
+                key={id}
+                ref={(node) => {
+                  scrollNodes.current[id] = node;
+                }}
+                aria-label={HEADERS[id].title}
+                aria-hidden={tab !== id}
+                style={{ display: tab === id ? "block" : "none" }}
+                onScroll={(event) => {
+                  if (tab === id) {
+                    scrollOffsets.current[id] = event.currentTarget.scrollTop;
+                  }
+                }}
+                className="mobile-scroll absolute inset-0 overflow-y-auto px-4 pb-6"
+              >
+                {id === "today" && <TodayTab />}
+                {id === "reminder" && <ReminderTab />}
+                {id === "data" && <DataTab />}
+                {id === "me" && <MeTab />}
+              </div>
+            ))}
+          </main>
 
-        {reminderSession !== undefined && (
-          <FullscreenReminder
-            session={reminderSession}
-            onClose={() => {
-              setReminderSession(undefined);
-              emitRefresh();
-            }}
-          />
-        )}
-      </div>
+          <MobileTabBar active={tab} onChange={changeTab} />
+          <Toaster position="top-center" richColors />
+
+          {reminderSession !== undefined && (
+            <FullscreenReminder
+              session={reminderSession}
+              onClose={() => {
+                setReminderSession(undefined);
+                emitRefresh();
+              }}
+            />
+          )}
+        </div>
+      </NotificationPermissionProvider>
     </MobileConfigProvider>
   );
 }

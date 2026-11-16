@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { isPermissionGranted } from "@tauri-apps/plugin-notification";
 import { BellRing } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -17,6 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { sendReminderNotification } from "@/utils/notification";
 import { useMobileConfig } from "./config-context";
+import { useNotificationPermission } from "./notification-permission-context";
 import { MobileRow, MobileSection, MobileTimeInput } from "./ui";
 
 /** 从系统设置返回后轮询确认授权结果的时长上限与间隔。 */
@@ -76,17 +76,19 @@ function ReminderSkeleton() {
 export function ReminderTab() {
   const { alert, general, hydrated, patchAlert, patchGeneral } =
     useMobileConfig();
-  const [permission, setPermission] = useState<"unknown" | "granted" | "denied">(
-    "unknown"
-  );
+  // 通知权限由 NotificationPermissionProvider 统一持有：今日 tab 的提示卡和
+  // 这里的红字读同一份状态，切回前台也只查一次系统。
+  const {
+    permission,
+    canRequest: notifCanRequest,
+    request: requestNotification,
+  } = useNotificationPermission();
   const [exactAlarm, setExactAlarm] = useState<"unknown" | "granted" | "denied">(
     "unknown"
   );
   const [battery, setBattery] = useState<"unknown" | "granted" | "denied">(
     "unknown"
   );
-  /** 系统是否还会弹通知授权框；永久拒绝后为 false，只能去设置页开。 */
-  const [notifCanRequest, setNotifCanRequest] = useState(true);
   const alive = useRef(true);
   const watchTimer = useRef<number | null>(null);
 
@@ -94,29 +96,6 @@ export function ReminderTab() {
     if (watchTimer.current !== null) {
       window.clearInterval(watchTimer.current);
       watchTimer.current = null;
-    }
-  }, []);
-
-  // 三个读取函数同时承担「刷新开关状态」和「给轮询判断是否已授权」两个职责。
-  const readNotification = useCallback(async (): Promise<boolean> => {
-    try {
-      const state = await invoke<{ granted: boolean; canRequest: boolean }>(
-        "notification_permission_state"
-      );
-      if (alive.current) {
-        setPermission(state.granted ? "granted" : "denied");
-        setNotifCanRequest(state.canRequest);
-      }
-      return state.granted;
-    } catch {
-      // 桌面预览没有原生命令，退回插件查询。
-      try {
-        const granted = await isPermissionGranted();
-        if (alive.current) setPermission(granted ? "granted" : "denied");
-        return granted;
-      } catch {
-        return false;
-      }
     }
   }, []);
 
@@ -145,10 +124,10 @@ export function ReminderTab() {
   }, []);
 
   const refreshPermissions = useCallback(() => {
-    void readNotification();
+    // 通知权限由 Provider 在同一个前台信号里刷新，这里不重复查。
     void readExactAlarm();
     void readBattery();
-  }, [readNotification, readExactAlarm, readBattery]);
+  }, [readExactAlarm, readBattery]);
 
   /**
    * 跳系统设置或触发系统确认弹窗后，短轮询确认结果。
@@ -208,54 +187,6 @@ export function ReminderTab() {
         : [...weekdays, day].sort((a, b) => a - b),
     });
   };
-
-  /**
-   * 申请通知权限。系统还会弹授权框就直接申请；已被永久拒绝
-   * （Android 13+ 拒绝两次后 requestPermissions 静默失败）则跳到系统设置页，
-   * 否则点了开关什么都不会发生。
-   */
-  async function requestNotification() {
-    try {
-      const state = await invoke<{ granted: boolean; canRequest: boolean }>(
-        "notification_permission_state"
-      );
-      if (state.granted) {
-        setPermission("granted");
-        await openNotificationSettings("turnOff");
-        return;
-      }
-      if (state.canRequest) {
-        // 系统授权框本身就是反馈，这里不再叠一层 toast。
-        await invoke("request_notification_permission");
-        watchPermission(readNotification, "通知权限已开启");
-        return;
-      }
-      await openNotificationSettings("turnOn");
-    } catch {
-      toast.info("当前为桌面预览，通知权限由系统管理");
-    }
-  }
-
-  /**
-   * 打开系统通知设置页。
-   * @param intent turnOff：已开启，用户是去关闭；turnOn：已永久拒绝，去手动开启。
-   */
-  async function openNotificationSettings(intent: "turnOn" | "turnOff") {
-    const turningOff = intent === "turnOff";
-    try {
-      await invoke("open_notification_settings");
-      toast.info(
-        turningOff ? "已打开通知设置，可在此关闭" : "系统已不再弹授权窗，请在设置中开启"
-      );
-      watchPermission(
-        readNotification,
-        turningOff ? "通知权限已关闭" : "通知权限已开启",
-        !turningOff
-      );
-    } catch {
-      toast.error("无法打开通知设置，请到 应用信息 → 通知 手动调整");
-    }
-  }
 
   async function openExactAlarmSettings() {
     // 已开启时点开关是去关闭，未开启才是去开启——文案和轮询方向都不同。

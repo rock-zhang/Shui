@@ -10,6 +10,7 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -124,6 +125,13 @@ object ReminderScheduler {
     /** 「提醒音效」开关；缺省为有声，与前端默认值一致。 */
     fun isSoundEnabled(context: Context): Boolean =
         config(context)?.optJSONObject("general")?.optBoolean("isSound", true) ?: true
+
+    /**
+     * 系统是否还允许本应用发通知。Android 13+ 由 POST_NOTIFICATIONS 决定，
+     * 低版本恒为 true（用户仍可在系统设置里整个关掉）。
+     */
+    fun canPostNotifications(context: Context): Boolean =
+        NotificationManagerCompat.from(context).areNotificationsEnabled()
 
     fun cancel(context: Context) {
         val manager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -240,8 +248,14 @@ class ReminderReceiver : BroadcastReceiver() {
                 // 避免「进 App 后通知 + 全屏同时弹」。首启/账本缺失时 last=0，
                 // 视为该提醒一次，正常发通知并落账本。
                 if (now - last >= gapMs) {
-                    ReminderScheduler.markReminder(context)
-                    if (ReminderScheduler.shouldNotify(context)) showNotification(context)
+                    // 没有通知权限时不盖账本戳：notify() 会被系统静默丢弃，
+                    // 若这里照旧落账本，用户打开 App 后前台 timer 会认为
+                    // 「刚提醒过」，连全屏提醒都不补——提醒变成彻底静默的
+                    // 失败。不盖章，让下次进 App 时补一次全屏提醒。
+                    if (ReminderScheduler.canPostNotifications(context)) {
+                        ReminderScheduler.markReminder(context)
+                        if (ReminderScheduler.shouldNotify(context)) showNotification(context)
+                    }
                 }
                 // 无论是否展示，都要安排下一次，保证达标/勿扰结束后能自动恢复。
                 ReminderScheduler.scheduleNext(context)
