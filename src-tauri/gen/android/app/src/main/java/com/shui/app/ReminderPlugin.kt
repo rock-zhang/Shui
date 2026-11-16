@@ -126,6 +126,21 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         invoke.resolve()
     }
 
+    /**
+     * Rust 前台计时到点后由原生裁决提醒通道：
+     * 只有「App 在前台 + 亮屏 + 未锁屏」才允许 WebView 弹全屏，
+     * 其余情况直接走通知，避免全屏页在解锁后才迟到弹出。
+     */
+    @Suppress("UNUSED_PARAMETER")
+    @Command
+    fun deliverReminder(invoke: Invoke) {
+        val mode = ReminderScheduler.deliverForeground(activity)
+        Log.i(ReminderScheduler.TAG, "Rust 到点裁决结果=$mode")
+        val payload = JSObject()
+        payload.put("mode", mode)
+        invoke.resolve(payload)
+    }
+
     /** 今日页「预计下一杯」：直接读原生已排定的绝对时间。 */
     @Suppress("UNUSED_PARAMETER")
     @Command
@@ -475,6 +490,9 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         fun notifyForeground() {
             instance?.dispatchForeground()
         }
+
+        /** 供通道裁决读取窗口焦点状态；插件未加载时返回 null（视为后台）。 */
+        fun currentActivity(): Activity? = instance?.activity
 
         /**
          * 必须在主线程调用。manifest 的 configChanges 含 uiMode，系统切深浅色

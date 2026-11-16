@@ -178,7 +178,14 @@ pub async fn record_drink(
     if request_id.is_empty() || request_id.len() > 128 || !request_id.is_ascii() {
         return Err("无效的请求标识".into());
     }
-    save_drink(&app_handle, amount, &format!("manual:{request_id}"))
+    let receipt = save_drink(&app_handle, amount, &format!("manual:{request_id}"))?;
+    // 实际新增一笔才重置节奏；requestId 幂等命中（重复点同一按钮）不动闹钟，
+    // 否则连点会把「预计下一杯」无限往后推。
+    #[cfg(target_os = "android")]
+    if receipt.added {
+        crate::mobile::reanchor_after_drink(&app_handle);
+    }
+    Ok(receipt)
 }
 
 #[tauri::command]
@@ -187,5 +194,11 @@ pub async fn undo_drink(
     date: String,
     request_id: String,
 ) -> Result<UndoReceipt, String> {
-    undo_saved_drink(&app_handle, &date, &request_id)
+    let receipt = undo_saved_drink(&app_handle, &date, &request_id)?;
+    // 撤销同样算一次水量更新：重算下一杯时间，但不回退到过去的时间点。
+    #[cfg(target_os = "android")]
+    if receipt.undone {
+        crate::mobile::reanchor_after_drink(&app_handle);
+    }
+    Ok(receipt)
 }

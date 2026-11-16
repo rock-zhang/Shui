@@ -89,6 +89,16 @@ fn mark_reminder(app: &tauri::AppHandle) {
     }
 }
 
+/// 水量真正发生变化后重置提醒节奏：把账本锚点改到「现在」，并立刻让原生
+/// 按 anchorMs + gap 重排。这样今日页的「预计下一杯」会跟着每次记水更新。
+///
+/// 只在 receipt.added / undone 为真时调用：Rust 侧 requestId 幂等命中时
+/// 水量没变，若也重排，连续点同一按钮会把闹钟无限往后推。
+pub fn reanchor_after_drink(app: &tauri::AppHandle) {
+    mark_reminder(app);
+    sync_schedule(app);
+}
+
 pub fn setup(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     // 前台计时：以共享账本为唯一时间锚点。WebView 活着时给出全屏提醒；
     // 退后台由 Kotlin 闹钟兜底，两者写同一份账本，互不重复。
@@ -115,14 +125,47 @@ pub fn setup(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 let now_ms = Local::now().timestamp_millis();
                 let gap_ms = settings.gap as i64 * 1000; // AppSettings.gap 以秒存储
                 if now_ms - last_reminder_at(&timer_handle) >= gap_ms {
-                    // 先写账本再弹窗：后台闹钟随后读到新账本，就不会再补一条通知。
-                    mark_reminder(&timer_handle);
-                    IS_RUNNING.store(false, Ordering::SeqCst);
-                    reminder_session::begin();
-                    let _ = timer_handle.emit("timer-complete", ());
-                    // 全屏已承接本次提醒，把原生闹钟重排到 now+gap。
-                    sync_schedule(&timer_handle);
-                    break;
+                    // 到点后先问原生：此刻是否真的能弹 App 内全屏（前台+亮屏+未锁屏）。
+                    // 裁决权完全在 Kotlin；Rust 只在明确拿到 "overlay" 时才动手。
+                    //
+                    // 关键：native 失败一律当作 "defer"，绝不兜底成 overlay。
+                    // 后台 native 调用一旦失败（插件未就绪 / WebView 冻结导致 IPC 异常）
+                    // 若兜底 overlay，会写账本 + 把 timer-complete 投给冻结的 WebView：
+                    // 账本被抢写 → AlarmManager 判「间隔内已提醒」吞掉后台通知；
+                    // 事件积压 → 用户打开 App 才弹全屏。这正是「后台没通知、打开才弹窗」。
+                    let mode = native::<ReminderDelivery>(
+                        &timer_handle,
+                        "deliverReminder",
+                        json!({}),
+                    )
+                    .map(|delivery| delivery.mode)
+                    .unwrap_or_else(|_| "defer".to_string());
+                    match mode.as_str() {
+                        "overlay" => {
+                            // Kotlin 已确认 WebView 在前台可见可交互：弹全屏。
+                            // 先发事件再写账本，保证「提醒真的投递了才盖戳」；账本只由
+                            // 这一路写，AlarmManager 随后读到新账本便不再补发通知。
+                            IS_RUNNING.store(false, Ordering::SeqCst);
+                            reminder_session::begin();
+                            let _ = timer_handle.emit("timer-complete", ());
+                            mark_reminder(&timer_handle);
+                            // 全屏已承接本次提醒，把原生闹钟重排到账本 + gap。
+                            sync_schedule(&timer_handle);
+                            break;
+                        }
+                        "notification" => {
+                            // Kotlin 当场发了通知并写好账本；Rust 只刷新下次时间。
+                            sync_schedule(&timer_handle);
+                            continue;
+                        }
+                        _ => {
+                            // "defer"（含 native 失败）：Rust 完全放手——不写账本、
+                            // 不 emit。账本留给 AlarmManager，由它独占后台通知这一路。
+                            // 拉长空转间隔，避免每秒重复问一次原生。
+                            std::thread::sleep(Duration::from_secs(5));
+                            continue;
+                        }
+                    }
                 }
                 std::thread::sleep(Duration::from_secs(1));
             }
@@ -139,6 +182,12 @@ pub fn setup(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
 
     sync_schedule(app);
     Ok(())
+}
+
+#[derive(Debug, Deserialize)]
+struct ReminderDelivery {
+    #[serde(default)]
+    mode: String,
 }
 
 #[derive(Debug, Deserialize)]

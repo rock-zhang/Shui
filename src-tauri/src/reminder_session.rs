@@ -168,7 +168,13 @@ pub async fn record_reminder_drink(
     amount: u64,
     session: String,
 ) -> Result<crate::drink_store::Receipt, String> {
-    confirm_with(&session, || {
+    let receipt = confirm_with(&session, || {
         crate::drink_store::save_drink(&app_handle, amount, &format!("reminder:{session}"))
-    })
+    })?;
+    // 全屏提醒里点「喝一杯」也是一次水量更新，同样重置下一杯时间。
+    #[cfg(target_os = "android")]
+    if receipt.added {
+        crate::mobile::reanchor_after_drink(&app_handle);
+    }
+    Ok(receipt)
 }

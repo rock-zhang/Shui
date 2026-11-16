@@ -53,8 +53,9 @@ type Celebration = { amount: number; token: number };
  * 提醒节奏卡片的第二行。
  *
  * 绝对时间只来自原生已排定的闹钟，不再按「当前时间 + gap」现算——因此
- * 切换外观、切 tab、记录饮水这类重渲染不会让文案跳动。这里只用一个 15s
- * 的节拍更新「还有 N 分钟」和跨天文案。
+ * 切换外观、切 tab 这类重渲染不会让文案跳动。水量真正变化（记水/撤销）
+ * 时由 Rust 把账本锚点重置到「现在」并立即重排，这里收到 refresh 后重读，
+ * 时间就会跟着更新。15s 节拍只更新「还有 N 分钟」和跨天文案。
  */
 function NextReminderLine({
   goalReached,

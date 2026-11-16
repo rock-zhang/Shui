@@ -1,6 +1,7 @@
 package com.shui.app
 
 import android.app.AlarmManager
+import android.app.KeyguardManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -9,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.os.Build
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -164,6 +166,64 @@ object ReminderScheduler {
             return false
         }
         return true
+    }
+
+    /**
+     * 只有「Activity 真正有窗口焦点 + 亮屏 + 未锁屏」才允许 WebView 弹全屏。
+     *
+     * 不能直接看 appForeground：它只在 onResume/onPause 维护，锁屏、分屏、
+     * 系统对话框覆盖、失焦等场景都不准——一旦误判为前台，Rust 就会把
+     * timer-complete 投给一个其实不可见的 WebView，用户关闭后打开 App
+     * 才看到积压的弹窗，而后台通知又被抢写的账本吞掉。
+     * hasWindowFocus() 由系统按真实焦点给出，是可靠得多前台判据。
+     */
+    fun canUseOverlay(context: Context): Boolean {
+        val activity = ReminderPlugin.currentActivity()
+        if (activity == null || activity.isFinishing) return false
+        if (!activity.hasWindowFocus()) return false
+        val power = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        if (power?.isInteractive != true) return false
+        val keyguard = context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+        if (keyguard?.isKeyguardLocked == true) return false
+        Log.i(TAG, "canUseOverlay=true：窗口有焦点且亮屏未锁屏，本次走 App 内全屏")
+        return true
+    }
+
+    /**
+     * Rust 前台计时到点后的通道裁决：
+     * - overlay：交给 WebView 弹全屏（仅窗口真有焦点 + 亮屏 + 未锁屏）
+     * - notification：原生已校验通知可用、投递成功并写好账本
+     * - defer：暂时不归任何一路处理，Rust 不写账本、不 emit，
+     *          交给 AlarmManager 独占后台通知（暂停/关通知/无权限都归这里）
+     */
+    fun deliverForeground(context: Context): String {
+        if (canUseOverlay(context)) return "overlay"
+        val general = config(context)?.optJSONObject("general")
+        // 刚点暂停、用户关掉系统通知、或无通知权限时不能把这次提醒静默吞掉：
+        // 返回 defer 让 Rust 不盖账本，AlarmManager 那一路保留补偿机会。
+        if (general?.optBoolean("isPaused", false) == true) {
+            Log.i(TAG, "deliverForeground=defer：已暂停，交给 AlarmManager")
+            return "defer"
+        }
+        if (general?.optBoolean("isNotification", true) == false) {
+            Log.i(TAG, "deliverForeground=defer：系统通知已关闭")
+            return "defer"
+        }
+        if (!canPostNotifications(context)) {
+            Log.i(TAG, "deliverForeground=defer：无通知权限，不盖账本")
+            return "defer"
+        }
+        // 只在通知真正投递成功后才盖账本，杜绝「账本写了但通知没发出去」
+        // 导致 AlarmManager 与前台全屏两路都被抑制的静默失败。
+        val delivered = shouldNotify(context) && ReminderReceiver().showNotification(context)
+        if (delivered) {
+            markReminder(context)
+            Log.i(TAG, "deliverForeground=notification：通知已投递并写账本")
+        } else {
+            // 已达标或投递失败：不盖账本，让 AlarmManager 按自己的判断处理。
+            Log.i(TAG, "deliverForeground=defer：已达标或通知投递失败")
+        }
+        return if (delivered) "notification" else "defer"
     }
 
     /** 原生当前排定的下一次提醒；没有有效闹钟时为 0。 */
@@ -344,9 +404,12 @@ class ReminderReceiver : BroadcastReceiver() {
                     // 「刚提醒过」，连全屏提醒都不补——提醒变成彻底静默的
                     // 失败。不盖章，让下次进 App 时补一次全屏提醒。
                     if (ReminderScheduler.canPostNotifications(context)) {
-                        ReminderScheduler.markReminder(context)
-                        if (ReminderScheduler.shouldNotify(context)) {
+                        // 投递成功才盖账本：顺序反了会出现「账本说提醒过、用户
+                        // 却一条都没看到」，这是后台静默失败最难查的一种。
+                        val delivered = ReminderScheduler.shouldNotify(context) &&
                             showNotification(context)
+                        if (delivered) {
+                            ReminderScheduler.markReminder(context)
                         } else {
                             Log.i(ReminderScheduler.TAG, "不发通知：已暂停或今日饮水量已达标")
                         }
@@ -368,8 +431,9 @@ class ReminderReceiver : BroadcastReceiver() {
     /**
      * 非 private：自定义插件的「测试通知」命令会复用同一条通知构建逻辑，
      * 保证测试通知与闹钟通知的图标、渠道、Action 完全一致。
+     * 返回通知是否真正投递（POST_NOTIFICATIONS 被系统拒绝时为 false）。
      */
-    fun showNotification(context: Context) {
+    fun showNotification(context: Context): Boolean {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         // 「提醒音效」开关：关掉后切到无声渠道，通知本身照常送达。
         val soundEnabled = ReminderScheduler.isSoundEnabled(context)
@@ -442,12 +506,14 @@ class ReminderReceiver : BroadcastReceiver() {
 
         val notification = builder.build()
 
-        try {
+        return try {
             manager.notify(ReminderScheduler.NOTIFICATION_ID, notification)
             Log.i(ReminderScheduler.TAG, "通知已投递：渠道=$channelId id=${ReminderScheduler.NOTIFICATION_ID}")
+            true
         } catch (error: SecurityException) {
-            // 未授予 POST_NOTIFICATIONS：App 前台的 timer-complete 通道仍然可用。
+            // 未授予 POST_NOTIFICATIONS：不能盖账本，交给前台全屏补偿。
             Log.w(ReminderScheduler.TAG, "通知投递被拒绝（POST_NOTIFICATIONS 未授予）", error)
+            false
         }
     }
 }
