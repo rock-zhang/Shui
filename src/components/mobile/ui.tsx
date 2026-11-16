@@ -40,6 +40,7 @@ export function MobileRow({
   description,
   descriptionClassName,
   control,
+  footer,
   className,
 }: {
   title: string;
@@ -47,29 +48,34 @@ export function MobileRow({
   description?: ReactNode;
   descriptionClassName?: string;
   control?: ReactNode;
+  /** 行下方的整宽操作区。文案里的行内链接点击区太小，重要操作放这里。 */
+  footer?: ReactNode;
   className?: string;
 }) {
   return (
     <div
       className={cn(
-        "flex min-h-14 items-center justify-between gap-3 border-b border-border/50 py-2 last:border-0",
+        "border-b border-border/50 py-2 last:border-0",
         className
       )}
     >
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium leading-5">{title}</p>
-        {description && (
-          <p
-            className={cn(
-              "mt-0.5 text-xs leading-5 text-muted-foreground",
-              descriptionClassName
-            )}
-          >
-            {description}
-          </p>
-        )}
+      <div className="flex min-h-14 items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium leading-5">{title}</p>
+          {description && (
+            <p
+              className={cn(
+                "mt-0.5 text-xs leading-5 text-muted-foreground",
+                descriptionClassName
+              )}
+            >
+              {description}
+            </p>
+          )}
+        </div>
+        {control && <div className="shrink-0">{control}</div>}
       </div>
-      {control && <div className="shrink-0">{control}</div>}
+      {footer && <div className="pb-1 pt-1.5">{footer}</div>}
     </div>
   );
 }

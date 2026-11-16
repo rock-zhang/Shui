@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { BellRing } from "lucide-react";
+import { BellRing, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -330,24 +330,13 @@ export function ReminderTab() {
         <MobileRow
           title="系统通知"
           description={
-            notifBlocked ? (
-              <>
-                {notifCanRequest
-                  ? "通知权限未开启，当前收不到提醒 · "
-                  : "通知权限已被系统禁止弹窗，当前收不到提醒 · "}
-                <button
-                  type="button"
-                  onClick={() => void requestNotification()}
-                  className="font-medium text-primary underline-offset-2 hover:underline"
-                >
-                  去开启
-                </button>
-              </>
-            ) : general.isNotification ? (
-              "锁屏或退到后台也能到达，通知里可直接记一杯水"
-            ) : (
-              "已关闭，锁屏与后台不再提醒"
-            )
+            notifBlocked
+              ? notifCanRequest
+                ? "通知权限未开启，锁屏与后台的提醒收不到"
+                : "通知权限已被系统拒绝，需到系统设置里手动开启"
+              : general.isNotification
+                ? "锁屏或退到后台也能到达，通知里可直接记一杯水"
+                : "已关闭，锁屏与后台不再提醒"
           }
           descriptionClassName={notifBlocked ? "text-destructive" : undefined}
           control={
@@ -356,6 +345,29 @@ export function ReminderTab() {
               onCheckedChange={(value) => patchGeneral({ isNotification: value })}
               aria-label="系统通知"
             />
+          }
+          // 行内文字链接的点击区只有十来个像素高，在开关旁边根本不像能点。
+          // 未授权是「这个开关此刻是假的」这种状态，必须给一个实心按钮。
+          footer={
+            notifBlocked ? (
+              <Button
+                variant="destructive"
+                className="min-h-10 w-full"
+                onClick={() => void requestNotification()}
+              >
+                {notifCanRequest ? (
+                  <>
+                    <BellRing className="mr-1.5 h-4 w-4" />
+                    允许通知
+                  </>
+                ) : (
+                  <>
+                    <Settings className="mr-1.5 h-4 w-4" />
+                    去系统设置开启
+                  </>
+                )}
+              </Button>
+            ) : undefined
           }
         />
         <MobileRow
