@@ -13,6 +13,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
+import android.util.Log
 import android.webkit.WebView
 import androidx.activity.result.ActivityResult
 import androidx.core.app.ActivityCompat
@@ -103,6 +104,8 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
             .edit()
             .putString(KEY_CONFIG, payload.toString())
             .apply()
+        // 这条日志是「闹钟到底有没有被排上」的唯一入口判据：没有它就只能靠猜。
+        Log.i(ReminderScheduler.TAG, "收到 schedule 命令，配置=${payload.toString().take(400)}")
         ReminderScheduler.scheduleNext(activity, anchor.takeIf { it > 0 })
         invoke.resolve()
     }

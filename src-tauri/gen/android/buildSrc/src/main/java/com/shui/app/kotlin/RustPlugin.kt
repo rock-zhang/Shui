@@ -63,13 +63,15 @@ open class RustPlugin : Plugin<Project> {
                     val targetName = targetPair.value
                     val targetArch = archList[targetPair.index]
                     val targetArchCapitalized = targetArch.replaceFirstChar { it.uppercase() }
-                    val targetBuildTask = project.tasks.maybeCreate(
+                    val targetBuildTask = project.tasks.register(
                         "rustBuild$targetArchCapitalized$profileCapitalized",
                         BuildTask::class.java
-                    ).apply {
+                    ) {
                         group = TASK_GROUP
                         description = "Build dynamic library in $profile mode for $targetArch"
                         rootDirRel = config.rootDirRel
+                        // Gradle 9 执行期不能再读 project，路径必须在配置期固定下来。
+                        projectDir = project.projectDir.path
                         target = targetName
                         release = profile == "release"
                     }
