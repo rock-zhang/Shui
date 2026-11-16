@@ -45,6 +45,8 @@ const TEXTS = [
 ];
 
 const OPTIONS = [50, 100, 200, 300];
+/** 全屏提醒自动关闭的秒数。 */
+const COUNTDOWN_SECONDS = 30;
 type Outcome = "confirmed" | "skipped" | "timedOut";
 
 /**
@@ -59,7 +61,7 @@ export function FullscreenReminder({
   session: string | null;
   onClose: () => void;
 }) {
-  const [countdown, setCountdown] = useState(30);
+  const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
   const [water, setWater] = useState({ gold: 0, drink: 0 });
   const [saving, setSaving] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -92,12 +94,29 @@ export function FullscreenReminder({
     [onClose, session]
   );
 
+  // 倒计时按绝对截止时间重算，而不是每秒累减。Android WebView 退到后台后
+  // setInterval 会被系统节流甚至完全冻结，累减会停在原地，回到前台看起来
+  // 就像倒计时被暂停了。以 deadline 为唯一时间源后，任何时刻（尤其是恢复
+  // 前台时）都能立即校正到真实剩余秒数；后台待满 30s 回来则直接判超时。
   useEffect(() => {
-    const id = window.setInterval(
-      () => setCountdown((value) => (value <= 1 ? 0 : value - 1)),
-      1000
-    );
-    return () => window.clearInterval(id);
+    const deadline = Date.now() + COUNTDOWN_SECONDS * 1000;
+    const sync = () => {
+      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      setCountdown(remaining);
+    };
+    sync();
+    // 500ms 轮询只为让秒数尽快贴合边界；真正的时间源是 deadline。
+    const id = window.setInterval(sync, 500);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") sync();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
   }, []);
 
   useEffect(() => {
