@@ -122,6 +122,16 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         val alreadyIgnored = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
             power?.isIgnoringBatteryOptimizations(activity.packageName) == true
         val result = if (alreadyIgnored) {
+            // 已加入白名单时也打开列表页：前端开关点下去要能进到设置里撤销或确认。
+            val listIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+            if (listIntent.resolveActivity(activity.packageManager) != null) {
+                try {
+                    listIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    activity.startActivity(listIntent)
+                } catch (_: Exception) {
+                    // 打不开就算了，状态仍是 already。
+                }
+            }
             "already"
         } else {
             val candidates = listOf(
@@ -152,6 +162,47 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         // resolve(JSObject) 走 PluginResult 的标准 JSON 路径；resolveObject 会
         // 用 Jackson 序列化 org.json.JSONObject，字段结构不可控。
         invoke.resolve(payload)
+    }
+
+    /** 电池优化白名单状态；已加入白名单（不受后台冻结）返回 granted=true。 */
+    @Suppress("UNUSED_PARAMETER")
+    @Command
+    fun isBatteryOptimizationIgnored(invoke: Invoke) {
+        val power = activity.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val ignored = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+            power?.isIgnoringBatteryOptimizations(activity.packageName) == true
+        val payload = JSObject()
+        payload.put("granted", ignored)
+        invoke.resolve(payload)
+    }
+
+    /**
+     * 通知权限已开启时用户仍可能想调整或关闭，直接打开本应用的通知设置页；
+     * 部分 ROM 没有该页时回退到应用详情。
+     */
+    @Suppress("UNUSED_PARAMETER")
+    @Command
+    fun openNotificationSettings(invoke: Invoke) {
+        val candidates = mutableListOf<Intent>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            candidates += Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, activity.packageName)
+            }
+        }
+        candidates += Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.parse("package:${activity.packageName}")
+        }
+        for (intent in candidates) {
+            if (intent.resolveActivity(activity.packageManager) == null) continue
+            try {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                activity.startActivity(intent)
+                break
+            } catch (_: Exception) {
+                // 换下一个入口。
+            }
+        }
+        invoke.resolve()
     }
 
     /** 供 Rust 侧消费「通知点击待弹提醒」标志，保证冷/热启动只弹一次。 */

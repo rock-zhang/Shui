@@ -277,6 +277,24 @@ pub fn open_battery_settings(app: tauri::AppHandle) -> Result<String, String> {
         .map(|value| value.result)
 }
 
+#[derive(Debug, Deserialize)]
+struct BatteryIgnoredResult {
+    granted: bool,
+}
+
+/// 是否已加入电池优化白名单；未加入时国产 ROM 会冻结后台提醒。
+#[tauri::command]
+pub fn is_battery_optimization_ignored(app: tauri::AppHandle) -> Result<bool, String> {
+    native::<BatteryIgnoredResult>(&app, "isBatteryOptimizationIgnored", json!({}))
+        .map(|value| value.granted)
+}
+
+/// 通知权限已开启时，用户仍可能想去系统设置调整或关闭。
+#[tauri::command]
+pub fn open_notification_settings(app: tauri::AppHandle) -> Result<(), String> {
+    native::<Value>(&app, "openNotificationSettings", json!({})).map(|_| ())
+}
+
 /// 让状态栏 / 导航栏的底色与图标明暗跟随 App 内主题，而不是只跟随系统
 /// 深浅色设置。冷启动首帧由 values(-night)/themes.xml 兜底，这里负责
 /// 用户手动切主题、以及 configChanges 含 uiMode 时的运行时同步。

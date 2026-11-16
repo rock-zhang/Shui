@@ -167,6 +167,8 @@ pub fn run() {
         mobile::consume_pending_reminder,
         mobile::is_exact_alarm_granted,
         mobile::open_exact_alarm_settings,
+        mobile::is_battery_optimization_ignored,
+        mobile::open_notification_settings,
         mobile::export_drink_backup,
         mobile::preview_drink_import,
         crate::data_backup::confirm_drink_import,

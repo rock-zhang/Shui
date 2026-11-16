@@ -6,7 +6,7 @@ import {
   isPermissionGranted,
   requestPermission,
 } from "@tauri-apps/plugin-notification";
-import { BatteryCharging, BellRing, ShieldCheck } from "lucide-react";
+import { BellRing } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -81,21 +81,23 @@ export function ReminderTab() {
   const [exactAlarm, setExactAlarm] = useState<"unknown" | "granted" | "denied">(
     "unknown"
   );
+  const [battery, setBattery] = useState<"unknown" | "granted" | "denied">(
+    "unknown"
+  );
 
+  // 三项都是系统级权限，App 无法直接开关。统一在挂载和恢复前台时复查，
+  // 用户从系统设置返回后，三个开关的状态会自动对齐真实值。
   useEffect(() => {
     let cancelled = false;
-    isPermissionGranted()
-      .then((granted) => !cancelled && setPermission(granted ? "granted" : "denied"))
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
-  // Android 12+ 精确闹钟是独立权限；用户从系统设置返回后自动复查。
-  useEffect(() => {
-    let cancelled = false;
-    const check = () => {
+    const checkNotification = () =>
+      isPermissionGranted()
+        .then((granted) => {
+          if (!cancelled) setPermission(granted ? "granted" : "denied");
+        })
+        .catch(() => {});
+
+    const checkExactAlarm = () =>
       invoke<boolean>("is_exact_alarm_granted")
         .then((granted) => {
           if (!cancelled) setExactAlarm(granted ? "granted" : "denied");
@@ -104,10 +106,26 @@ export function ReminderTab() {
           // 桌面预览 / Android 11 以下无此权限概念，按已满足处理。
           if (!cancelled) setExactAlarm("granted");
         });
+
+    const checkBattery = () =>
+      invoke<boolean>("is_battery_optimization_ignored")
+        .then((granted) => {
+          if (!cancelled) setBattery(granted ? "granted" : "denied");
+        })
+        .catch(() => {
+          // 桌面预览没有电池优化概念，按已满足处理。
+          if (!cancelled) setBattery("granted");
+        });
+
+    const refresh = () => {
+      void checkNotification();
+      void checkExactAlarm();
+      void checkBattery();
     };
-    check();
+
+    refresh();
     const onVisible = () => {
-      if (document.visibilityState === "visible") check();
+      if (document.visibilityState === "visible") refresh();
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
@@ -143,6 +161,19 @@ export function ReminderTab() {
     }
   }
 
+  /** 已授权时不能在 App 内撤销通知权限，引导到系统通知设置页。 */
+  async function toggleNotificationPermission() {
+    if (permission === "granted") {
+      try {
+        await invoke("open_notification_settings");
+      } catch {
+        toast.info("已开启。如需关闭，请到 系统设置 → 应用 → Shui → 通知");
+      }
+      return;
+    }
+    await ensurePermission();
+  }
+
   async function openExactAlarmSettings() {
     try {
       await invoke("open_exact_alarm_settings");
@@ -157,7 +188,7 @@ export function ReminderTab() {
     try {
       const result = await invoke<string>("open_battery_settings");
       if (result === "already") {
-        toast.success("已在电池优化白名单中，无需重复设置");
+        toast.info("当前已在白名单中，可在系统设置里调整");
       } else if (result === "unavailable") {
         toast.info(`当前系统未开放该设置页，${manual}`);
       } else {
@@ -349,57 +380,54 @@ export function ReminderTab() {
           title="通知权限"
           description={
             permission === "granted"
-              ? "已开启"
+              ? "已开启，后台提醒可送达 · 点击可去系统设置调整"
               : permission === "denied"
-                ? "未开启，后台提醒无法送达"
-                : "点击右侧检查"
+                ? "未开启，后台提醒无法送达 · 点击申请授权"
+                : "检测中…"
           }
           control={
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-10"
-              onClick={ensurePermission}
-            >
-              <ShieldCheck className="mr-1 h-3.5 w-3.5" />
-              检查
-            </Button>
+            <Switch
+              checked={permission === "granted"}
+              disabled={permission === "unknown"}
+              onCheckedChange={() => void toggleNotificationPermission()}
+              aria-label="通知权限"
+            />
           }
         />
         <MobileRow
           title="精确闹钟权限"
           description={
             exactAlarm === "granted"
-              ? "已开启，后台提醒可准时到达"
+              ? "已开启，后台提醒可准时到达 · 点击可去系统设置调整"
               : exactAlarm === "denied"
                 ? "未开启，后台提醒会被系统延迟或不触发"
-                : "点击右侧检查"
+                : "检测中…"
           }
           control={
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-10"
-              onClick={openExactAlarmSettings}
-            >
-              <BellRing className="mr-1 h-3.5 w-3.5" />
-              {exactAlarm === "denied" ? "去开启" : "检查"}
-            </Button>
+            <Switch
+              checked={exactAlarm === "granted"}
+              disabled={exactAlarm === "unknown"}
+              onCheckedChange={() => void openExactAlarmSettings()}
+              aria-label="精确闹钟权限"
+            />
           }
         />
         <MobileRow
           title="电池优化白名单"
-          description="避免厂商 ROM 冻结定时提醒"
+          description={
+            battery === "granted"
+              ? "已加入白名单，系统不会冻结定时提醒"
+              : battery === "denied"
+                ? "未加入，厂商 ROM 可能冻结定时提醒"
+                : "检测中…"
+          }
           control={
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-10"
-              onClick={openBatterySettings}
-            >
-              <BatteryCharging className="mr-1 h-3.5 w-3.5" />
-              去设置
-            </Button>
+            <Switch
+              checked={battery === "granted"}
+              disabled={battery === "unknown"}
+              onCheckedChange={() => void openBatterySettings()}
+              aria-label="电池优化白名单"
+            />
           }
         />
         <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
