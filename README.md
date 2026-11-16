@@ -207,6 +207,127 @@ git tag -d v0.3.0
 - **已经是 `0.3.0`**（之前跑过 `yarn release`）：提交并推送修复代码后重新打 tag：`git push origin HEAD && git tag v0.3.0 && git push origin v0.3.0`。不要再跑 `yarn release 0.3.0`，它会以「版本号没变」拒绝。
 - **还是旧版本号**（当初手工打 tag、忘了升版本）：重新跑 `yarn release 0.3.0`，再按第 1 步依次 push commit 和 tag。
 
+## 📱 Android 生产打包（APK / AAB）
+
+上面是桌面端的发布流程。Android 独立打包，**AAB 用于 Google Play 上架，APK 用于侧载和国内渠道分发**。
+
+`--debug` 包只适合自测：Rust 走未优化编译、保留调试符号（包体大两三倍）、用 debug 证书签名（Play 直接拒绝）。要分发或上架，必须打 release 包。
+
+### 1. 一次性准备：生成 release keystore
+
+```shell
+keytool -genkeypair -v \
+  -keystore ~/.android-keys/shui-release.jks \
+  -alias shui \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -dname "CN=Shui, O=Shui, C=CN"
+```
+
+`-validity 10000`（约 27 年）要覆盖 App 的生命周期——Google Play 要求签名证书有效期至少到 2033 年。
+
+> ⚠️ **这个文件丢了就再也无法更新已上架的应用**。备份到密码管理器 + 离线介质，不要只留在本机。
+> 强烈建议在 Play 控制台开启 **Play App Signing**，把这份当「上传密钥」：即使泄露或丢失，也能让 Google 重置。
+
+### 2. 配置签名（二选一）
+
+**方式 A：本地文件**（个人开发推荐）
+
+新建 `src-tauri/gen/android/key.properties`（已在 `.gitignore` 中，不会误提交）：
+
+```properties
+storeFile=/Users/you/.android-keys/shui-release.jks
+storePassword=你的store密码
+keyAlias=shui
+keyPassword=你的key密码
+```
+
+`storeFile` 写绝对路径最省事；相对路径以 `src-tauri/gen/android/` 为基准。
+
+**方式 B：环境变量**（CI 或不想落盘时）
+
+| 环境变量 | 含义 |
+| --- | --- |
+| `ANDROID_KEYSTORE_FILE` | keystore 绝对路径 |
+| `ANDROID_KEYSTORE_PASSWORD` | store 密码 |
+| `ANDROID_KEY_ALIAS` | key 别名 |
+| `ANDROID_KEY_PASSWORD` | key 密码 |
+
+> 四个都提供才会启用 release 签名。**缺任意一个会静默回退 debug 签名**——本地照样能装能跑，但 Play 会拒绝。所以打完务必验签（第 5 步）。
+
+### 3. 升版本号
+
+```shell
+yarn release 0.3.0     # 同步 4 处版本号 + 生成提交 + 打 tag
+```
+
+Android 的 `versionCode` **不需要手填**：构建时由 `tauri.conf.json` 的 `version` 推导写入 `src-tauri/gen/android/app/tauri.properties`（规则 `major*1000000 + minor*1000 + patch`，如 `0.2.32` → `2032`）。该文件自动生成且不进仓库，**只要版本号递增，versionCode 必然递增**，Play 的「版本码必须大于线上」不会踩坑。
+
+不要手工改 `tauri.properties`（文件头已标明自动生成，每次构建都会被覆盖）。
+
+### 4. 打包
+
+```shell
+# AAB —— Google Play 上架用
+yarn tauri android build --aab -t aarch64
+
+# APK —— 侧载 / 国内渠道 / 内测分发
+yarn tauri android build --apk -t aarch64
+```
+
+- **绝对不要把 `--apk` 和 `--aab` 写在同一条命令里**：Tauri CLI 2.x 的第二次 Gradle 调用会等一个永远不会建立的 socket 并永久挂起。必须拆成两次执行。
+- `-t` 指定 ABI：`aarch64`（绝大多数手机，必选）、`armv7`（老机型）、`x86_64`（模拟器）。可传多个：`-t aarch64 armv7`；不传则打全部（体积显著变大）。
+- `--ci` 可选，非交互模式，不弹确认。
+- 前端产物不用手动准备：release 构建会自动执行 `beforeBuildCommand`（`yarn build`）。
+
+产物路径（`-t` 传单个 ABI 时 Tauri 仍包成 universal 容器）：
+
+```
+src-tauri/gen/android/app/build/outputs/
+├── bundle/universalRelease/app-universal-release.aab   # 上架用，约 11 MB
+└── apk/universal/release/app-universal-release.apk     # 分发用，约 19 MB
+```
+
+### 5. 验签（每次打生产包都做一次）
+
+```shell
+# AAB：确认签名块存在且不是 debug 证书
+unzip -l src-tauri/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab \
+  | grep -E 'META-INF/.*\.(RSA|DSA|EC|SF)'
+keytool -printcert -jarfile src-tauri/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab | head -3
+
+# APK
+$ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs \
+  src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk | head -3
+```
+
+输出里出现 `CN=Android Debug` 就说明回退成了 debug 签名，回去检查第 2 步的四个参数。
+
+### 6. 走 CI 打包
+
+仓库已有 [`.github/workflows/android-release.yml`](.github/workflows/android-release.yml)，在 Actions 页面手动触发，可分别选择产物类型（both / aab / apk）与 ABI。
+
+需要先配置 4 个 secrets（与本地第 2 步一一对应）：
+
+| Secret | 生成方式 |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | `base64 -i ~/.android-keys/shui-release.jks`（macOS）或 `base64 -w0 shui-release.jks`（Linux） |
+| `ANDROID_KEYSTORE_PASSWORD` | 同本地 store 密码 |
+| `ANDROID_KEY_ALIAS` | 同本地 key 别名 |
+| `ANDROID_KEY_PASSWORD` | 同本地 key 密码 |
+
+CI 会自己解码 keystore、校验 AAB 签名不是 debug，构建完删除密钥文件，产物通过 Actions artifact 下载（保留 14 天）。
+
+### 7. 常见问题
+
+| 现象 | 原因与处理 |
+| --- | --- |
+| `next build` 报 `TypeError: Cannot read properties of undefined (reading 'length')`（栈里有 `WasmHash._updateWithBuffer`） | webpack 缓存损坏。`rm -rf .next dist && mkdir -p dist` 后重打。注意本项目 `distDir` 是 `dist` 而非默认的 `.next` |
+| `beforeBuildCommand` 的 `yarn build` 失败，日志里有 safe-delete / `ENOENT` | 本地 Node 被注入了文件系统代理（某些 Agent/沙箱工具会做）。用 `NODE_OPTIONS= yarn tauri android build ...` 清空该变量后重试 |
+| Play 提示「版本码已存在」 | 版本号没升，`tauri.properties` 里的 versionCode 没变。跑 `yarn release <新版本>` |
+| Play 提示「APK/AAB 未签名或签名无效」 | 回退成了 debug 签名，第 2 步四个参数没配齐 |
+| 构建卡住不动，日志停在 Gradle 第二步 | 大概率是同一条命令里同时传了 `--apk --aab`，拆开重跑 |
+| 打出的包体积异常大（30 MB+） | 打成了 debug 包（漏了 `--apk` 之外的默认 release 行为被 `--debug` 覆盖），或 `-t` 传了全部 ABI |
+
 ## 社区交流
 
 欢迎 PR 和 Issue，一起探讨和改进 Shui！
