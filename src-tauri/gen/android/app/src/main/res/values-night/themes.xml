@@ -1,12 +1,6 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- 深色模式：系统栏底色 / 图标明暗与亮色模式互为 inverted。 -->
-    <style name="Theme.shui" parent="Theme.MaterialComponents.DayNight.NoActionBar" tools:targetApi="27">
+<resources>
+    <!-- 深色模式：冷启动窗口背景；系统栏底色与图标明暗在运行时按 App 内主题设置。 -->
+    <style name="Theme.shui" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="android:windowBackground">@color/shui_surface_dark</item>
-        <item name="android:statusBarColor">@color/shui_surface_dark</item>
-        <item name="android:navigationBarColor">@color/shui_surface_dark</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
-        <item name="android:windowTranslucentStatus">false</item>
-        <item name="android:windowTranslucentNavigation">false</item>
     </style>
 </resources>

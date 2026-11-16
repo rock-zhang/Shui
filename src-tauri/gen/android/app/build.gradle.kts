@@ -43,10 +43,9 @@ android {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         applicationId = "com.shui.app"
         minSdk = 24
-        // targetSdk 刻意留在 34：升到 35+ 会触发 Android 15 强制 edge-to-edge，
-        // statusBarColor / navigationBarColor 被忽略，现有「系统栏跟随主题」要
-        // 整体改写成 insets 注入。那是独立的一次改造，不混在框架升级里做。
-        targetSdk = 34
+        // 已按 Android 15+ 的强制 edge-to-edge 改造完成（见 MainActivity 的
+        // enableEdgeToEdge 与 ReminderPlugin.applySystemBarTheme 的窗口背景）。
+        targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
     }

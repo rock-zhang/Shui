@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -470,25 +471,28 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
             (configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
                 Configuration.UI_MODE_NIGHT_YES
 
-        /**
-         * 必须在主线程调用。manifest 的 configChanges 含 uiMode，系统切深浅色
-         * 不会重建 Activity，AppCompat 可能按旧主题重绘系统栏；从系统设置页 /
-         * 分享页返回时部分 ROM 也会重置。因此 onCreate / onResume /
-         * onConfigurationChanged 各重应用一次，成本只是设两个颜色。
-         */
         /** 供 MainActivity.onResume 调用；WebView 未就绪时静默跳过。 */
         fun notifyForeground() {
             instance?.dispatchForeground()
         }
 
+        /**
+         * 必须在主线程调用。manifest 的 configChanges 含 uiMode，系统切深浅色
+         * 不会重建 Activity，AppCompat 可能按旧主题重绘系统栏；从系统设置页 /
+         * 分享页返回时部分 ROM 也会重置。因此 onCreate / onResume /
+         * onConfigurationChanged 各重应用一次，成本只是设一次背景与图标明暗。
+         */
         fun applySystemBarTheme(activity: Activity) {
             val color = ContextCompat.getColor(
                 activity,
                 if (systemBarDark) R.color.shui_surface_dark else R.color.shui_surface_light
             )
             val window = activity.window
-            window.statusBarColor = color
-            window.navigationBarColor = color
+            // targetSdk 36 + Android 15+：系统栏强制透明，statusBarColor /
+            // navigationBarColor 的赋值会被忽略。透过半透明系统栏看到的是
+            // 窗口背景，所以这里改窗口背景色，保证栏底和 Web 页面同色。
+            window.setBackgroundDrawable(ColorDrawable(color))
+            // 图标明暗仍然由 insets controller 决定，与系统深浅色无关。
             WindowInsetsControllerCompat(window, window.decorView).apply {
                 isAppearanceLightStatusBars = !systemBarDark
                 isAppearanceLightNavigationBars = !systemBarDark

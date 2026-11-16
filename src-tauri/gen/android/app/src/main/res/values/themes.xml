@@ -1,16 +1,12 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
+<resources>
     <!--
-      系统栏与 Web 页面用同一个底色，避免 MDC 默认的紫色状态栏 + 黑色导航条
-      把白色页面切成两段。windowBackground 保证冷启动首帧也不闪紫色。
-      运行时若用户在 App 内手动切换主题，由 setSystemBarTheme 命令覆盖。
+      targetSdk 36 下系统栏强制透明（edge-to-edge），statusBarColor /
+      navigationBarColor / windowLight* 全部被忽略，留着只会误导。
+      栏底色现在由窗口背景提供（ReminderPlugin.applySystemBarTheme 在运行时
+      按 App 内主题设置），windowBackground 只负责冷启动首帧不闪 MDC 紫色。
+      内容避让由 WebView 的 env(safe-area-inset-*) 负责。
     -->
-    <style name="Theme.shui" parent="Theme.MaterialComponents.DayNight.NoActionBar" tools:targetApi="27">
+    <style name="Theme.shui" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="android:windowBackground">@color/shui_surface_light</item>
-        <item name="android:statusBarColor">@color/shui_surface_light</item>
-        <item name="android:navigationBarColor">@color/shui_surface_light</item>
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
-        <item name="android:windowTranslucentStatus">false</item>
-        <item name="android:windowTranslucentNavigation">false</item>
     </style>
 </resources>

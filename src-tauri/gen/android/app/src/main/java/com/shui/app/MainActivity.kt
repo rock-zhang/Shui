@@ -6,11 +6,16 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import androidx.activity.enableEdgeToEdge
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
 class MainActivity : TauriActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // targetSdk 36 在 Android 15+ 上强制 edge-to-edge。必须在 super 之前
+        // 调用，否则 TauriActivity 创建 Window 时已经定下了非透明系统栏。
+        // 内容避让由 WebView 的 env(safe-area-inset-*) 负责（viewportFit=cover）。
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         // 冷启动首帧的颜色由 themes.xml 保证；这里按系统 uiMode 定下初始值，
