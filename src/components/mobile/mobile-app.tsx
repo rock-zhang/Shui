@@ -173,7 +173,7 @@ export function MobileApp() {
       <NotificationPermissionProvider>
         <ReminderEvents openReminder={openReminder} />
         <div className="mobile-root flex flex-col overflow-hidden bg-background text-foreground">
-          <header className="shrink-0 px-5 pb-3 pt-4">
+          <header className="shrink-0 px-5 pb-3 pt-1.5">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               Shui · 喝水提醒
             </p>
@@ -216,7 +216,15 @@ export function MobileApp() {
           </main>
 
           <MobileTabBar active={tab} onChange={changeTab} />
-          <Toaster position="top-center" richColors />
+          <Toaster
+            position="top-center"
+            richColors
+            // edge-to-edge 下状态栏透明盖在内容上，sonner 默认 top 偏移
+            // （桌面 24px / 移动 16px）不感知安全区，toast 会顶进状态栏。
+            // 只抬高 top，左右仍交给 sonner 默认值，避免移动端 center 布局被挤窄。
+            offset={{ top: "calc(24px + env(safe-area-inset-top, 0px))" }}
+            mobileOffset={{ top: "calc(16px + env(safe-area-inset-top, 0px))" }}
+          />
 
           {reminderSession !== undefined && (
             <FullscreenReminder
