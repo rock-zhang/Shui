@@ -249,6 +249,13 @@ pub fn sync_reminder_schedule(app: tauri::AppHandle) -> Result<(), String> {
     native::<Value>(&app, "schedule", payload).map(|_| ())
 }
 
+/// 只同步配置给原生（音效、通知、目标等），不重排闹钟。
+/// 不改变节奏的开关也必须走这里，否则 Kotlin 的通知/音效判断会读到旧配置。
+#[tauri::command]
+pub fn sync_reminder_config(app: tauri::AppHandle) -> Result<(), String> {
+    native::<Value>(&app, "saveConfig", schedule_payload(&app)).map(|_| ())
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NextReminderState {

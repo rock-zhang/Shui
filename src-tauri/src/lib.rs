@@ -161,6 +161,7 @@ pub fn run() {
         mobile::pause_timer,
         mobile::start_timer,
         mobile::sync_reminder_schedule,
+        mobile::sync_reminder_config,
         mobile::get_next_reminder,
         mobile::send_mobile_notification,
         mobile::open_battery_settings,

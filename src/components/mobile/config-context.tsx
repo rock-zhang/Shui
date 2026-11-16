@@ -16,6 +16,7 @@ import {
   DEFAULT_GENERAL,
   readConfig,
   rescheduleReminders,
+  syncReminderConfig,
   writeConfig,
   type AlertConfig,
   type GeneralConfig,
@@ -103,7 +104,12 @@ export function MobileConfigProvider({ children }: { children: ReactNode }) {
     ) => {
       try {
         await writeConfig(key, value);
-        if (!reschedule) return;
+        if (!reschedule) {
+          // 不改变节奏的开关（音效/通知/目标/全屏）也要让 Kotlin 拿到新配置，
+          // 否则原生会继续按旧值决定是否发通知、走哪个渠道、是否已达标。
+          await syncReminderConfig();
+          return;
+        }
         await rescheduleReminders();
         // 通知今日页：原生已按新配置重排，重新读取下次提醒时间。
         setScheduleRevision((revision) => revision + 1);

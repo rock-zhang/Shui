@@ -142,6 +142,20 @@ export async function rescheduleReminders(): Promise<void> {
   }
 }
 
+/**
+ * 把最新配置推给原生，但不重排闹钟。
+ * 音效、系统通知、目标这类不改变节奏的开关也必须同步——Kotlin 侧判断
+ * 是否发通知、走哪个渠道、是否达标，都读这份原生配置快照。
+ */
+export async function syncReminderConfig(): Promise<void> {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("sync_reminder_config");
+  } catch {
+    // 桌面浏览器预览没有原生命令。
+  }
+}
+
 export function formatDateKey(key: string) {
   return `${key.slice(0, 4)}-${key.slice(4, 6)}-${key.slice(6, 8)}`;
 }

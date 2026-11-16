@@ -92,21 +92,36 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
-    @Command
-    fun schedule(invoke: Invoke) {
-        val args = invoke.getArgs()
+    /**
+     * 把 Rust 侧的最新配置写进 SharedPreferences，返回排期锚点。
+     * 原生通知/音效/目标判断都读这份快照，所以每次配置变更都必须更新它。
+     */
+    private fun storeConfig(args: JSONObject): Long {
+        val anchor = args.optLong("anchorMs", 0L)
         // anchorMs 只参与排期，不写进配置，避免 SharedPreferences 里留下一份
         // 会被下一次调度误读的旧锚点。
-        val payload = JSONObject(args.toString())
-        val anchor = payload.optLong("anchorMs", 0L)
-        payload.remove("anchorMs")
+        args.remove("anchorMs")
         activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
-            .putString(KEY_CONFIG, payload.toString())
+            .putString(KEY_CONFIG, args.toString())
             .apply()
+        return anchor
+    }
+
+    @Command
+    fun schedule(invoke: Invoke) {
+        val payload = JSONObject(invoke.getArgs().toString())
+        val anchor = storeConfig(payload)
         // 这条日志是「闹钟到底有没有被排上」的唯一入口判据：没有它就只能靠猜。
         Log.i(ReminderScheduler.TAG, "收到 schedule 命令，配置=${payload.toString().take(400)}")
         ReminderScheduler.scheduleNext(activity, anchor.takeIf { it > 0 })
+        invoke.resolve()
+    }
+
+    /** 只同步配置（音效/通知/目标等），不重排闹钟。 */
+    @Command
+    fun saveConfig(invoke: Invoke) {
+        storeConfig(JSONObject(invoke.getArgs().toString()))
         invoke.resolve()
     }
 
