@@ -35,6 +35,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # 发布密钥只在该环境内可见：可在仓库 Settings → Environments 中为它配置
+    # required reviewers 与部署分支限制，避免任意分支改动 workflow 后直接取用
+    # secrets。secrets 放到该环境下（同名）时优先于仓库级 secrets。
+    environment: production
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
