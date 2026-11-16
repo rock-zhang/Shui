@@ -74,6 +74,21 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
+    /**
+     * Activity 回到前台时通知 Web 端。从系统设置页、系统确认弹窗（如电池优化
+     * 的「允许/不允许」）返回时，Android WebView 未必派发 visibilitychange
+     * ——visibilityState 很可能一直是 visible，前端靠事件刷新权限状态会漏，
+     * 表现为开关点了允许仍旧停在「关」。这里由原生侧主动派发。
+     */
+    private fun dispatchForeground() {
+        Handler(Looper.getMainLooper()).post {
+            webView?.evaluateJavascript(
+                "window.dispatchEvent(new Event('shui:foreground'));",
+                null
+            )
+        }
+    }
+
     @Command
     fun schedule(invoke: Invoke) {
         val config = invoke.getArgs().toString()
@@ -385,6 +400,11 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
          * 分享页返回时部分 ROM 也会重置。因此 onCreate / onResume /
          * onConfigurationChanged 各重应用一次，成本只是设两个颜色。
          */
+        /** 供 MainActivity.onResume 调用；WebView 未就绪时静默跳过。 */
+        fun notifyForeground() {
+            instance?.dispatchForeground()
+        }
+
         fun applySystemBarTheme(activity: Activity) {
             val color = ContextCompat.getColor(
                 activity,

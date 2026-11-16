@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   isPermissionGranted,
@@ -21,6 +21,10 @@ import { cn } from "@/lib/utils";
 import { sendReminderNotification } from "@/utils/notification";
 import { useMobileConfig } from "./config-context";
 import { MobileRow, MobileSection, MobileTimeInput } from "./ui";
+
+/** 从系统设置返回后轮询确认授权结果的时长上限与间隔。 */
+const WATCH_TOTAL_MS = 30_000;
+const WATCH_INTERVAL_MS = 900;
 
 function Chip({
   selected,
@@ -84,55 +88,104 @@ export function ReminderTab() {
   const [battery, setBattery] = useState<"unknown" | "granted" | "denied">(
     "unknown"
   );
+  const alive = useRef(true);
+  const watchTimer = useRef<number | null>(null);
 
-  // 三项都是系统级权限，App 无法直接开关。统一在挂载和恢复前台时复查，
-  // 用户从系统设置返回后，三个开关的状态会自动对齐真实值。
-  useEffect(() => {
-    let cancelled = false;
-
-    const checkNotification = () =>
-      isPermissionGranted()
-        .then((granted) => {
-          if (!cancelled) setPermission(granted ? "granted" : "denied");
-        })
-        .catch(() => {});
-
-    const checkExactAlarm = () =>
-      invoke<boolean>("is_exact_alarm_granted")
-        .then((granted) => {
-          if (!cancelled) setExactAlarm(granted ? "granted" : "denied");
-        })
-        .catch(() => {
-          // 桌面预览 / Android 11 以下无此权限概念，按已满足处理。
-          if (!cancelled) setExactAlarm("granted");
-        });
-
-    const checkBattery = () =>
-      invoke<boolean>("is_battery_optimization_ignored")
-        .then((granted) => {
-          if (!cancelled) setBattery(granted ? "granted" : "denied");
-        })
-        .catch(() => {
-          // 桌面预览没有电池优化概念，按已满足处理。
-          if (!cancelled) setBattery("granted");
-        });
-
-    const refresh = () => {
-      void checkNotification();
-      void checkExactAlarm();
-      void checkBattery();
-    };
-
-    refresh();
-    const onVisible = () => {
-      if (document.visibilityState === "visible") refresh();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      cancelled = true;
-      document.removeEventListener("visibilitychange", onVisible);
-    };
+  const stopWatching = useCallback(() => {
+    if (watchTimer.current !== null) {
+      window.clearInterval(watchTimer.current);
+      watchTimer.current = null;
+    }
   }, []);
+
+  // 三个读取函数同时承担「刷新开关状态」和「给轮询判断是否已授权」两个职责。
+  const readNotification = useCallback(async (): Promise<boolean> => {
+    try {
+      const granted = await isPermissionGranted();
+      if (alive.current) setPermission(granted ? "granted" : "denied");
+      return granted;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const readExactAlarm = useCallback(async (): Promise<boolean> => {
+    try {
+      const granted = await invoke<boolean>("is_exact_alarm_granted");
+      if (alive.current) setExactAlarm(granted ? "granted" : "denied");
+      return granted;
+    } catch {
+      // 桌面预览 / Android 11 以下无此权限概念，按已满足处理。
+      if (alive.current) setExactAlarm("granted");
+      return true;
+    }
+  }, []);
+
+  const readBattery = useCallback(async (): Promise<boolean> => {
+    try {
+      const granted = await invoke<boolean>("is_battery_optimization_ignored");
+      if (alive.current) setBattery(granted ? "granted" : "denied");
+      return granted;
+    } catch {
+      // 桌面预览没有电池优化概念，按已满足处理。
+      if (alive.current) setBattery("granted");
+      return true;
+    }
+  }, []);
+
+  const refreshPermissions = useCallback(() => {
+    void readNotification();
+    void readExactAlarm();
+    void readBattery();
+  }, [readNotification, readExactAlarm, readBattery]);
+
+  /**
+   * 跳系统设置或触发系统确认弹窗后，短轮询确认结果。
+   * 电池优化的「允许/不允许」弹窗由系统设置承载，Tauri 的 WebView 在这种
+   * 场景下不一定派发 hidden→visible，只靠 visibilitychange 会让开关一直
+   * 停在「关」。轮询最多持续 WATCH_TOTAL_MS，状态翻转即停并提示。
+   */
+  const watchPermission = useCallback(
+    (read: () => Promise<boolean>, successText: string) => {
+      stopWatching();
+      const deadline = Date.now() + WATCH_TOTAL_MS;
+      const tick = async () => {
+        const granted = await read();
+        if (granted) {
+          stopWatching();
+          toast.success(successText);
+          return;
+        }
+        if (!alive.current || Date.now() >= deadline) stopWatching();
+      };
+      void tick();
+      watchTimer.current = window.setInterval(() => void tick(), WATCH_INTERVAL_MS);
+    },
+    [stopWatching]
+  );
+
+  useEffect(() => {
+    alive.current = true;
+    refreshPermissions();
+
+    // visibilitychange 之外再叠加两个信号：focus 覆盖部分 ROM 的行为，
+    // shui:foreground 由原生 onResume 主动派发，最可靠（系统确认弹窗返回时
+    // visibilityState 往往一直是 visible，只有它一定会来）。
+    const onForeground = () => {
+      if (document.visibilityState === "visible") refreshPermissions();
+    };
+    const onNativeForeground = () => refreshPermissions();
+    document.addEventListener("visibilitychange", onForeground);
+    window.addEventListener("focus", onForeground);
+    window.addEventListener("shui:foreground", onNativeForeground);
+    return () => {
+      alive.current = false;
+      document.removeEventListener("visibilitychange", onForeground);
+      window.removeEventListener("focus", onForeground);
+      window.removeEventListener("shui:foreground", onNativeForeground);
+      stopWatching();
+    };
+  }, [refreshPermissions, stopWatching]);
 
   const toggleWeekday = (day: number) => {
     const weekdays = alert.weekdays ?? [];
@@ -166,6 +219,8 @@ export function ReminderTab() {
     if (permission === "granted") {
       try {
         await invoke("open_notification_settings");
+        // 用户可能在那里关掉通知，回来后重新核对。
+        watchPermission(readNotification, "通知权限已开启");
       } catch {
         toast.info("已开启。如需关闭，请到 系统设置 → 应用 → Shui → 通知");
       }
@@ -178,6 +233,7 @@ export function ReminderTab() {
     try {
       await invoke("open_exact_alarm_settings");
       toast.info("请允许「闹钟和提醒」权限，返回后状态会自动刷新");
+      watchPermission(readExactAlarm, "精确闹钟权限已开启");
     } catch {
       toast.info("请在 系统设置 → 应用 → Shui → 闹钟和提醒 中手动开启");
     }
@@ -191,8 +247,14 @@ export function ReminderTab() {
         toast.info("当前已在白名单中，可在系统设置里调整");
       } else if (result === "unavailable") {
         toast.info(`当前系统未开放该设置页，${manual}`);
+      } else if (result === "requested") {
+        // 系统确认弹窗点「允许」后弹窗消失，WebView 不一定派发可见性变化，
+        // 这里必须主动轮询，否则开关会一直停在「关」。
+        toast.info("请在系统弹窗中选择「允许」");
+        watchPermission(readBattery, "已加入电池优化白名单");
       } else {
         toast.info("已打开系统设置，请把 Shui 设为「不优化」");
+        watchPermission(readBattery, "已加入电池优化白名单");
       }
     } catch {
       toast.info(manual);

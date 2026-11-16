@@ -46,6 +46,9 @@ class MainActivity : TauriActivity() {
         super.onResume()
         // 从系统设置 / 分享 chooser 回来后，部分 ROM 会把系统栏染回主题默认色。
         ReminderPlugin.applySystemBarTheme(this)
+        // 系统设置页、电池优化「允许/不允许」弹窗返回时，WebView 不一定派发
+        // visibilitychange，主动通知前端复查权限开关状态。
+        ReminderPlugin.notifyForeground()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
