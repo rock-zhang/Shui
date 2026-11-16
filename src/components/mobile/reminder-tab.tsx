@@ -12,6 +12,7 @@ import {
   GOLD_OPTIONS,
   WEEKDAY_LABELS,
   emitShowReminder,
+  rescheduleReminders,
 } from "@/lib/mobile";
 import { cn } from "@/lib/utils";
 import { sendReminderNotification } from "@/utils/notification";
@@ -86,6 +87,9 @@ export function ReminderTab() {
   const [exactAlarm, setExactAlarm] = useState<"unknown" | "granted" | "denied">(
     "unknown"
   );
+  // 上次读到的权限状态，放在 ref 里而不是靠 state 比对：读取可能在多个
+  // 前台信号里并发发生，state 更新是异步的，拿它判断「刚被授予」会漏。
+  const exactAlarmRef = useRef<"unknown" | "granted" | "denied">("unknown");
   const [battery, setBattery] = useState<"unknown" | "granted" | "denied">(
     "unknown"
   );
@@ -100,15 +104,23 @@ export function ReminderTab() {
   }, []);
 
   const readExactAlarm = useCallback(async (): Promise<boolean> => {
+    let granted: boolean;
     try {
-      const granted = await invoke<boolean>("is_exact_alarm_granted");
-      if (alive.current) setExactAlarm(granted ? "granted" : "denied");
-      return granted;
+      granted = await invoke<boolean>("is_exact_alarm_granted");
     } catch {
       // 桌面预览 / Android 11 以下无此权限概念，按已满足处理。
-      if (alive.current) setExactAlarm("granted");
-      return true;
+      granted = true;
     }
+    const next = granted ? "granted" : "denied";
+    const wasDenied = exactAlarmRef.current === "denied";
+    exactAlarmRef.current = next;
+    if (alive.current) setExactAlarm(next);
+
+    // 权限被拒绝时排的是非精确闹钟（setAndAllowWhileIdle，可能延迟 20+ 分钟）。
+    // 用户刚从系统设置里授予后必须立刻按原锚点重排，否则已排的那一次仍是
+    // 非精确的，要等下次改配置才升级——表现就是「开了权限但下一次还是不准」。
+    if (wasDenied && granted && alive.current) void rescheduleReminders();
+    return granted;
   }, []);
 
   const readBattery = useCallback(async (): Promise<boolean> => {
