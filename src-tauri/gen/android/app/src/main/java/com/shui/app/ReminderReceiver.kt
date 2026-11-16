@@ -35,6 +35,9 @@ object ReminderScheduler {
     const val NOTIFICATION_ID = 2001
     const val ALARM_REQUEST_CODE = 3101
 
+    /** 原生已排定的下一次提醒时间（毫秒）；今日页直接读它，不再按 now 现算。 */
+    const val KEY_NEXT_AT = "next_reminder_at_ms"
+
     /**
      * 与桌面 `registerActionTypes` 的档位保持一致（见 utils/notification.ts）。
      * Android 的闹钟通知与「测试通知」共用这一份配置，只有一套档位。
@@ -133,9 +136,32 @@ object ReminderScheduler {
     fun canPostNotifications(context: Context): Boolean =
         NotificationManagerCompat.from(context).areNotificationsEnabled()
 
+    /** 原生当前排定的下一次提醒；没有有效闹钟时为 0。 */
+    fun nextReminderAt(context: Context): Long =
+        context.getSharedPreferences(ReminderPlugin.PREFS, Context.MODE_PRIVATE)
+            .getLong(KEY_NEXT_AT, 0L)
+
+    private fun rememberNext(context: Context, at: Long) {
+        context.getSharedPreferences(ReminderPlugin.PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putLong(KEY_NEXT_AT, at)
+            .apply()
+    }
+
+    private fun forgetNext(context: Context) {
+        context.getSharedPreferences(ReminderPlugin.PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_NEXT_AT)
+            .apply()
+    }
+
+    fun isPaused(context: Context): Boolean =
+        config(context)?.optJSONObject("general")?.optBoolean("isPaused", false) ?: false
+
     fun cancel(context: Context) {
         val manager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         manager.cancel(alarmIntent(context, ACTION_REMINDER, ALARM_REQUEST_CODE))
+        forgetNext(context)
     }
 
     private fun alarmIntent(context: Context, action: String, requestCode: Int): PendingIntent {
@@ -144,7 +170,15 @@ object ReminderScheduler {
         return PendingIntent.getBroadcast(context, requestCode, intent, flags)
     }
 
-    fun scheduleNext(context: Context) {
+    /**
+     * 以「上次提醒时间」为唯一锚点排下一次闹钟。
+     *
+     * 所有调用方（冷启动、配置变更、全屏关闭、闹钟触发、开机）都走这里，
+     * 所以只要账本和配置没变，重复调用算出的绝对时间就完全一致，不会因为
+     * 「什么时候调用了它」而漂移。`anchorMs` 只给首次安装等账本还不存在的
+     * 场景用；缺省读共享账本。
+     */
+    fun scheduleNext(context: Context, anchorMs: Long? = null) {
         val root = config(context) ?: return
         val alert = root.optJSONObject("alert") ?: JSONObject()
         val general = root.optJSONObject("general") ?: JSONObject()
@@ -166,7 +200,15 @@ object ReminderScheduler {
         val quietStart = parseTime(general.optString("quietStart", "22:00"))
         val quietEnd = parseTime(general.optString("quietEnd", "07:00"))
 
-        val candidate = Calendar.getInstance().apply { add(Calendar.MINUTE, gap) }
+        val now = System.currentTimeMillis()
+        val rawAnchor = (anchorMs ?: lastReminderAt(context)).takeIf { it > 0 } ?: now
+        // 账本可能停在很久以前（App 被关了几小时甚至几天）：仍沿 gap 网格
+        // 追上当前时间，而不是退化成「现在 + gap」，这样节奏不会被打乱。
+        val anchor = if (now - rawAnchor > 8L * 24 * 60 * 60_000) now else rawAnchor
+        var candidateMs = anchor + gap * 60_000L
+        while (candidateMs <= now) candidateMs += gap * 60_000L
+        val candidate = Calendar.getInstance().apply { timeInMillis = candidateMs }
+
         var found = false
         // 最多向后找 8 天，覆盖「只在周一提醒」这类配置。
         var attempts = 0
@@ -183,7 +225,11 @@ object ReminderScheduler {
             candidate.add(Calendar.MINUTE, gap)
             attempts += gap
         }
-        if (!found) return
+        if (!found) {
+            // 当前配置下没有任何可提醒的时间：撤掉旧闹钟，也让今日页如实显示。
+            cancel(context)
+            return
+        }
 
         val manager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val pending = alarmIntent(context, ACTION_REMINDER, ALARM_REQUEST_CODE)
@@ -197,6 +243,7 @@ object ReminderScheduler {
         } catch (_: SecurityException) {
             manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, candidate.timeInMillis, pending)
         }
+        rememberNext(context, candidate.timeInMillis)
     }
 
     /** 通知 Action 在 WebView 未启动时把饮水写进待处理文件，由 Rust 回灌。 */

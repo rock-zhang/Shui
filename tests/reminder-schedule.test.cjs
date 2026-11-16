@@ -2,7 +2,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 
 const api = require('./load-typescript.cjs')('src/lib/reminder-schedule.ts');
-const { findNextReminder, describeNextReminder } = api;
+const { findNextReminder, describeNextReminder, describeNextAt } = api;
 
 // 2026-11-15 is a Sunday (getDay() === 0), same weekday indexing as Kotlin.
 const sunday = new Date(2026, 10, 15, 18, 48);
@@ -77,4 +77,22 @@ test('end 00:00 is treated as a cross-midnight window', () => {
   const result = findNextReminder(base({ timeEnd: '00:00' }), now);
   assert.equal(result.kind, 'time');
   assert.equal(result.date.getDate(), 15);
+});
+
+test('native next time keeps the absolute clock and shows remaining minutes', () => {
+  const now = new Date(2026, 10, 16, 10, 0).getTime();
+  const at = new Date(2026, 10, 16, 10, 30).getTime();
+  assert.equal(describeNextAt(at, now), '预计下一杯约 10:30 · 还有 30 分钟');
+});
+
+test('native next time rolls to tomorrow wording', () => {
+  const now = new Date(2026, 10, 16, 18, 48).getTime();
+  const at = new Date(2026, 10, 17, 9, 0).getTime();
+  assert.equal(describeNextAt(at, now), '今天不提醒 · 下次明天 09:00');
+});
+
+test('overdue native next time is reported as imminent', () => {
+  const now = new Date(2026, 10, 16, 10, 0).getTime();
+  const at = new Date(2026, 10, 16, 9, 30).getTime();
+  assert.equal(describeNextAt(at, now), '预计下一杯随时到达');
 });

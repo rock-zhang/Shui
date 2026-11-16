@@ -129,3 +129,32 @@ export function describeNextReminder(
     }
   }
 }
+
+/**
+ * 把原生已排定的绝对时间（毫秒）格式化成今日页文案。
+ *
+ * 原生返回的是一个固定的时间点，重渲染不会改变它；这里只负责按 `now`
+ * 更新「还有 N 分钟」这类相对描述。`now` 可注入，便于回归测试。
+ */
+export function describeNextAt(nextAt: number, now: number = Date.now()): string {
+  const target = new Date(nextAt);
+  if (!Number.isFinite(target.getTime())) {
+    return "当前设置下没有下一次提醒";
+  }
+  if (target.getTime() <= now) {
+    return "预计下一杯随时到达";
+  }
+
+  const time = clock(target);
+  if (isSameDay(target, new Date(now))) {
+    const minutes = Math.max(1, Math.ceil((target.getTime() - now) / 60_000));
+    return `预计下一杯约 ${time} · 还有 ${minutes} 分钟`;
+  }
+
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const when = isSameDay(target, tomorrow)
+    ? "明天"
+    : `周${DAY_LABELS[target.getDay()]}`;
+  return `今天不提醒 · 下次${when} ${time}`;
+}

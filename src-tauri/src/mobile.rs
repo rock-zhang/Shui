@@ -41,11 +41,14 @@ fn native<T: DeserializeOwned>(
 /// 把 config_store 里原始配置透传给 Kotlin，由原生侧自己判断工作日/时段/勿扰。
 fn schedule_payload(app: &tauri::AppHandle) -> Value {
     let Ok(store) = app.store("config_store.json") else {
-        return json!({ "alert": {}, "general": {} });
+        return json!({ "alert": {}, "general": {}, "anchorMs": 0 });
     };
     json!({
         "alert": store.get("alert").unwrap_or_else(|| json!({})),
         "general": store.get("general").unwrap_or_else(|| json!({})),
+        // 账本是唯一锚点：Kotlin 用它 + gap 推下一次，重复调用结果不变。
+        // 0 表示首次安装/账本缺失，由原生侧回落到「当前时间」。
+        "anchorMs": last_reminder_at(app),
     })
 }
 
@@ -244,6 +247,22 @@ pub fn send_mobile_notification(app: tauri::AppHandle) -> Result<(), String> {
 pub fn sync_reminder_schedule(app: tauri::AppHandle) -> Result<(), String> {
     let payload = schedule_payload(&app);
     native::<Value>(&app, "schedule", payload).map(|_| ())
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NextReminderState {
+    /// 原生已排定的下一次提醒（毫秒时间戳）；0 表示当前没有可用的下一次。
+    pub next_at: i64,
+    /// 「暂停提醒」时原生会撤掉闹钟，返回 0。
+    pub paused: bool,
+}
+
+/// 今日页「预计下一杯」：返回原生侧真实排定的绝对时间。
+/// 前端不再按「当前时间 + gap」现算，因此重渲染不会让文案跳动。
+#[tauri::command]
+pub fn get_next_reminder(app: tauri::AppHandle) -> Result<NextReminderState, String> {
+    native::<NextReminderState>(&app, "nextReminder", json!({}))
 }
 
 #[derive(Debug, Deserialize)]

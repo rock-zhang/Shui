@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Check,
@@ -19,11 +19,12 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDrinkData } from "@/hooks/use-drink-data";
+import { usePlatform } from "@/hooks/use-platform";
 import { getLocalDateKey } from "@/lib/drink-history";
 import type { DrinkReceipt } from "@/lib/drink-day";
-import { emitRefresh, formatTimeLabel } from "@/lib/mobile";
+import { emitRefresh, formatTimeLabel, onRefresh } from "@/lib/mobile";
 import {
-  describeNextReminder,
+  describeNextAt,
   findNextReminder,
 } from "@/lib/reminder-schedule";
 import { useMobileConfig } from "./config-context";
@@ -47,6 +48,122 @@ const QUICK_DEDUPE_MS = 1200;
 const CELEBRATE_MS = 1400;
 
 type Celebration = { amount: number; token: number };
+
+/**
+ * 提醒节奏卡片的第二行。
+ *
+ * 绝对时间只来自原生已排定的闹钟，不再按「当前时间 + gap」现算——因此
+ * 切换外观、切 tab、记录饮水这类重渲染不会让文案跳动。这里只用一个 15s
+ * 的节拍更新「还有 N 分钟」和跨天文案。
+ */
+function NextReminderLine({
+  goalReached,
+  goal,
+  todayTotal,
+}: {
+  goalReached: boolean;
+  goal: number;
+  todayTotal: number;
+}) {
+  const { alert, general, hydrated, scheduleRevision } = useMobileConfig();
+  const { isTauri } = usePlatform();
+  const [nextAt, setNextAt] = useState<number | null | undefined>(undefined);
+  // idle = 首次读取中；unavailable = 没有原生命令（桌面预览），退回纯函数推算。
+  const [nativeState, setNativeState] = useState<
+    "idle" | "ready" | "unavailable"
+  >("idle");
+  const [now, setNow] = useState(() => Date.now());
+
+  const load = useCallback(() => {
+    if (!isTauri) {
+      setNativeState("unavailable");
+      return;
+    }
+    invoke<{ nextAt: number }>("get_next_reminder")
+      .then((state) => {
+        setNextAt(state.nextAt > 0 ? state.nextAt : null);
+        setNativeState("ready");
+      })
+      .catch(() => {
+        setNextAt(null);
+        setNativeState("unavailable");
+      });
+  }, [isTauri]);
+
+  // 配置变更后要等原生重排完成（scheduleRevision 递增）再读，避免读到旧值。
+  // 音效、系统通知、全屏、外观等不改变节奏的开关不会递增它。
+  useEffect(() => {
+    load();
+  }, [load, scheduleRevision]);
+
+  // 记录/撤销、通知记水、全屏提醒结束都会广播 refresh。
+  useEffect(() => onRefresh(load), [load]);
+
+  useEffect(() => {
+    const tick = window.setInterval(() => setNow(Date.now()), 15_000);
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      setNow(Date.now());
+      load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      window.clearInterval(tick);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [load]);
+
+  if (!hydrated) {
+    return (
+      <p className="mt-0.5 text-xs text-muted-foreground">正在读取提醒设置…</p>
+    );
+  }
+  if (general.isPaused) {
+    return <p className="mt-0.5 text-xs text-muted-foreground">提醒已暂停</p>;
+  }
+  if (goalReached) {
+    return (
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        今日目标已达成，暂停提醒
+      </p>
+    );
+  }
+
+  let text: string;
+  if (isTauri && nativeState === "ready") {
+    text =
+      nextAt === null || nextAt === undefined
+        ? "当前设置下没有下一次提醒"
+        : describeNextAt(nextAt, now);
+  } else if (isTauri && nativeState === "idle") {
+    text = "正在读取提醒时间…";
+  } else {
+    // 桌面浏览器预览 / 原生命令不可用：退回同一套纯函数推算。
+    const result = findNextReminder(
+      {
+        gap: alert.gap,
+        weekdays: alert.weekdays,
+        timeStart: alert.timeStart,
+        timeEnd: alert.timeEnd,
+        quietEnabled: general.quietEnabled,
+        quietStart: general.quietStart,
+        quietEnd: general.quietEnd,
+        isPaused: general.isPaused,
+        goal,
+        todayTotal,
+      },
+      new Date(now)
+    );
+    text =
+      result.kind === "time"
+        ? describeNextAt(result.date.getTime(), now)
+        : "当前设置下没有下一次提醒";
+  }
+
+  return <p className="mt-0.5 text-xs text-muted-foreground">{text}</p>;
+}
 
 export function TodayTab() {
   const { today, goal, loading, error, reload } = useDrinkData(7);
@@ -79,22 +196,8 @@ export function TodayTab() {
     null
   );
 
-  const nextReminderText = hydrated
-    ? describeNextReminder(
-        findNextReminder({
-          gap: alert.gap,
-          weekdays: alert.weekdays,
-          timeStart: alert.timeStart,
-          timeEnd: alert.timeEnd,
-          quietEnabled: general.quietEnabled,
-          quietStart: general.quietStart,
-          quietEnd: general.quietEnd,
-          isPaused: general.isPaused,
-          goal: goal || today.goal,
-          todayTotal: today.total,
-        })
-      )
-    : "";
+  const goalValue = goal || today.goal;
+  const goalReached = goalValue > 0 && today.total >= goalValue;
 
   async function submit(amount: number) {
     // `busy` is a ref: repeated taps are dropped without disabling (and hence
@@ -250,9 +353,11 @@ export function TodayTab() {
                 <p className="text-sm font-medium">
                   每 {alert.gap} 分钟 · {alert.timeStart}–{alert.timeEnd}
                 </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {nextReminderText}
-                </p>
+                <NextReminderLine
+                  goalReached={goalReached}
+                  goal={goalValue}
+                  todayTotal={today.total}
+                />
               </>
             ) : (
               <>

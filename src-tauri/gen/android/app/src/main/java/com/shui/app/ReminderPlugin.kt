@@ -26,6 +26,7 @@ import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
+import org.json.JSONObject
 import java.io.File
 
 /**
@@ -92,13 +93,28 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
 
     @Command
     fun schedule(invoke: Invoke) {
-        val config = invoke.getArgs().toString()
+        val args = invoke.getArgs()
+        // anchorMs 只参与排期，不写进配置，避免 SharedPreferences 里留下一份
+        // 会被下一次调度误读的旧锚点。
+        val payload = JSONObject(args.toString())
+        val anchor = payload.optLong("anchorMs", 0L)
+        payload.remove("anchorMs")
         activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
-            .putString(KEY_CONFIG, config)
+            .putString(KEY_CONFIG, payload.toString())
             .apply()
-        ReminderScheduler.scheduleNext(activity)
+        ReminderScheduler.scheduleNext(activity, anchor.takeIf { it > 0 })
         invoke.resolve()
+    }
+
+    /** 今日页「预计下一杯」：直接读原生已排定的绝对时间。 */
+    @Suppress("UNUSED_PARAMETER")
+    @Command
+    fun nextReminder(invoke: Invoke) {
+        val payload = JSObject()
+        payload.put("nextAt", ReminderScheduler.nextReminderAt(activity))
+        payload.put("paused", ReminderScheduler.isPaused(activity))
+        invoke.resolve(payload)
     }
 
     @Command
