@@ -22,6 +22,10 @@ __pycache__/
 # WorkBuddy project data
 /.workbuddy/
 
+# Android 端单独文档
+README-ANDROID.md
+README-ANDROID.en.md
+
 # Android release signing material — never commit keystores or key.properties
 *.jks
 *.keystore
