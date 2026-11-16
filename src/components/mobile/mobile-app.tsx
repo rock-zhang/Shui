@@ -13,7 +13,7 @@ import {
   type MobileTabId,
 } from "@/lib/mobile";
 import { MOBILE_TABS, MobileTabBar } from "./mobile-tab-bar";
-import { MobileConfigProvider } from "./config-context";
+import { MobileConfigProvider, useMobileConfig } from "./config-context";
 import { TodayTab } from "./today-tab";
 import { ReminderTab } from "./reminder-tab";
 import { DataTab } from "./data-tab";
@@ -41,12 +41,85 @@ function readStoredTab(): MobileTabId {
   return "today";
 }
 
+/**
+ * 原生提醒事件桥接。
+ *
+ * 必须放在 MobileConfigProvider 内部：「全屏提醒」关掉后，系统通知与定时器照常
+ * 到达（统计、账本都照常记），但不再弹出全屏页。此前这个开关只写进配置、没有
+ * 任何地方消费，关掉后前台照样弹全屏——界面在骗人。
+ */
+function ReminderEvents({ openReminder }: { openReminder: () => void }) {
+  const { isTauri } = usePlatform();
+  const { general } = useMobileConfig();
+  // 回调不在渲染闭包里，用 ref 取最新值，避免改配置时重绑所有原生监听。
+  const fullScreen = useRef(general.isFullScreen);
+  fullScreen.current = general.isFullScreen;
+
+  useEffect(() => {
+    if (!isTauri) return;
+    const disposers: Array<() => void> = [];
+    const bind = (event: string, handler: () => void) => {
+      listen(event, handler)
+        .then((unlisten) => disposers.push(unlisten))
+        .catch(() => {
+          // Browser preview has no native event bus.
+        });
+    };
+
+    const remind = () => {
+      if (fullScreen.current) openReminder();
+    };
+
+    // `mobile-reminder` is emitted by the Android alarm bridge; `timer-complete`
+    // keeps the desktop timer working when the mobile shell is previewed there.
+    bind("mobile-reminder", () => {
+      // 原生闹钟 / 通知唤醒 App 时开启会话，让通知这一路也计入提醒统计。
+      invoke("begin_mobile_reminder").catch(() => {});
+      remind();
+    });
+    bind("timer-complete", remind);
+    // A drink recorded from a notification action happens on the native side.
+    bind("drink-recorded-from-notification", emitRefresh);
+
+    return () => disposers.forEach((dispose) => dispose());
+  }, [isTauri, openReminder]);
+
+  // 通知主体点击：Kotlin 记下 pending 标志并让 WebView 派发 check 事件。
+  // 冷启动时该事件可能早于 React 挂载，因此启动时与恢复前台时各查一次；
+  // 标志由 Rust 侧消费，保证一次点击只弹一次。
+  useEffect(() => {
+    if (!isTauri) return;
+    const consume = () => {
+      invoke<boolean>("consume_pending_reminder")
+        .then((pending) => {
+          if (!pending) return;
+          invoke("begin_mobile_reminder").catch(() => {});
+          if (fullScreen.current) openReminder();
+        })
+        .catch(() => {
+          // 桌面预览没有这个命令。
+        });
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") consume();
+    };
+    const stop = onCheckReminder(consume);
+    document.addEventListener("visibilitychange", onVisible);
+    consume();
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [isTauri, openReminder]);
+
+  return null;
+}
+
 export function MobileApp() {
   const [tab, setTab] = useState<MobileTabId>("today");
   const [reminderSession, setReminderSession] = useState<string | null | undefined>(
     undefined
   );
-  const { isTauri } = usePlatform();
   // 系统栏底色 / 图标明暗跟随 App 内主题，避免亮色系统下出现紫色状态栏。
   useSystemBars();
   const scrollNodes = useRef<Partial<Record<MobileTabId, HTMLDivElement | null>>>(
@@ -81,64 +154,11 @@ export function MobileApp() {
     if (node) node.scrollTop = scrollOffsets.current[tab] ?? 0;
   }, [tab]);
 
-  useEffect(() => {
-    if (!isTauri) return;
-    const disposers: Array<() => void> = [];
-    const bind = (event: string, handler: () => void) => {
-      listen(event, handler)
-        .then((unlisten) => disposers.push(unlisten))
-        .catch(() => {
-          // Browser preview has no native event bus.
-        });
-    };
-
-    // `mobile-reminder` is emitted by the Android alarm bridge; `timer-complete`
-    // keeps the desktop timer working when the mobile shell is previewed there.
-    bind("mobile-reminder", () => {
-      // 原生闹钟 / 通知唤醒 App 时开启会话，让通知这一路也计入提醒统计。
-      invoke("begin_mobile_reminder").catch(() => {});
-      setReminderSession(null);
-    });
-    bind("timer-complete", () => setReminderSession(null));
-    // A drink recorded from a notification action happens on the native side.
-    bind("drink-recorded-from-notification", emitRefresh);
-
-    return () => disposers.forEach((dispose) => dispose());
-  }, [isTauri]);
+  const openReminder = useCallback(() => setReminderSession(null), []);
 
   // "预览提醒" from the reminder tab opens the very same full-screen channel.
-  useEffect(
-    () => onShowReminder(() => setReminderSession(null)),
-    []
-  );
-
-  // 通知主体点击：Kotlin 记下 pending 标志并让 WebView 派发 check 事件。
-  // 冷启动时该事件可能早于 React 挂载，因此启动时与恢复前台时各查一次；
-  // 标志由 Rust 侧消费，保证一次点击只弹一次。
-  useEffect(() => {
-    if (!isTauri) return;
-    const consume = () => {
-      invoke<boolean>("consume_pending_reminder")
-        .then((pending) => {
-          if (!pending) return;
-          invoke("begin_mobile_reminder").catch(() => {});
-          setReminderSession(null);
-        })
-        .catch(() => {
-          // 桌面预览没有这个命令。
-        });
-    };
-    const onVisible = () => {
-      if (document.visibilityState === "visible") consume();
-    };
-    const stop = onCheckReminder(consume);
-    document.addEventListener("visibilitychange", onVisible);
-    consume();
-    return () => {
-      stop();
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [isTauri]);
+  // 用户主动预览不看「全屏提醒」开关，那个开关管的是被动提醒。
+  useEffect(() => onShowReminder(openReminder), [openReminder]);
 
   const header = HEADERS[tab];
   const dateLabel = new Date().toLocaleDateString("zh-CN", {
@@ -149,6 +169,7 @@ export function MobileApp() {
 
   return (
     <MobileConfigProvider>
+      <ReminderEvents openReminder={openReminder} />
       <div className="mobile-root flex flex-col overflow-hidden bg-background text-foreground">
         <header className="shrink-0 px-5 pb-3 pt-4">
           <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">

@@ -257,15 +257,6 @@ export function ReminderTab() {
     }
   }
 
-  /** 已授权时 App 内无法撤销，只能引导到系统通知设置页。 */
-  async function toggleNotificationPermission() {
-    if (permission === "granted") {
-      await openNotificationSettings("turnOff");
-      return;
-    }
-    await requestNotification();
-  }
-
   async function openExactAlarmSettings() {
     // 已开启时点开关是去关闭，未开启才是去开启——文案和轮询方向都不同。
     const turningOff = exactAlarm === "granted";
@@ -316,6 +307,10 @@ export function ReminderTab() {
   }
 
   if (!hydrated) return <ReminderSkeleton />;
+
+  // 「想收通知」与「系统允许通知」是两件事：前者是 App 偏好，后者是系统权限。
+  // 两者同时成立才会真正到达，所以只在这一行做联动提示，不再单列一个开关。
+  const notifBlocked = general.isNotification && permission === "denied";
 
   return (
     <>
@@ -403,7 +398,27 @@ export function ReminderTab() {
       >
         <MobileRow
           title="系统通知"
-          description="锁屏或退到后台也能到达，通知里可直接记一杯水"
+          description={
+            notifBlocked ? (
+              <>
+                {notifCanRequest
+                  ? "通知权限未开启，当前收不到提醒 · "
+                  : "通知权限已被系统禁止弹窗，当前收不到提醒 · "}
+                <button
+                  type="button"
+                  onClick={() => void requestNotification()}
+                  className="font-medium text-primary underline-offset-2 hover:underline"
+                >
+                  去开启
+                </button>
+              </>
+            ) : general.isNotification ? (
+              "锁屏或退到后台也能到达，通知里可直接记一杯水"
+            ) : (
+              "已关闭，锁屏与后台不再提醒"
+            )
+          }
+          descriptionClassName={notifBlocked ? "text-destructive" : undefined}
           control={
             <Switch
               checked={general.isNotification}
@@ -481,28 +496,8 @@ export function ReminderTab() {
 
       <MobileSection
         title="后台到达能力"
-        description="Android 会冻结后台页面，提醒必须由系统闹钟驱动"
+        description="Android 会冻结后台页面，提醒必须由系统闹钟驱动；以下系统权限决定能否准时到达"
       >
-        <MobileRow
-          title="通知权限"
-          description={
-            permission === "granted"
-              ? "已开启 · 点击可去系统设置关闭"
-              : permission === "denied"
-                ? notifCanRequest
-                  ? "未开启 · 点击申请授权"
-                  : "未开启 · 系统已不再弹窗，点击去设置"
-                : "检测中…"
-          }
-          control={
-            <Switch
-              checked={permission === "granted"}
-              disabled={permission === "unknown"}
-              onCheckedChange={() => void toggleNotificationPermission()}
-              aria-label="通知权限"
-            />
-          }
-        />
         <MobileRow
           title="精确闹钟权限"
           description={

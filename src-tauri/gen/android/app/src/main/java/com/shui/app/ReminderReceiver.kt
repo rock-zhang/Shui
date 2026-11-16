@@ -25,6 +25,12 @@ object ReminderScheduler {
     const val ACTION_SKIP = "com.shui.app.SKIP"
     const val ACTION_DRINK_PREFIX = "com.shui.app.DRINK_"
     const val CHANNEL_ID = "shui-reminder"
+    /**
+     * 静音渠道。Android 8+ 的渠道创建后音效属性不可修改，所以「提醒音效」开关
+     * 只能靠切渠道实现：开启走 CHANNEL_ID，关闭走这个无声通道。
+     * 两者都是 IMPORTANCE_HIGH，区别只在有没有声音——关掉音效仍然要浮出横幅。
+     */
+    const val CHANNEL_ID_SILENT = "shui-reminder-silent"
     const val NOTIFICATION_ID = 2001
     const val ALARM_REQUEST_CODE = 3101
 
@@ -109,9 +115,15 @@ object ReminderScheduler {
         val alert = root.optJSONObject("alert") ?: return false
         val general = root.optJSONObject("general")
         if (general?.optBoolean("isPaused", false) == true) return false
+        // 「系统通知」开关：关闭后后台不再发通知，前台的全屏提醒不受影响。
+        if (general?.optBoolean("isNotification", true) == false) return false
         val goal = alert.optString("gold", "1000").toLongOrNull() ?: 1000L
         return goal <= 0 || todayAmount(context) < goal
     }
+
+    /** 「提醒音效」开关；缺省为有声，与前端默认值一致。 */
+    fun isSoundEnabled(context: Context): Boolean =
+        config(context)?.optJSONObject("general")?.optBoolean("isSound", true) ?: true
 
     fun cancel(context: Context) {
         val manager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -248,12 +260,28 @@ class ReminderReceiver : BroadcastReceiver() {
      */
     fun showNotification(context: Context) {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        // 「提醒音效」开关：关掉后切到无声渠道，通知本身照常送达。
+        val soundEnabled = ReminderScheduler.isSoundEnabled(context)
+        val channelId =
+            if (soundEnabled) ReminderScheduler.CHANNEL_ID else ReminderScheduler.CHANNEL_ID_SILENT
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                ReminderScheduler.CHANNEL_ID,
-                "喝水提醒",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply { description = "定时喝水提醒，可直接在通知里记一杯水" }
+            val channel = if (soundEnabled) {
+                NotificationChannel(
+                    channelId,
+                    "喝水提醒",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply { description = "定时喝水提醒，可直接在通知里记一杯水" }
+            } else {
+                NotificationChannel(
+                    channelId,
+                    "喝水提醒（静音）",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "已关闭提醒音效：照常提醒，但不发出声音"
+                    setSound(null, null)
+                }
+            }
             manager.createNotificationChannel(channel)
         }
 
@@ -270,7 +298,7 @@ class ReminderReceiver : BroadcastReceiver() {
             return PendingIntent.getBroadcast(context, requestCode, broadcast, flags)
         }
 
-        val builder = NotificationCompat.Builder(context, ReminderScheduler.CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_water)
             // 下拉大图标用桌面版「水」字 logo；状态栏小图标受系统限制只能单色剪影。
             .setLargeIcon(BitmapFactory.decodeResource(context.resources, R.drawable.ic_notification_large))
@@ -280,6 +308,8 @@ class ReminderReceiver : BroadcastReceiver() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(content)
+            // Android 7.x 没有渠道，音效由 builder 决定。
+            .setSilent(!soundEnabled)
 
         ReminderScheduler.DRINK_ACTIONS.forEachIndexed { index, amount ->
             val label = if (index == 0) "喝一杯 ${amount}ml" else "${amount}ml"

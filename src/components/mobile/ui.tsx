@@ -38,11 +38,14 @@ export function MobileSection({
 export function MobileRow({
   title,
   description,
+  descriptionClassName,
   control,
   className,
 }: {
   title: string;
-  description?: string;
+  /** 可以是字符串，也可以内嵌一个行内操作（如「去开启」）。 */
+  description?: ReactNode;
+  descriptionClassName?: string;
   control?: ReactNode;
   className?: string;
 }) {
@@ -56,7 +59,12 @@ export function MobileRow({
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium leading-5">{title}</p>
         {description && (
-          <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+          <p
+            className={cn(
+              "mt-0.5 text-xs leading-5 text-muted-foreground",
+              descriptionClassName
+            )}
+          >
             {description}
           </p>
         )}

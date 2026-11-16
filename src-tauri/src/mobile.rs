@@ -103,7 +103,9 @@ pub fn setup(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             }
             while IS_RUNNING.load(Ordering::SeqCst) {
                 let settings = AppSettings::load_from_store::<tauri::Wry>(&timer_handle);
-                if !settings.should_run_timer() {
+                // 全屏提醒关掉后前台计时器不该再跑：它只为全屏页服务，一旦到期
+                // 会写共享账本，反而把后台闹钟那一通道也抑制掉。
+                if !settings.should_run_timer() || !settings.is_full_screen {
                     std::thread::sleep(Duration::from_secs(1));
                     continue;
                 }
