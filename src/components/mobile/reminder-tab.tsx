@@ -154,15 +154,17 @@ export function ReminderTab() {
    * 跳系统设置或触发系统确认弹窗后，短轮询确认结果。
    * 电池优化的「允许/不允许」弹窗由系统设置承载，Tauri 的 WebView 在这种
    * 场景下不一定派发 hidden→visible，只靠 visibilitychange 会让开关一直
-   * 停在「关」。轮询最多持续 WATCH_TOTAL_MS，状态翻转即停并提示。
+   * 停在「关」。轮询最多持续 WATCH_TOTAL_MS，状态变成期望值即停并提示。
+   *
+   * @param expect 期望的最终状态：去开启传 true，去关闭传 false。
    */
   const watchPermission = useCallback(
-    (read: () => Promise<boolean>, successText: string) => {
+    (read: () => Promise<boolean>, successText: string, expect = true) => {
       stopWatching();
       const deadline = Date.now() + WATCH_TOTAL_MS;
       const tick = async () => {
-        const granted = await read();
-        if (granted) {
+        const current = await read();
+        if (current === expect) {
           stopWatching();
           toast.success(successText);
           return;
@@ -219,7 +221,7 @@ export function ReminderTab() {
       );
       if (state.granted) {
         setPermission("granted");
-        await openNotificationSettings();
+        await openNotificationSettings("turnOff");
         return;
       }
       if (state.canRequest) {
@@ -228,19 +230,28 @@ export function ReminderTab() {
         watchPermission(readNotification, "通知权限已开启");
         return;
       }
-      await invoke("open_notification_settings");
-      toast.info("系统已不再弹授权窗，请在设置中开启「通知」");
-      watchPermission(readNotification, "通知权限已开启");
+      await openNotificationSettings("turnOn");
     } catch {
-      toast.error("当前为桌面预览，通知权限由系统管理");
+      toast.info("当前为桌面预览，通知权限由系统管理");
     }
   }
 
-  async function openNotificationSettings() {
+  /**
+   * 打开系统通知设置页。
+   * @param intent turnOff：已开启，用户是去关闭；turnOn：已永久拒绝，去手动开启。
+   */
+  async function openNotificationSettings(intent: "turnOn" | "turnOff") {
+    const turningOff = intent === "turnOff";
     try {
       await invoke("open_notification_settings");
-      toast.info("已打开通知设置，可在此关闭提醒");
-      watchPermission(readNotification, "通知权限已开启");
+      toast.info(
+        turningOff ? "已打开通知设置，可在此关闭" : "系统已不再弹授权窗，请在设置中开启"
+      );
+      watchPermission(
+        readNotification,
+        turningOff ? "通知权限已关闭" : "通知权限已开启",
+        !turningOff
+      );
     } catch {
       toast.error("无法打开通知设置，请到 应用信息 → 通知 手动调整");
     }
@@ -249,19 +260,29 @@ export function ReminderTab() {
   /** 已授权时 App 内无法撤销，只能引导到系统通知设置页。 */
   async function toggleNotificationPermission() {
     if (permission === "granted") {
-      await openNotificationSettings();
+      await openNotificationSettings("turnOff");
       return;
     }
     await requestNotification();
   }
 
   async function openExactAlarmSettings() {
+    // 已开启时点开关是去关闭，未开启才是去开启——文案和轮询方向都不同。
+    const turningOff = exactAlarm === "granted";
     try {
       await invoke("open_exact_alarm_settings");
-      toast.info("已打开「闹钟和提醒」，请允许 Shui");
-      watchPermission(readExactAlarm, "精确闹钟权限已开启");
+      toast.info(
+        turningOff
+          ? "已打开「闹钟和提醒」，可在此关闭"
+          : "已打开「闹钟和提醒」，请允许 Shui"
+      );
+      watchPermission(
+        readExactAlarm,
+        turningOff ? "精确闹钟权限已关闭" : "精确闹钟权限已开启",
+        !turningOff
+      );
     } catch {
-      toast.error("无法打开该设置页，请到 应用信息 → 闹钟和提醒 手动开启");
+      toast.error("无法打开该设置页，请到 应用信息 → 闹钟和提醒 手动设置");
     }
   }
 
@@ -269,7 +290,8 @@ export function ReminderTab() {
     try {
       const result = await invoke<string>("open_battery_settings");
       if (result === "already") {
-        toast.info("已在白名单中，可在此撤销");
+        toast.info("已打开电池优化列表，可在此关闭");
+        watchPermission(readBattery, "已关闭电池优化白名单", false);
       } else if (result === "unavailable") {
         toast.error("当前系统未开放该设置页，请到 应用信息 → 电池 手动设置");
       } else if (result === "requested") {
@@ -503,7 +525,7 @@ export function ReminderTab() {
           title="电池优化白名单"
           description={
             battery === "granted"
-              ? "已加入白名单 · 点击可去系统设置撤销"
+              ? "已加入白名单 · 点击可去系统设置关闭"
               : battery === "denied"
                 ? "未加入 · 厂商 ROM 可能冻结提醒，点击去设置"
                 : "检测中…"

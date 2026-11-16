@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Toaster } from "@/components/ui/sonner";
@@ -27,6 +27,20 @@ const HEADERS: Record<MobileTabId, { title: string; subtitle: string }> = {
   me: { title: "我的", subtitle: "偏好、备份与关于" },
 };
 
+const TAB_STORAGE_KEY = "shui:mobile-tab";
+const TAB_IDS = MOBILE_TABS.map(({ id }) => id);
+
+/** 读取上次停留的 tab；非法值或存储不可用时回落到「今日」。 */
+function readStoredTab(): MobileTabId {
+  try {
+    const saved = window.localStorage.getItem(TAB_STORAGE_KEY);
+    if (saved && (TAB_IDS as string[]).includes(saved)) return saved as MobileTabId;
+  } catch {
+    // 隐私模式 / 存储被禁用时忽略。
+  }
+  return "today";
+}
+
 export function MobileApp() {
   const [tab, setTab] = useState<MobileTabId>("today");
   const [reminderSession, setReminderSession] = useState<string | null | undefined>(
@@ -39,6 +53,25 @@ export function MobileApp() {
     {}
   );
   const scrollOffsets = useRef<Partial<Record<MobileTabId, number>>>({});
+
+  // 从系统设置改权限返回时，Android 可能重建 Activity（部分 ROM 甚至会重启
+  // 进程来应用权限变更），WebView 重新加载会让整棵 React 树重挂载，内存里的
+  // tab 就退回「今日」——看起来像 App 自己重启了。落到 localStorage 后恢复，
+  // 重挂载在视觉上完全无感。
+  // 用 effect 而非 useState 初始值：静态导出的 HTML 里必须是「今日」，
+  // 否则首帧 hydration 与服务端不一致。
+  useEffect(() => {
+    setTab(readStoredTab());
+  }, []);
+
+  const changeTab = useCallback((next: MobileTabId) => {
+    setTab(next);
+    try {
+      window.localStorage.setItem(TAB_STORAGE_KEY, next);
+    } catch {
+      // 存储不可用时仅内存生效，不影响本次切换。
+    }
+  }, []);
 
   // Every tab stays mounted so its state (inputs, previews, scroll) survives
   // a switch. Restore the offset explicitly because WebViews may reset it
@@ -159,7 +192,7 @@ export function MobileApp() {
           ))}
         </main>
 
-        <MobileTabBar active={tab} onChange={setTab} />
+        <MobileTabBar active={tab} onChange={changeTab} />
         <Toaster position="top-center" richColors />
 
         {reminderSession !== undefined && (
