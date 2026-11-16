@@ -2,10 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import {
-  isPermissionGranted,
-  requestPermission,
-} from "@tauri-apps/plugin-notification";
+import { isPermissionGranted } from "@tauri-apps/plugin-notification";
 import { BellRing } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -88,6 +85,8 @@ export function ReminderTab() {
   const [battery, setBattery] = useState<"unknown" | "granted" | "denied">(
     "unknown"
   );
+  /** 系统是否还会弹通知授权框；永久拒绝后为 false，只能去设置页开。 */
+  const [notifCanRequest, setNotifCanRequest] = useState(true);
   const alive = useRef(true);
   const watchTimer = useRef<number | null>(null);
 
@@ -101,11 +100,23 @@ export function ReminderTab() {
   // 三个读取函数同时承担「刷新开关状态」和「给轮询判断是否已授权」两个职责。
   const readNotification = useCallback(async (): Promise<boolean> => {
     try {
-      const granted = await isPermissionGranted();
-      if (alive.current) setPermission(granted ? "granted" : "denied");
-      return granted;
+      const state = await invoke<{ granted: boolean; canRequest: boolean }>(
+        "notification_permission_state"
+      );
+      if (alive.current) {
+        setPermission(state.granted ? "granted" : "denied");
+        setNotifCanRequest(state.canRequest);
+      }
+      return state.granted;
     } catch {
-      return false;
+      // 桌面预览没有原生命令，退回插件查询。
+      try {
+        const granted = await isPermissionGranted();
+        if (alive.current) setPermission(granted ? "granted" : "denied");
+        return granted;
+      } catch {
+        return false;
+      }
     }
   }, []);
 
@@ -196,68 +207,80 @@ export function ReminderTab() {
     });
   };
 
-  async function ensurePermission() {
+  /**
+   * 申请通知权限。系统还会弹授权框就直接申请；已被永久拒绝
+   * （Android 13+ 拒绝两次后 requestPermissions 静默失败）则跳到系统设置页，
+   * 否则点了开关什么都不会发生。
+   */
+  async function requestNotification() {
     try {
-      if (await isPermissionGranted()) {
+      const state = await invoke<{ granted: boolean; canRequest: boolean }>(
+        "notification_permission_state"
+      );
+      if (state.granted) {
         setPermission("granted");
-        toast.success("通知权限已开启");
+        await openNotificationSettings();
         return;
       }
-      const result = await requestPermission();
-      const granted = result === "granted";
-      setPermission(granted ? "granted" : "denied");
-      toast[granted ? "success" : "error"](
-        granted ? "通知权限已开启" : "未获得通知权限，请到系统设置中开启"
-      );
+      if (state.canRequest) {
+        // 系统授权框本身就是反馈，这里不再叠一层 toast。
+        await invoke("request_notification_permission");
+        watchPermission(readNotification, "通知权限已开启");
+        return;
+      }
+      await invoke("open_notification_settings");
+      toast.info("系统已不再弹授权窗，请在设置中开启「通知」");
+      watchPermission(readNotification, "通知权限已开启");
     } catch {
-      toast.info("当前为桌面预览，权限由 Android 系统管理");
+      toast.error("当前为桌面预览，通知权限由系统管理");
     }
   }
 
-  /** 已授权时不能在 App 内撤销通知权限，引导到系统通知设置页。 */
+  async function openNotificationSettings() {
+    try {
+      await invoke("open_notification_settings");
+      toast.info("已打开通知设置，可在此关闭提醒");
+      watchPermission(readNotification, "通知权限已开启");
+    } catch {
+      toast.error("无法打开通知设置，请到 应用信息 → 通知 手动调整");
+    }
+  }
+
+  /** 已授权时 App 内无法撤销，只能引导到系统通知设置页。 */
   async function toggleNotificationPermission() {
     if (permission === "granted") {
-      try {
-        await invoke("open_notification_settings");
-        // 用户可能在那里关掉通知，回来后重新核对。
-        watchPermission(readNotification, "通知权限已开启");
-      } catch {
-        toast.info("已开启。如需关闭，请到 系统设置 → 应用 → Shui → 通知");
-      }
+      await openNotificationSettings();
       return;
     }
-    await ensurePermission();
+    await requestNotification();
   }
 
   async function openExactAlarmSettings() {
     try {
       await invoke("open_exact_alarm_settings");
-      toast.info("请允许「闹钟和提醒」权限，返回后状态会自动刷新");
+      toast.info("已打开「闹钟和提醒」，请允许 Shui");
       watchPermission(readExactAlarm, "精确闹钟权限已开启");
     } catch {
-      toast.info("请在 系统设置 → 应用 → Shui → 闹钟和提醒 中手动开启");
+      toast.error("无法打开该设置页，请到 应用信息 → 闹钟和提醒 手动开启");
     }
   }
 
   async function openBatterySettings() {
-    const manual = "请到 系统设置 → 应用 → Shui → 电池 中关闭电池优化";
     try {
       const result = await invoke<string>("open_battery_settings");
       if (result === "already") {
-        toast.info("当前已在白名单中，可在系统设置里调整");
+        toast.info("已在白名单中，可在此撤销");
       } else if (result === "unavailable") {
-        toast.info(`当前系统未开放该设置页，${manual}`);
+        toast.error("当前系统未开放该设置页，请到 应用信息 → 电池 手动设置");
       } else if (result === "requested") {
-        // 系统确认弹窗点「允许」后弹窗消失，WebView 不一定派发可见性变化，
-        // 这里必须主动轮询，否则开关会一直停在「关」。
-        toast.info("请在系统弹窗中选择「允许」");
+        toast.info("请在系统弹窗中选「允许」");
         watchPermission(readBattery, "已加入电池优化白名单");
       } else {
-        toast.info("已打开系统设置，请把 Shui 设为「不优化」");
+        toast.info("请在列表中找到 Shui，选择「不优化」");
         watchPermission(readBattery, "已加入电池优化白名单");
       }
     } catch {
-      toast.info(manual);
+      toast.error("当前系统未开放该设置页，请到 应用信息 → 电池 手动设置");
     }
   }
 
@@ -442,9 +465,11 @@ export function ReminderTab() {
           title="通知权限"
           description={
             permission === "granted"
-              ? "已开启，后台提醒可送达 · 点击可去系统设置调整"
+              ? "已开启 · 点击可去系统设置关闭"
               : permission === "denied"
-                ? "未开启，后台提醒无法送达 · 点击申请授权"
+                ? notifCanRequest
+                  ? "未开启 · 点击申请授权"
+                  : "未开启 · 系统已不再弹窗，点击去设置"
                 : "检测中…"
           }
           control={
@@ -460,9 +485,9 @@ export function ReminderTab() {
           title="精确闹钟权限"
           description={
             exactAlarm === "granted"
-              ? "已开启，后台提醒可准时到达 · 点击可去系统设置调整"
+              ? "已开启 · 后台提醒可准时到达"
               : exactAlarm === "denied"
-                ? "未开启，后台提醒会被系统延迟或不触发"
+                ? "未开启 · 提醒会被系统延迟，点击去设置"
                 : "检测中…"
           }
           control={
@@ -478,9 +503,9 @@ export function ReminderTab() {
           title="电池优化白名单"
           description={
             battery === "granted"
-              ? "已加入白名单，系统不会冻结定时提醒"
+              ? "已加入白名单 · 点击可去系统设置撤销"
               : battery === "denied"
-                ? "未加入，厂商 ROM 可能冻结定时提醒"
+                ? "未加入 · 厂商 ROM 可能冻结提醒，点击去设置"
                 : "检测中…"
           }
           control={

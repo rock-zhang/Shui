@@ -16,6 +16,7 @@ import android.provider.Settings
 import android.webkit.WebView
 import androidx.activity.result.ActivityResult
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowInsetsControllerCompat
@@ -314,6 +315,40 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         invoke.resolve()
     }
 
+    /**
+     * 通知权限的真实状态，附带「系统是否还会弹授权框」。
+     *
+     * Android 13+ 里用户拒绝两次后系统永久静默拒绝：requestPermissions 不再
+     * 显示任何对话框，直接回调 denied。此时只能引导用户去系统设置手动开。
+     * 区分「首次请求」和「永久拒绝」靠 shouldShowRequestPermissionRationale
+     * 不够——两者都返回 false——所以额外用 SharedPreferences 记请求次数。
+     */
+    @Command
+    fun notificationPermissionState(invoke: Invoke) {
+        val granted: Boolean
+        val canRequest: Boolean
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            // 13 以下没有运行时通知权限，但用户仍能在系统设置里整体关闭通知，
+            // areNotificationsEnabled 才是真实状态。
+            granted = NotificationManagerCompat.from(activity).areNotificationsEnabled()
+            canRequest = false
+        } else {
+            granted = NotificationManagerCompat.from(activity).areNotificationsEnabled()
+            val asked = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getInt(KEY_NOTIFICATION_ASKED, 0)
+            val rationale = ActivityCompat.shouldShowRequestPermissionRationale(
+                activity,
+                Manifest.permission.POST_NOTIFICATIONS
+            )
+            // 从未请求过 → 系统还会弹；请求过但 rationale 为 true → 只是拒过一次，仍会弹。
+            canRequest = !granted && (asked == 0 || rationale)
+        }
+        val payload = JSObject()
+        payload.put("granted", granted)
+        payload.put("canRequest", canRequest)
+        invoke.resolve(payload)
+    }
+
     @Suppress("UNUSED_PARAMETER")
     @Command
     fun requestNotificationPermission(invoke: Invoke) {
@@ -321,6 +356,10 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
             ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS)
             != PackageManager.PERMISSION_GRANTED
         ) {
+            val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            prefs.edit()
+                .putInt(KEY_NOTIFICATION_ASKED, prefs.getInt(KEY_NOTIFICATION_ASKED, 0) + 1)
+                .apply()
             ActivityCompat.requestPermissions(
                 activity,
                 arrayOf(Manifest.permission.POST_NOTIFICATIONS),
@@ -371,6 +410,9 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
     companion object {
         const val PREFS = "shui_reminder"
         const val KEY_CONFIG = "config"
+
+        /** 已发起过几次通知权限请求；用于区分「首次」与「永久拒绝」。 */
+        const val KEY_NOTIFICATION_ASKED = "notification_asked_count"
         const val EXTRA_OPEN_REMINDER = "openReminder"
 
         @Volatile

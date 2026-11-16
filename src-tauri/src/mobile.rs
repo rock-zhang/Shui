@@ -256,6 +256,27 @@ pub fn is_exact_alarm_granted(app: tauri::AppHandle) -> Result<bool, String> {
         .map(|value| value.granted)
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct NotificationPermissionState {
+    pub granted: bool,
+    /// 系统是否还会弹授权框。Android 13+ 用户拒绝两次后变 false，
+    /// 此后 requestPermissions 静默返回 denied，只能引导去系统设置。
+    #[serde(rename = "canRequest")]
+    pub can_request: bool,
+}
+
+#[tauri::command]
+pub fn notification_permission_state(
+    app: tauri::AppHandle,
+) -> Result<NotificationPermissionState, String> {
+    native::<NotificationPermissionState>(&app, "notificationPermissionState", json!({}))
+}
+
+#[tauri::command]
+pub fn request_notification_permission(app: tauri::AppHandle) -> Result<(), String> {
+    native::<Value>(&app, "requestNotificationPermission", json!({})).map(|_| ())
+}
+
 #[tauri::command]
 pub fn open_exact_alarm_settings(app: tauri::AppHandle) -> Result<(), String> {
     native::<Value>(&app, "openExactAlarmSettings", json!({})).map(|_| ())
