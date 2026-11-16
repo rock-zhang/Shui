@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <!-- 与 src/app/globals.css 中 :root / .dark 的 background token 精确对齐：
+         light = oklch(1 0 0)                  -> #FFFFFF
+         dark  = oklch(0.129 0.042 264.695)   -> #020618
+         改主题 token 时必须同步这里，否则状态栏与页面会出现色差。 -->
+    <color name="shui_surface_light">#FFFFFFFF</color>
+    <color name="shui_surface_dark">#FF020618</color>
 </resources>

@@ -1,6 +1,16 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Theme.shui" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <!-- Customize your theme here. -->
+    <!--
+      系统栏与 Web 页面用同一个底色，避免 MDC 默认的紫色状态栏 + 黑色导航条
+      把白色页面切成两段。windowBackground 保证冷启动首帧也不闪紫色。
+      运行时若用户在 App 内手动切换主题，由 setSystemBarTheme 命令覆盖。
+    -->
+    <style name="Theme.shui" parent="Theme.MaterialComponents.DayNight.NoActionBar" tools:targetApi="27">
+        <item name="android:windowBackground">@color/shui_surface_light</item>
+        <item name="android:statusBarColor">@color/shui_surface_light</item>
+        <item name="android:navigationBarColor">@color/shui_surface_light</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowTranslucentStatus">false</item>
+        <item name="android:windowTranslucentNavigation">false</item>
     </style>
 </resources>

@@ -88,11 +88,13 @@ async function setupReminderActions() {
 }
 
 export const sendReminderNotification = async () => {
-  // Android 上不能用 plugin-notification 发带 Action 的通知：
-  // 2.2.2 的 NotificationStorage.writeActionGroup 把 key 写成 `id${type.id}`，
-  // getActionGroup 却按 `id0..idN` 读，结果每个 Action 的 id/title 都是空串，
-  // 用户看到一排无文字按钮，点了也不会记水。统一改走自定义原生插件，
-  // 与后台闹钟是同一条通道，图标、渠道、三档 Action 完全一致。
+  // Android 统一走自定义原生插件，与后台闹钟共用同一条通道，保证图标、
+  // 渠道和三档 Action 完全一致；点 Action 由 BroadcastReceiver 静默落盘，
+  // 不拉起 App，进程被杀后仍能记水。
+  // 2.2.2 的 writeActionGroup 曾把 key 写成 `id${type.id}`（读侧却是 `id0..idN`），
+  // 该缺陷已在 plugin-notification 2.4.0 修复。若升级到 2.8.1+ 可重新评估切回
+  // 官方通道，但官方 Action 用 getActivity，点击会拉起界面且依赖 WebView 启动后
+  // 的 onAction 回调，与当前「静默记账」行为并不等价。
   if (detectPlatform() === PLATFORM_OS.ANDROID) {
     await invoke("send_mobile_notification");
     return;

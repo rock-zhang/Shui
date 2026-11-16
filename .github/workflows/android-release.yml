@@ -57,7 +57,11 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+      # 默认 packages 含 'tools'，该包已从 SDK 仓库移除，会让 sdkmanager 直接失败；
+      # 真正的组件在下一步显式安装。
       - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
       - name: Install Android SDK components
         run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0" "ndk;27.1.12297006" > /dev/null
 

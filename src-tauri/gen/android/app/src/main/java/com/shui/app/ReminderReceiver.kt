@@ -7,8 +7,10 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -24,6 +26,12 @@ object ReminderScheduler {
     const val ACTION_SKIP = "com.shui.app.SKIP"
     const val ACTION_DRINK_PREFIX = "com.shui.app.DRINK_"
     const val CHANNEL_ID = "shui-reminder"
+    /**
+     * 静音渠道。Android 8+ 的渠道创建后音效属性不可修改，所以「提醒音效」开关
+     * 只能靠切渠道实现：开启走 CHANNEL_ID，关闭走这个无声通道。
+     * 两者都是 IMPORTANCE_HIGH，区别只在有没有声音——关掉音效仍然要浮出横幅。
+     */
+    const val CHANNEL_ID_SILENT = "shui-reminder-silent"
     const val NOTIFICATION_ID = 2001
     const val ALARM_REQUEST_CODE = 3101
 
@@ -63,6 +71,32 @@ object ReminderScheduler {
      */
     private fun appDataDir(context: Context): File = context.dataDir
 
+    /** 与 Rust mobile.rs 共享的「上次提醒时间」账本，避免前台全屏与后台通知重复触发。 */
+    private fun ledgerFile(context: Context): File = File(appDataDir(context), "last_reminder_at.txt")
+
+    fun lastReminderAt(context: Context): Long = try {
+        ledgerFile(context).readText().trim().toLongOrNull() ?: 0L
+    } catch (_: Exception) {
+        0L
+    }
+
+    fun markReminder(context: Context) {
+        synchronized(this) {
+            try {
+                val file = ledgerFile(context)
+                val tmp = File(file.parentFile, "last_reminder_at.tmp")
+                tmp.writeText(System.currentTimeMillis().toString())
+                tmp.renameTo(file)
+            } catch (_: Exception) {
+                // 账本写失败不影响本次提醒到达，下一轮仍能靠闹钟兜底。
+            }
+        }
+    }
+
+    fun gapMinutes(context: Context): Long =
+        (config(context)?.optJSONObject("alert")?.optString("gap", "30")?.toLongOrNull() ?: 30L)
+            .coerceIn(1, 720)
+
     private fun todayAmount(context: Context): Long {
         return try {
             val file = File(appDataDir(context), "drink_history_store.json")
@@ -82,9 +116,22 @@ object ReminderScheduler {
         val alert = root.optJSONObject("alert") ?: return false
         val general = root.optJSONObject("general")
         if (general?.optBoolean("isPaused", false) == true) return false
+        // 「系统通知」开关：关闭后后台不再发通知，前台的全屏提醒不受影响。
+        if (general?.optBoolean("isNotification", true) == false) return false
         val goal = alert.optString("gold", "1000").toLongOrNull() ?: 1000L
         return goal <= 0 || todayAmount(context) < goal
     }
+
+    /** 「提醒音效」开关；缺省为有声，与前端默认值一致。 */
+    fun isSoundEnabled(context: Context): Boolean =
+        config(context)?.optJSONObject("general")?.optBoolean("isSound", true) ?: true
+
+    /**
+     * 系统是否还允许本应用发通知。Android 13+ 由 POST_NOTIFICATIONS 决定，
+     * 低版本恒为 true（用户仍可在系统设置里整个关掉）。
+     */
+    fun canPostNotifications(context: Context): Boolean =
+        NotificationManagerCompat.from(context).areNotificationsEnabled()
 
     fun cancel(context: Context) {
         val manager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -194,7 +241,22 @@ class ReminderReceiver : BroadcastReceiver() {
                 ReminderScheduler.scheduleNext(context)
             }
             else -> {
-                if (ReminderScheduler.shouldNotify(context)) showNotification(context)
+                val now = System.currentTimeMillis()
+                val last = ReminderScheduler.lastReminderAt(context)
+                val gapMs = ReminderScheduler.gapMinutes(context) * 60_000L
+                // 前台 timer 刚弹过全屏并写了账本时，闹钟这一路不再补通知，
+                // 避免「进 App 后通知 + 全屏同时弹」。首启/账本缺失时 last=0，
+                // 视为该提醒一次，正常发通知并落账本。
+                if (now - last >= gapMs) {
+                    // 没有通知权限时不盖账本戳：notify() 会被系统静默丢弃，
+                    // 若这里照旧落账本，用户打开 App 后前台 timer 会认为
+                    // 「刚提醒过」，连全屏提醒都不补——提醒变成彻底静默的
+                    // 失败。不盖章，让下次进 App 时补一次全屏提醒。
+                    if (ReminderScheduler.canPostNotifications(context)) {
+                        ReminderScheduler.markReminder(context)
+                        if (ReminderScheduler.shouldNotify(context)) showNotification(context)
+                    }
+                }
                 // 无论是否展示，都要安排下一次，保证达标/勿扰结束后能自动恢复。
                 ReminderScheduler.scheduleNext(context)
             }
@@ -212,12 +274,28 @@ class ReminderReceiver : BroadcastReceiver() {
      */
     fun showNotification(context: Context) {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        // 「提醒音效」开关：关掉后切到无声渠道，通知本身照常送达。
+        val soundEnabled = ReminderScheduler.isSoundEnabled(context)
+        val channelId =
+            if (soundEnabled) ReminderScheduler.CHANNEL_ID else ReminderScheduler.CHANNEL_ID_SILENT
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                ReminderScheduler.CHANNEL_ID,
-                "喝水提醒",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply { description = "定时喝水提醒，可直接在通知里记一杯水" }
+            val channel = if (soundEnabled) {
+                NotificationChannel(
+                    channelId,
+                    "喝水提醒",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply { description = "定时喝水提醒，可直接在通知里记一杯水" }
+            } else {
+                NotificationChannel(
+                    channelId,
+                    "喝水提醒（静音）",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "已关闭提醒音效：照常提醒，但不发出声音"
+                    setSound(null, null)
+                }
+            }
             manager.createNotificationChannel(channel)
         }
 
@@ -234,14 +312,18 @@ class ReminderReceiver : BroadcastReceiver() {
             return PendingIntent.getBroadcast(context, requestCode, broadcast, flags)
         }
 
-        val builder = NotificationCompat.Builder(context, ReminderScheduler.CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_water)
+            // 下拉大图标用桌面版「水」字 logo；状态栏小图标受系统限制只能单色剪影。
+            .setLargeIcon(BitmapFactory.decodeResource(context.resources, R.drawable.ic_notification_large))
             .setColor(0xFF3B82F6.toInt())
             .setContentTitle("该喝水啦")
             .setContentText("站起来喝杯水，顺便活动一下身体吧")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .setContentIntent(content)
+            // Android 7.x 没有渠道，音效由 builder 决定。
+            .setSilent(!soundEnabled)
 
         ReminderScheduler.DRINK_ACTIONS.forEachIndexed { index, amount ->
             val label = if (index == 0) "喝一杯 ${amount}ml" else "${amount}ml"

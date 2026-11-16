@@ -57,7 +57,7 @@ A cross-platform desktop app focused on water intake reminders, promoting office
 - ✅ macOS
 - ✅ Windows
 - ✅ Linux
-- 🚧 Android (coming soon)
+- 🚧 Android (standalone app — see [Android notes](README-ANDROID.en.md))
 
 ### Download and Installation
 
@@ -83,6 +83,12 @@ If you encounter the "Shui is damaged and can't be opened" message on `macOS`, p
 ```shell
 sudo xattr -r -d com.apple.quarantine /Applications/Shui.app
 ```
+
+## 📱 Android
+
+The Android build ships as a standalone app. It shares the same drink data with the desktop build, while reminders, notifications, system bars and other native capabilities are reimplemented.
+
+Feature mapping, system-bar theming, the background reminder pipeline, and the **full APK / AAB production build flow** (release keystore, signing configuration, versionCode derivation, signature verification, CI, troubleshooting) all live in **[README-ANDROID.en.md](README-ANDROID.en.md)**.
 
 ## 🛣 Development Roadmap
 
@@ -127,6 +133,40 @@ Reminder display duration is not actual rest time. CSV is for viewing and analys
 - [React](https://reactjs.org/) - User Interface Framework
 - [Rust](https://www.rust-lang.org/) - Backend Logic Implementation
 - [shadcn/ui](https://ui.shadcn.com/) - UI Component Library
+
+## 📦 Release Process
+
+Pushing a `v*` tag triggers the [publish workflow](.github/workflows/publish.yaml), which builds all platforms, creates a draft Release and refreshes the auto-update manifest.
+
+**Do not create tags manually.** Version numbers live in four files and are maintained by a single command that combines bumping, committing and tagging:
+
+```shell
+# On main with a clean index
+git switch main && git pull --ff-only
+yarn release 0.3.0          # bumps 4 files, creates a commit and tag v0.3.0
+git push origin HEAD        # push the version commit first
+git push origin v0.3.0      # pushing the tag triggers the workflow
+```
+
+`package.json` is the single source of truth. `yarn release <version>` also updates `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `Cargo.lock` (daily CI runs `cargo build --locked`, so the lockfile must match). It runs on `main` only, refuses a dirty index, and **never pushes**. Use `yarn version:check` to verify consistency without changing anything.
+
+Three version gates: `ci.yaml` checks the four files on every PR, `publish.yaml` fails within seconds if the tag doesn't match (before the 7 build jobs start), and `upload-assets` re-checks before uploading. `upload-assets` now **rebuilds** `latest.json` from the Release's `.sig` and installer assets, validating signatures and all 7 main platforms, then uploads it to the `updater` Release.
+
+Before releasing, make sure the `updater` Release exists and is published (`.../releases/download/updater/latest.json`) and `TAURI_SIGNING_PRIVATE_KEY` is configured. CI creates a **draft** Release — click **Publish release** on GitHub before clients can detect the update.
+
+If a run fails, delete the draft Release and the tag before retrying:
+
+```shell
+gh release delete v0.3.0 --repo rock-zhang/Shui --yes
+git push origin :refs/tags/v0.3.0
+git tag -d v0.3.0
+```
+
+Then either push the fix and re-tag (`git push origin HEAD && git tag v0.3.0 && git push origin v0.3.0`) if the version was already bumped — `yarn release 0.3.0` will refuse with "version unchanged" — or run `yarn release 0.3.0` if the version in code is still old.
+
+## 📱 Android Production Builds (APK / AAB)
+
+Kept in a dedicated document: **[README-ANDROID.en.md](README-ANDROID.en.md)** — release keystore, both signing configurations, versionCode derivation, build commands and outputs, signature verification, CI, troubleshooting.
 
 ## Community
 

@@ -2,9 +2,11 @@ package com.shui.app
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -14,8 +16,10 @@ import android.provider.Settings
 import android.webkit.WebView
 import androidx.activity.result.ActivityResult
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.view.WindowInsetsControllerCompat
 import app.tauri.annotation.ActivityCallback
 import app.tauri.annotation.Command
 import app.tauri.annotation.TauriPlugin
@@ -71,6 +75,21 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
+    /**
+     * Activity 回到前台时通知 Web 端。从系统设置页、系统确认弹窗（如电池优化
+     * 的「允许/不允许」）返回时，Android WebView 未必派发 visibilitychange
+     * ——visibilityState 很可能一直是 visible，前端靠事件刷新权限状态会漏，
+     * 表现为开关点了允许仍旧停在「关」。这里由原生侧主动派发。
+     */
+    private fun dispatchForeground() {
+        Handler(Looper.getMainLooper()).post {
+            webView?.evaluateJavascript(
+                "window.dispatchEvent(new Event('shui:foreground'));",
+                null
+            )
+        }
+    }
+
     @Command
     fun schedule(invoke: Invoke) {
         val config = invoke.getArgs().toString()
@@ -89,11 +108,13 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     /**
-     * 前台「测试通知」走这里，而不是 plugin-notification：
-     * tauri-plugin-notification 2.2.2 的 NotificationStorage.writeActionGroup
-     * 用 `type.id`（字符串）拼 key 写入，getActionGroup 却用 0..count 读取，
-     * 导致 Android 上注册的所有 Action 的 id/title 都是空串，点了不记水。
-     * 自定义通道没有这个问题，且 App 被杀时也能记账。
+     * 前台「测试通知」与后台闹钟共用这一条自定义通道，保证图标、渠道、
+     * 三档 Action 完全一致，且点 Action 时静默落盘、不拉起 App，进程被杀后也能记账。
+     *
+     * 注：plugin-notification 2.2.2 的 writeActionGroup 曾按 type.id 拼 key 写入
+     * （读侧按 0..count），导致 Action 的 id/title 为空；该缺陷已在 2.4.0 修复。
+     * 升级到 2.8.1+ 后可评估切回官方通道，但官方 Action 基于 getActivity，
+     * 点击会拉起界面且依赖 WebView 启动后的 onAction 回调，行为并不等价。
      */
     @Command
     fun showNotification(invoke: Invoke) {
@@ -117,6 +138,16 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         val alreadyIgnored = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
             power?.isIgnoringBatteryOptimizations(activity.packageName) == true
         val result = if (alreadyIgnored) {
+            // 已加入白名单时也打开列表页：前端开关点下去要能进到设置里撤销或确认。
+            val listIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+            if (listIntent.resolveActivity(activity.packageManager) != null) {
+                try {
+                    listIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    activity.startActivity(listIntent)
+                } catch (_: Exception) {
+                    // 打不开就算了，状态仍是 already。
+                }
+            }
             "already"
         } else {
             val candidates = listOf(
@@ -147,6 +178,47 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         // resolve(JSObject) 走 PluginResult 的标准 JSON 路径；resolveObject 会
         // 用 Jackson 序列化 org.json.JSONObject，字段结构不可控。
         invoke.resolve(payload)
+    }
+
+    /** 电池优化白名单状态；已加入白名单（不受后台冻结）返回 granted=true。 */
+    @Suppress("UNUSED_PARAMETER")
+    @Command
+    fun isBatteryOptimizationIgnored(invoke: Invoke) {
+        val power = activity.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val ignored = Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+            power?.isIgnoringBatteryOptimizations(activity.packageName) == true
+        val payload = JSObject()
+        payload.put("granted", ignored)
+        invoke.resolve(payload)
+    }
+
+    /**
+     * 通知权限已开启时用户仍可能想调整或关闭，直接打开本应用的通知设置页；
+     * 部分 ROM 没有该页时回退到应用详情。
+     */
+    @Suppress("UNUSED_PARAMETER")
+    @Command
+    fun openNotificationSettings(invoke: Invoke) {
+        val candidates = mutableListOf<Intent>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            candidates += Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, activity.packageName)
+            }
+        }
+        candidates += Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.parse("package:${activity.packageName}")
+        }
+        for (intent in candidates) {
+            if (intent.resolveActivity(activity.packageManager) == null) continue
+            try {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                activity.startActivity(intent)
+                break
+            } catch (_: Exception) {
+                // 换下一个入口。
+            }
+        }
+        invoke.resolve()
     }
 
     /** 供 Rust 侧消费「通知点击待弹提醒」标志，保证冷/热启动只弹一次。 */
@@ -229,6 +301,54 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
+    /**
+     * 系统栏颜色与图标明暗跟随 App 内主题（next-themes 的 resolvedTheme），
+     * 而不是只跟随系统深浅色：用户在 App 里手动选「深色」但系统是亮色时，
+     * 仅靠 values-night 资源是错的一档。
+     */
+    @Command
+    fun setSystemBarTheme(invoke: Invoke) {
+        val dark = invoke.getArgs().optBoolean("dark", false)
+        systemBarThemeFromWeb = true
+        systemBarDark = dark
+        activity.runOnUiThread { applySystemBarTheme(activity) }
+        invoke.resolve()
+    }
+
+    /**
+     * 通知权限的真实状态，附带「系统是否还会弹授权框」。
+     *
+     * Android 13+ 里用户拒绝两次后系统永久静默拒绝：requestPermissions 不再
+     * 显示任何对话框，直接回调 denied。此时只能引导用户去系统设置手动开。
+     * 区分「首次请求」和「永久拒绝」靠 shouldShowRequestPermissionRationale
+     * 不够——两者都返回 false——所以额外用 SharedPreferences 记请求次数。
+     */
+    @Command
+    fun notificationPermissionState(invoke: Invoke) {
+        val granted: Boolean
+        val canRequest: Boolean
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            // 13 以下没有运行时通知权限，但用户仍能在系统设置里整体关闭通知，
+            // areNotificationsEnabled 才是真实状态。
+            granted = NotificationManagerCompat.from(activity).areNotificationsEnabled()
+            canRequest = false
+        } else {
+            granted = NotificationManagerCompat.from(activity).areNotificationsEnabled()
+            val asked = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getInt(KEY_NOTIFICATION_ASKED, 0)
+            val rationale = ActivityCompat.shouldShowRequestPermissionRationale(
+                activity,
+                Manifest.permission.POST_NOTIFICATIONS
+            )
+            // 从未请求过 → 系统还会弹；请求过但 rationale 为 true → 只是拒过一次，仍会弹。
+            canRequest = !granted && (asked == 0 || rationale)
+        }
+        val payload = JSObject()
+        payload.put("granted", granted)
+        payload.put("canRequest", canRequest)
+        invoke.resolve(payload)
+    }
+
     @Suppress("UNUSED_PARAMETER")
     @Command
     fun requestNotificationPermission(invoke: Invoke) {
@@ -236,6 +356,10 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
             ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS)
             != PackageManager.PERMISSION_GRANTED
         ) {
+            val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            prefs.edit()
+                .putInt(KEY_NOTIFICATION_ASKED, prefs.getInt(KEY_NOTIFICATION_ASKED, 0) + 1)
+                .apply()
             ActivityCompat.requestPermissions(
                 activity,
                 arrayOf(Manifest.permission.POST_NOTIFICATIONS),
@@ -245,9 +369,50 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         invoke.resolve()
     }
 
+    /**
+     * Android 12+ (API 31) 起，setExact 需要 ACTION_REQUEST_SCHEDULE_EXACT_ALARM
+     * 特殊权限。未授权时调度器只能降级到非精确闹钟，Doze / 国产 ROM 下会被
+     * 大幅延迟甚至不触发——这正是「后台收不到通知」的主因之一。低版本恒为 true。
+     */
+    @Suppress("UNUSED_PARAMETER")
+    @Command
+    fun isExactAlarmGranted(invoke: Invoke) {
+        val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val manager = activity.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+            manager?.canScheduleExactAlarms() == true
+        } else {
+            true
+        }
+        val payload = JSObject()
+        payload.put("granted", granted)
+        invoke.resolve(payload)
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    @Command
+    fun openExactAlarmSettings(invoke: Invoke) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                    data = Uri.parse("package:${activity.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                if (intent.resolveActivity(activity.packageManager) != null) {
+                    activity.startActivity(intent)
+                }
+            } catch (_: Exception) {
+                // 部分 ROM 无此设置页，前端提示用户手动开启。
+            }
+        }
+        invoke.resolve()
+    }
+
     companion object {
         const val PREFS = "shui_reminder"
         const val KEY_CONFIG = "config"
+
+        /** 已发起过几次通知权限请求；用于区分「首次」与「永久拒绝」。 */
+        const val KEY_NOTIFICATION_ASKED = "notification_asked_count"
         const val EXTRA_OPEN_REMINDER = "openReminder"
 
         @Volatile
@@ -259,6 +424,47 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         /** 只有真正由通知主体点进来的 Intent 才置位。 */
         @Volatile
         var reminderPending = false
+
+        /** Web 端是否已锁定主题；false 时按系统 uiMode 走。 */
+        @Volatile
+        var systemBarThemeFromWeb = false
+
+        @Volatile
+        var systemBarDark = false
+
+        fun isNightMode(configuration: Configuration): Boolean =
+            (configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                Configuration.UI_MODE_NIGHT_YES
+
+        /**
+         * 必须在主线程调用。manifest 的 configChanges 含 uiMode，系统切深浅色
+         * 不会重建 Activity，AppCompat 可能按旧主题重绘系统栏；从系统设置页 /
+         * 分享页返回时部分 ROM 也会重置。因此 onCreate / onResume /
+         * onConfigurationChanged 各重应用一次，成本只是设两个颜色。
+         */
+        /** 供 MainActivity.onResume 调用；WebView 未就绪时静默跳过。 */
+        fun notifyForeground() {
+            instance?.dispatchForeground()
+        }
+
+        fun applySystemBarTheme(activity: Activity) {
+            val color = ContextCompat.getColor(
+                activity,
+                if (systemBarDark) R.color.shui_surface_dark else R.color.shui_surface_light
+            )
+            val window = activity.window
+            window.statusBarColor = color
+            window.navigationBarColor = color
+            WindowInsetsControllerCompat(window, window.decorView).apply {
+                isAppearanceLightStatusBars = !systemBarDark
+                isAppearanceLightNavigationBars = !systemBarDark
+            }
+            // API 29+ 会给浅色系统栏压一层半透明遮罩，会把纯白染成灰白。
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                window.isStatusBarContrastEnforced = false
+                window.isNavigationBarContrastEnforced = false
+            }
+        }
 
         fun holdReminderIntent(intent: Intent?) {
             if (intent?.getBooleanExtra(EXTRA_OPEN_REMINDER, false) == true) {

@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tauri::{Emitter, Manager, Runtime};
 use tauri_plugin_store::StoreExt;
 
@@ -53,8 +53,42 @@ pub fn sync_schedule(app: &tauri::AppHandle) {
     let _ = native::<Value>(app, "schedule", schedule_payload(app));
 }
 
+/// 与 Kotlin ReminderScheduler 共享的「上次提醒时间」账本：内容为毫秒时间戳。
+/// 前台全屏与后台通知写同一份账本，任一路触发后另一路在 gap 内不再重复；
+/// 同时取代前台 timer 里会被后台冻结时长一次性撑爆的 elapsed 累加。
+const LAST_REMINDER_FILE: &str = "last_reminder_at.txt";
+
+fn ledger_path(app: &tauri::AppHandle) -> Option<PathBuf> {
+    app.path()
+        .app_data_dir()
+        .ok()
+        .map(|dir| dir.join(LAST_REMINDER_FILE))
+}
+
+fn last_reminder_at(app: &tauri::AppHandle) -> i64 {
+    ledger_path(app)
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|raw| raw.trim().parse::<i64>().ok())
+        .unwrap_or(0)
+}
+
+fn mark_reminder(app: &tauri::AppHandle) {
+    let Some(path) = ledger_path(app) else { return };
+    let Some(parent) = path.parent() else { return };
+    if std::fs::create_dir_all(parent).is_err() {
+        return;
+    }
+    // 写临时文件再原子替换，避免与 Kotlin 侧并发写时读到半截数字。
+    let tmp = path.with_extension("tmp");
+    let now = Local::now().timestamp_millis();
+    if std::fs::write(&tmp, now.to_string()).is_ok() {
+        let _ = std::fs::rename(&tmp, &path);
+    }
+}
+
 pub fn setup(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    // 前台计时：WebView 活着时给出全屏提醒；退后台由 Kotlin 闹钟兜底。
+    // 前台计时：以共享账本为唯一时间锚点。WebView 活着时给出全屏提醒；
+    // 退后台由 Kotlin 闹钟兜底，两者写同一份账本，互不重复。
     let timer_handle = app.clone();
     std::thread::Builder::new()
         .name("mobile-timer".into())
@@ -63,23 +97,27 @@ pub fn setup(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                 std::thread::sleep(Duration::from_millis(500));
                 continue;
             }
-            let mut elapsed = 0u64;
-            let mut tick = Instant::now();
+            // 首次启动把账本初始化为当前时间，避免一进 App 就补弹历史提醒。
+            if last_reminder_at(&timer_handle) == 0 {
+                mark_reminder(&timer_handle);
+            }
             while IS_RUNNING.load(Ordering::SeqCst) {
                 let settings = AppSettings::load_from_store::<tauri::Wry>(&timer_handle);
-                if !settings.should_run_timer() {
-                    tick = Instant::now();
+                // 全屏提醒关掉后前台计时器不该再跑：它只为全屏页服务，一旦到期
+                // 会写共享账本，反而把后台闹钟那一通道也抑制掉。
+                if !settings.should_run_timer() || !settings.is_full_screen {
                     std::thread::sleep(Duration::from_secs(1));
                     continue;
                 }
-                elapsed += tick.elapsed().as_secs();
-                tick = Instant::now();
-                if elapsed >= settings.gap {
+                let now_ms = Local::now().timestamp_millis();
+                let gap_ms = settings.gap as i64 * 1000; // AppSettings.gap 以秒存储
+                if now_ms - last_reminder_at(&timer_handle) >= gap_ms {
+                    // 先写账本再弹窗：后台闹钟随后读到新账本，就不会再补一条通知。
+                    mark_reminder(&timer_handle);
                     IS_RUNNING.store(false, Ordering::SeqCst);
                     reminder_session::begin();
                     let _ = timer_handle.emit("timer-complete", ());
-                    // 前台已经弹出全屏提醒，把原生闹钟重排到 now+gap，避免同一
-                    // 时刻再补一条系统通知。双通道是保底关系，不是并列触发。
+                    // 全屏已承接本次提醒，把原生闹钟重排到 now+gap。
                     sync_schedule(&timer_handle);
                     break;
                 }
@@ -209,6 +247,44 @@ pub fn sync_reminder_schedule(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[derive(Debug, Deserialize)]
+struct ExactAlarmResult {
+    granted: bool,
+}
+
+/// Android 12+ (API 31+) 精确闹钟需要用户单独授权；低版本恒为 true。
+#[tauri::command]
+pub fn is_exact_alarm_granted(app: tauri::AppHandle) -> Result<bool, String> {
+    native::<ExactAlarmResult>(&app, "isExactAlarmGranted", json!({}))
+        .map(|value| value.granted)
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct NotificationPermissionState {
+    pub granted: bool,
+    /// 系统是否还会弹授权框。Android 13+ 用户拒绝两次后变 false，
+    /// 此后 requestPermissions 静默返回 denied，只能引导去系统设置。
+    #[serde(rename = "canRequest")]
+    pub can_request: bool,
+}
+
+#[tauri::command]
+pub fn notification_permission_state(
+    app: tauri::AppHandle,
+) -> Result<NotificationPermissionState, String> {
+    native::<NotificationPermissionState>(&app, "notificationPermissionState", json!({}))
+}
+
+#[tauri::command]
+pub fn request_notification_permission(app: tauri::AppHandle) -> Result<(), String> {
+    native::<Value>(&app, "requestNotificationPermission", json!({})).map(|_| ())
+}
+
+#[tauri::command]
+pub fn open_exact_alarm_settings(app: tauri::AppHandle) -> Result<(), String> {
+    native::<Value>(&app, "openExactAlarmSettings", json!({})).map(|_| ())
+}
+
+#[derive(Debug, Deserialize)]
 struct BatterySettingsResult {
     result: String,
 }
@@ -222,6 +298,32 @@ struct PendingReminderFlag {
 pub fn open_battery_settings(app: tauri::AppHandle) -> Result<String, String> {
     native::<BatterySettingsResult>(&app, "openBatterySettings", json!({}))
         .map(|value| value.result)
+}
+
+#[derive(Debug, Deserialize)]
+struct BatteryIgnoredResult {
+    granted: bool,
+}
+
+/// 是否已加入电池优化白名单；未加入时国产 ROM 会冻结后台提醒。
+#[tauri::command]
+pub fn is_battery_optimization_ignored(app: tauri::AppHandle) -> Result<bool, String> {
+    native::<BatteryIgnoredResult>(&app, "isBatteryOptimizationIgnored", json!({}))
+        .map(|value| value.granted)
+}
+
+/// 通知权限已开启时，用户仍可能想去系统设置调整或关闭。
+#[tauri::command]
+pub fn open_notification_settings(app: tauri::AppHandle) -> Result<(), String> {
+    native::<Value>(&app, "openNotificationSettings", json!({})).map(|_| ())
+}
+
+/// 让状态栏 / 导航栏的底色与图标明暗跟随 App 内主题，而不是只跟随系统
+/// 深浅色设置。冷启动首帧由 values(-night)/themes.xml 兜底，这里负责
+/// 用户手动切主题、以及 configChanges 含 uiMode 时的运行时同步。
+#[tauri::command]
+pub fn set_system_bar_theme(app: tauri::AppHandle, dark: bool) -> Result<(), String> {
+    native::<Value>(&app, "setSystemBarTheme", json!({ "dark": dark })).map(|_| ())
 }
 
 /// 通知主体被点击后 Kotlin 只记一个标志；前端在启动 / 恢复 / 收到
