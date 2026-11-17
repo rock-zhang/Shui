@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Notification small icon: Android renders only the alpha channel of the small
+  icon, so it must be a flat white silhouette. Using @mipmap/ic_launcher here
+  produces a solid white square in the status bar on API 21+.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,2C8.1,6.1 4.5,9.9 4.5,14A7.5,7.5 0 0,0 12,21.5A7.5,7.5 0 0,0 19.5,14C19.5,9.9 15.9,6.1 12,2Z" />
+    <!-- A small transparent notch gives the droplet a readable highlight. -->
+    <path
+        android:fillColor="#66FFFFFF"
+        android:pathData="M8.6,13.6C8.6,12.3 9.5,11.1 10.7,10.4C10.1,11.6 9.9,12.8 10,14C10.2,16 11.8,17.6 13.8,17.8C12.7,18.4 11.4,18.5 10.3,18.1C9.2,17.7 8.6,16.6 8.6,15.4C8.6,14.8 8.6,14.2 8.6,13.6Z" />
+</vector>

@@ -1,0 +1,6 @@
+<resources>
+    <!-- 深色模式：冷启动窗口背景；系统栏底色与图标明暗在运行时按 App 内主题设置。 -->
+    <style name="Theme.shui" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/shui_surface_dark</item>
+    </style>
+</resources>

@@ -1,0 +1,12 @@
+<resources>
+    <!--
+      targetSdk 36 下系统栏强制透明（edge-to-edge），statusBarColor /
+      navigationBarColor / windowLight* 全部被忽略，留着只会误导。
+      栏底色现在由窗口背景提供（ReminderPlugin.applySystemBarTheme 在运行时
+      按 App 内主题设置），windowBackground 只负责冷启动首帧不闪 MDC 紫色。
+      内容避让由 WebView 的 env(safe-area-inset-*) 负责。
+    -->
+    <style name="Theme.shui" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/shui_surface_light</item>
+    </style>
+</resources>
