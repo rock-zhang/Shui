@@ -57,7 +57,7 @@ A cross-platform desktop app focused on water intake reminders, promoting office
 - ✅ macOS
 - ✅ Windows
 - ✅ Linux
-- 🚧 Android (coming soon)
+- 🚧 Android (standalone app — see [Android notes](README-ANDROID.en.md))
 
 ### Download and Installation
 
@@ -84,22 +84,11 @@ If you encounter the "Shui is damaged and can't be opened" message on `macOS`, p
 sudo xattr -r -d com.apple.quarantine /Applications/Shui.app
 ```
 
-## 📱 Android vs Desktop
+## 📱 Android
 
-The Android build ships as a standalone app, so the UI no longer carries desktop-comparison notes. The mapping and trade-offs are kept here for maintainers.
+The Android build ships as a standalone app. It shares the same drink data with the desktop build, while reminders, notifications, system bars and other native capabilities are reimplemented.
 
-| Desktop | Android |
-| --- | --- |
-| Tray countdown | Today → "Reminder rhythm" card |
-| Global hotkeys | "Log a drink" action on system notifications |
-| Silent autostart | Alarms rebuilt after the boot broadcast |
-| App whitelist / lock-screen auto-pause | Quiet hours + manual pause |
-| In-app auto update | Play Store updates (in-app self-updates violate store policy) |
-| Installed-app list | Not collected (sensitive permission) |
-
-Unchanged: daily goal, reminder interval (minutes), repeat days, time range, full-screen reminders / system notifications / sound, drink logging and undo, trend and habit statistics, CSV export, JSON backup and import, appearance themes.
-
-Background delivery depends on system alarms, notification permission and the battery-optimization whitelist; some vendor ROMs also require autostart / background-lock permission. See `src-tauri/gen/android/` for the native implementation.
+Feature mapping, system-bar theming, the background reminder pipeline, and the **full APK / AAB production build flow** (release keystore, signing configuration, versionCode derivation, signature verification, CI, troubleshooting) all live in **[README-ANDROID.en.md](README-ANDROID.en.md)**.
 
 ## 🛣 Development Roadmap
 

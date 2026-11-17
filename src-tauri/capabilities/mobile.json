@@ -1,0 +1,29 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "mobile",
+  "description": "Android/iOS capability: store, notification, opener and dialogs only",
+  "platforms": [
+    "android",
+    "iOS"
+  ],
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "store:default",
+    "notification:default",
+    "notification:allow-register-action-types",
+    "notification:allow-create-channel",
+    "notification:allow-register-listener",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "dialog:allow-ask",
+    "dialog:allow-confirm",
+    "dialog:allow-message",
+    "opener:default",
+    "clipboard-manager:allow-write-text",
+    "os:allow-platform"
+  ]
+}

@@ -15,12 +15,25 @@ dist-ssr
 __pycache__/
 /artifacts/
 /.next/
+# Next 在已有 .next 上重建会崩（WasmHash），现场习惯改名为 .next.bak-<ts> 保留
+/.next.bak-*/
+# 同理，重建前端时把旧 dist 改名留档
+/dist.bak-*/
 
 # TypeScript incremental build
 *.tsbuildinfo
 
 # WorkBuddy project data
 /.workbuddy/
+
+# Android 端单独文档
+README-ANDROID.md
+README-ANDROID.en.md
+
+# Android release signing material — never commit keystores or key.properties
+*.jks
+*.keystore
+key.properties
 
 # Editor directories and files
 .vscode/*

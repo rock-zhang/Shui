@@ -1,0 +1,20 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "com.shui.app",
+  "bundle": {
+    "createUpdaterArtifacts": false
+  },
+  "app": {
+    "security": {
+      "csp": null
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "Shui",
+        "url": "/",
+        "backgroundThrottling": "disabled"
+      }
+    ]
+  }
+}

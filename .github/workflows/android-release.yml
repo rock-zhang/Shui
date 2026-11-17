@@ -1,0 +1,159 @@
+name: Android package
+
+# 与桌面发布流程解耦：tag v* 由 publish.yaml 负责，这里单独手动触发打
+# APK / AAB，避免没配置 Android keystore 时把整个 Release 流程带崩。
+on:
+  workflow_dispatch:
+    inputs:
+      artifacts:
+        description: "产物类型"
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - aab
+          - apk
+      targets:
+        description: "ABI 目标，空格分隔（aarch64 armv7 x86_64 i686）"
+        required: true
+        default: aarch64
+        type: string
+      signed:
+        description: "使用 release keystore（需配置 ANDROID_KEYSTORE_* secrets）"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # 发布密钥只在该环境内可见：可在仓库 Settings → Environments 中为它配置
+    # required reviewers 与部署分支限制，避免任意分支改动 workflow 后直接取用
+    # secrets。secrets 放到该环境下（同名）时优先于仓库级 secrets。
+    environment: production
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+      - run: corepack enable
+      - run: corepack yarn install --frozen-lockfile
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: '. -> target'
+          cache-on-failure: true
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      # 默认 packages 含 'tools'，该包已从 SDK 仓库移除，会让 sdkmanager 直接失败；
+      # 真正的组件在下一步显式安装。
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
+      - name: Install Android SDK components
+        run: sdkmanager --install "platforms;android-34" "build-tools;34.0.0" "ndk;27.1.12297006" > /dev/null
+
+      - name: Export NDK toolchain
+        run: |
+          NDK="$ANDROID_HOME/ndk/27.1.12297006"
+          test -d "$NDK/toolchains/llvm/prebuilt/linux-x86_64" || { echo "NDK 未安装"; exit 1; }
+          {
+            echo "NDK_HOME=$NDK"
+            echo "ANDROID_NDK_HOME=$NDK"
+            echo "JAVA_HOME=$JAVA_HOME"
+          } >> "$GITHUB_ENV"
+
+      # build.gradle.kts 从这四个环境变量读 release signingConfig；
+      # 未配置环境变量时会回退 debug 签名（仅可用于本地自测）。
+      - name: Decode release keystore
+        if: ${{ inputs.signed }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEY_ALIAS" ]; then
+            echo "::error::缺少 ANDROID_KEYSTORE_BASE64 / ANDROID_KEY_ALIAS 等 secrets"
+            exit 1
+          fi
+          KS="$GITHUB_WORKSPACE/src-tauri/gen/android/app/release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$KS"
+          test -s "$KS" || { echo "::error::keystore 解码失败"; exit 1; }
+          {
+            echo "ANDROID_KEYSTORE_FILE=$KS"
+            echo "ANDROID_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "ANDROID_KEY_ALIAS=$KEY_ALIAS"
+            echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Build Android artifacts
+        run: |
+          set -euo pipefail
+          TARGETS="${{ inputs.targets }}"
+          case "${{ inputs.artifacts }}" in
+            aab)
+              corepack yarn tauri android build --aab -t $TARGETS --ci
+              ;;
+            apk)
+              corepack yarn tauri android build --apk -t $TARGETS --ci
+              ;;
+            *)
+              # Tauri CLI 2.4.0 同时传 --apk --aab 时，第二次 Gradle 调用会
+              # 等一个不会建立的 CLI socket 并永久挂起。必须拆成两次调用。
+              corepack yarn tauri android build --apk -t $TARGETS --ci
+              corepack yarn tauri android build --aab -t $TARGETS --ci
+              ;;
+          esac
+
+      # jarsigner / keytool 对未签名 AAB 也会返回 0，只靠文字描述区分，
+      # 因此直接查 META-INF 里的 v1 签名块 + 证书 DN，跨 locale 才可靠。
+      - name: Verify AAB is signed with the release key
+        if: ${{ inputs.signed && inputs.artifacts != 'apk' }}
+        run: |
+          AAB=$(find src-tauri/gen/android/app/build/outputs -name '*.aab' | head -1)
+          if [ -z "$AAB" ]; then echo "::error::未生成 AAB"; exit 1; fi
+          unzip -l "$AAB" | grep -qE 'META-INF/.*\.(RSA|DSA|EC|SF)' || {
+            echo "::error::AAB 缺少签名块，Play 会拒绝；检查 ANDROID_KEYSTORE_* secrets"
+            exit 1
+          }
+          CERT=$(keytool -printcert -jarfile "$AAB" 2>&1)
+          if echo "$CERT" | grep -qiE 'Android Debug|CN=Android Debug'; then
+            echo "::error::AAB 仍是 debug 签名；检查 build.gradle.kts 的 release signingConfig"
+            exit 1
+          fi
+          echo "$CERT" | head -8
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p android-artifacts
+          find src-tauri/gen/android/app/build/outputs -type f \
+            \( -name '*.apk' -o -name '*.aab' \) -exec cp {} android-artifacts/ \;
+          ls -lh android-artifacts
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f src-tauri/gen/android/app/release.jks
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ github.run_id }}
+          path: android-artifacts/
+          if-no-files-found: error
+          retention-days: 14
