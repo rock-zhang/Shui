@@ -132,3 +132,86 @@
 button:focus {
   outline: none;
 }
+
+/* ---- Mobile baseline (scoped: does not change desktop rendering) ---- */
+.mobile-root {
+  height: 100dvh;
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+.mobile-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* Horizontal carousels: only X is scrollable here. `overflow-x: auto` would
+   otherwise compute overflow-y to `auto` too, and combined with the old
+   `overscroll-behavior-y: contain` it swallowed vertical swipes instead of
+   letting the parent tab scroll. */
+.mobile-scroll-x {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
+  touch-action: pan-x pan-y;
+}
+
+.mobile-tab-bar {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklch, var(--background) 88%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+/* Keep keyboard focus visible on mobile; the global rule above only targets mouse. */
+.mobile-root :focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.mobile-root input,
+.mobile-root textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* ---- 记录成功的就地反馈：卡片水位上涨 + ✓，进度环光晕扩散 ---- */
+@keyframes drink-wave {
+  0% { transform: translateY(100%); }
+  25% { transform: translateY(0); }
+  100% { transform: translateY(0); opacity: 0; }
+}
+
+@keyframes drink-done {
+  0% { opacity: 0; transform: scale(0.72) translateY(8px); }
+  22% { opacity: 1; transform: scale(1) translateY(0); }
+  75% { opacity: 1; transform: scale(1) translateY(0); }
+  100% { opacity: 0; transform: scale(0.96) translateY(-3px); }
+}
+
+@keyframes ring-pulse {
+  0% { transform: scale(0.94); opacity: 0.6; box-shadow: 0 0 0 0 rgb(56 189 248 / 45%); }
+  100% { transform: scale(1.08); opacity: 0; box-shadow: 0 0 0 16px rgb(56 189 248 / 0%); }
+}
+
+.drink-wave { animation: drink-wave 1.4s ease-out both; }
+.drink-done { animation: drink-done 1.4s ease-out both; }
+.ring-pulse { animation: ring-pulse 720ms ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-root *,
+  .mobile-root *::before,
+  .mobile-root *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  /* 成功反馈改为静态呈现，避免动画被压到 0.01ms 后直接消失。 */
+  .mobile-root .drink-wave { animation: none !important; opacity: 0.4 !important; }
+  .mobile-root .drink-done { animation: none !important; opacity: 1 !important; }
+  .mobile-root .ring-pulse { display: none !important; }
+}
