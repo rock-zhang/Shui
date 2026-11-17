@@ -17,6 +17,7 @@ use tokio::sync::mpsc;
 // 只保留 channel 相关的静态变量
 static REMINDER_PAGE_COUNTDOWN_SENDER: Mutex<Option<mpsc::Sender<()>>> = Mutex::new(None);
 
+#[cfg(not(target_os = "android"))]
 fn countdown_async(app_handle: tauri::AppHandle) {
     let token = reminder_session::current_id();
     // 取消之前的倒计时
@@ -90,7 +91,10 @@ pub async fn hide_reminder_windows(app_handle: tauri::AppHandle, outcome: Option
     if !reminder_session::close(&app_handle, expected_session.as_deref(), outcome.unwrap_or(Outcome::Skipped)) {
         return;
     }
+    #[cfg(not(target_os = "android"))]
     reset_timer();
+    #[cfg(target_os = "android")]
+    crate::mobile::reset_timer(app_handle.clone());
 
     // 取消之前的倒计时
     if let Some(sender) = REMINDER_PAGE_COUNTDOWN_SENDER.lock().unwrap().take() {
@@ -103,6 +107,8 @@ pub fn hide_reminder_window(app_handle: tauri::AppHandle, label: &str) {
     window::hide_reminder_window(&app_handle, &label);
 }
 
+// Android 下同名命令由 mobile.rs 提供（会顺带重建原生闹钟）。
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub fn reset_timer() {
     // 重置计时器
@@ -114,11 +120,13 @@ pub fn reset_timer() {
     });
 }
 
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub fn pause_timer() {
     IS_RUNNING.store(false, Ordering::SeqCst);
 }
 
+#[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub fn start_timer() {
     IS_RUNNING.store(true, Ordering::SeqCst);

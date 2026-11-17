@@ -4,6 +4,7 @@ use chrono::Local;
 use serde::{Deserialize, Serialize};
 use std::{sync::Mutex, time::Instant};
 use tauri::{AppHandle, Emitter};
+#[cfg(not(target_os = "android"))]
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
@@ -111,6 +112,7 @@ pub fn close(app: &AppHandle, expected: Option<&str>, outcome: Outcome) -> bool 
     // Never hold TRACKER while calling native window/shortcut APIs: these can
     // wait on the UI thread, which can itself be handling a session command.
     crate::core::window::hide_reminder_windows(app);
+    #[cfg(not(target_os = "android"))]
     let _ = app.global_shortcut().unregister("Esc");
     let _ = app.emit("reminder_already_hidden", ());
     let _ = app.emit("reminder-session-closed", closed);
@@ -166,7 +168,13 @@ pub async fn record_reminder_drink(
     amount: u64,
     session: String,
 ) -> Result<crate::drink_store::Receipt, String> {
-    confirm_with(&session, || {
+    let receipt = confirm_with(&session, || {
         crate::drink_store::save_drink(&app_handle, amount, &format!("reminder:{session}"))
-    })
+    })?;
+    // 全屏提醒里点「喝一杯」也是一次水量更新，同样重置下一杯时间。
+    #[cfg(target_os = "android")]
+    if receipt.added {
+        crate::mobile::reanchor_after_drink(&app_handle);
+    }
+    Ok(receipt)
 }

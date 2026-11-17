@@ -21,6 +21,7 @@ pub mod store_fields {
     pub const TIMEEND: &str = "timeEnd";
     pub const ISCOUNTDOWN: &str = "isCountDown";
     pub const ISFULLSCREEN: &str = "isFullScreen";
+    pub const ISPAUSED: &str = "isPaused";
 }
 
 #[derive(Debug, Clone, Serialize)] // 添加 Serialize
@@ -42,6 +43,11 @@ pub struct AppSettings {
     pub is_work_day: bool,
     pub is_in_time_range: bool,
     pub is_show_countdown: bool,
+    /// 「暂停提醒」：前后台都要停，前台 timer 也必须遵守。
+    pub is_paused: bool,
+    /// 「全屏提醒」：前台 timer 只为全屏页服务，关掉后不该继续跑——
+    /// 否则它到期会写提醒账本，把后台通知也一并抑制掉。
+    pub is_full_screen: bool,
     pub meta: AppSettingsMeta,
 }
 
@@ -179,6 +185,21 @@ impl AppSettings {
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
+        let is_paused = config_store
+            .get(config_store_category::GENERAL)
+            .and_then(|v| v.as_object().cloned())
+            .and_then(|obj| obj.get(store_fields::ISPAUSED).cloned())
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        // 旧版本升级上来的用户没有这个字段，默认开启全屏（与前端 store.ts 一致）。
+        let is_full_screen = config_store
+            .get(config_store_category::GENERAL)
+            .and_then(|v| v.as_object().cloned())
+            .and_then(|obj| obj.get(store_fields::ISFULLSCREEN).cloned())
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
+
         AppSettings {
             gold: gold,
             gap: gap_minutes * 60,
@@ -187,6 +208,8 @@ impl AppSettings {
             is_work_day: is_work_day,
             is_in_time_range: is_in_time_range,
             is_show_countdown: is_show_countdown,
+            is_paused: is_paused,
+            is_full_screen: is_full_screen,
             meta: AppSettingsMeta {
                 weekdays,
                 current_time,
@@ -199,7 +222,10 @@ impl AppSettings {
     }
 
     pub fn should_run_timer(&self) -> bool {
-        self.is_work_day && self.is_in_time_range && self.today_drink_amount < self.gold
+        !self.is_paused
+            && self.is_work_day
+            && self.is_in_time_range
+            && self.today_drink_amount < self.gold
     }
 
     pub fn get_status_message(&self) -> (&str, &str) {
@@ -213,8 +239,65 @@ impl AppSettings {
 
 #[cfg(test)]
 mod tests {
-    use super::drink_amount_from_value;
+    use super::{drink_amount_from_value, AppSettings, AppSettingsMeta};
+    use chrono::NaiveTime;
     use serde_json::json;
+
+    /// 造一份「本该跑计时器」的设置，便于单个条件逐个放开验证。
+    fn running_settings() -> AppSettings {
+        let time = NaiveTime::from_hms_opt(10, 0, 0).unwrap();
+        AppSettings {
+            gold: 1500,
+            gap: 1800,
+            whitelist_apps: vec![],
+            today_drink_amount: 200,
+            is_work_day: true,
+            is_in_time_range: true,
+            is_show_countdown: true,
+            is_paused: false,
+            is_full_screen: true,
+            meta: AppSettingsMeta {
+                weekdays: vec![1, 2, 3, 4, 5],
+                current_time: time,
+                time_start: time,
+                time_end: time,
+                today_weekday: 1,
+                gap_minutes: 30,
+            },
+        }
+    }
+
+    #[test]
+    fn timer_pauses_when_user_pauses_reminders() {
+        assert!(running_settings().should_run_timer());
+        // 暂停提醒是前后台共用的开关，前台 timer 也必须停。
+        let paused = AppSettings {
+            is_paused: true,
+            ..running_settings()
+        };
+        assert!(!paused.should_run_timer());
+    }
+
+    #[test]
+    fn timer_stops_outside_work_hours_or_after_goal() {
+        let off_day = AppSettings {
+            is_work_day: false,
+            ..running_settings()
+        };
+        assert!(!off_day.should_run_timer());
+
+        let out_of_range = AppSettings {
+            is_in_time_range: false,
+            ..running_settings()
+        };
+        assert!(!out_of_range.should_run_timer());
+
+        let goal_met = AppSettings {
+            today_drink_amount: 1500,
+            ..running_settings()
+        };
+        assert!(!goal_met.should_run_timer());
+    }
 
     #[test]
     fn reads_legacy_numeric_drink_amount() {
