@@ -19,6 +19,11 @@ pub fn is_frontapp_in_whitelist(whitelist_apps: &Vec<String>) -> bool {
         return check_whitelist(whitelist_apps);
     }
 
+    // 白名单只在 macOS 实现了前台应用识别；Windows / Linux 走提醒前置检查时
+    // 恒返回 false，即不因白名单抑制提醒。
+    #[cfg(not(target_os = "macos"))]
+    let _ = whitelist_apps;
+
     false
 }
 

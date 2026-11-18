@@ -52,7 +52,10 @@ tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 tauri-plugin-drag = "2"
 tauri-plugin-macos-permissions = "2"
-winapi = { version = "0.3", features = [ "wtsapi32", "winuser", "winbase", "libloaderapi", "winnt", "powersetting"] }
+# impl-default 不可省：core/setup/windows.rs 用 MSG::default() 初始化消息结构，
+# 该 impl 由 winapi 的 `impl-default` feature 门控。过去它是由已删除的
+# tauri-plugin-sql（sqlx 链路）间接启用的，改成显式声明，避免再次被连带移除。
+winapi = { version = "0.3", features = [ "impl-default", "wtsapi32", "winuser", "winbase", "libloaderapi", "winnt", "powersetting"] }
 widestring = "1.0"
 windows = { version = "0.48", features = [
     "Win32_Foundation",

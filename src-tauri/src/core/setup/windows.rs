@@ -14,11 +14,10 @@ use winapi::{
             MSG, PBT_POWERSETTINGCHANGE, POWERBROADCAST_SETTING, WM_DESTROY, WM_POWERBROADCAST,
             WM_WTSSESSION_CHANGE, WNDCLASSEXW, WS_EX_OVERLAPPEDWINDOW,
         },
-        wtsapi32::*,
     },
 };
 // use windows::Win32::Foundation::HWND;
-use chrono::{Datelike, Local, NaiveTime};
+use chrono::Local;
 // use winapi::um::wtsapi32::{WTS_SESSION_LOCK, WTS_SESSION_UNLOCK};
 use crate::timer::IS_RUNNING;
 use std::sync::atomic::Ordering;
