@@ -117,22 +117,30 @@ jobs:
             echo "ANDROID_KEY_PASSWORD=$KEY_PASSWORD"
           } >> "$GITHUB_ENV"
 
+      # 前端只构建一次：tauri.conf.json 的 beforeBuildCommand 是 yarn build，
+      # 而 APK / AAB 必须拆成两次 tauri 调用（见下），若各自触发一次 next build，
+      # 第二次撞 webpack 缓存会崩 WasmHash._updateWithBuffer / undefined.length。
+      - name: Build frontend once
+        run: corepack yarn build
+
       - name: Build Android artifacts
         run: |
           set -euo pipefail
           TARGETS="${{ env.ANDROID_TARGETS }}"
+          # 用内联 config 关掉 beforeBuildCommand，直接复用上一步生成的 dist。
+          SKIP_BUILD='{"build":{"beforeBuildCommand":""}}'
           case "${{ env.ANDROID_ARTIFACTS }}" in
             aab)
-              corepack yarn tauri android build --aab -t $TARGETS --ci
+              corepack yarn tauri android build --aab -t $TARGETS --ci -c "$SKIP_BUILD"
               ;;
             apk)
-              corepack yarn tauri android build --apk -t $TARGETS --ci
+              corepack yarn tauri android build --apk -t $TARGETS --ci -c "$SKIP_BUILD"
               ;;
             *)
               # Tauri CLI 2.4.0 同时传 --apk --aab 时，第二次 Gradle 调用会
               # 等一个不会建立的 CLI socket 并永久挂起。必须拆成两次调用。
-              corepack yarn tauri android build --apk -t $TARGETS --ci
-              corepack yarn tauri android build --aab -t $TARGETS --ci
+              corepack yarn tauri android build --apk -t $TARGETS --ci -c "$SKIP_BUILD"
+              corepack yarn tauri android build --aab -t $TARGETS --ci -c "$SKIP_BUILD"
               ;;
           esac
 
