@@ -84,7 +84,8 @@ jobs:
           tail -80 cargo-test.log || true
           echo "===== 关键行 ====="
           grep -aE "FAILED|panicked at|assertion|error\[E[0-9]+\]|could not compile|^error:" cargo-test.log | head -40 || true
-          grep -aE "^(test .* FAILED|error:)" cargo-test.log | head -15 | sed 's/^/::error::/' || true
+          grep -aE "^(test .* FAILED|error)" cargo-test.log | head -15 | sed 's/^/::error::/' || true
+          grep -a -A 6 -E "^error(\[|:)" cargo-test.log | head -50 | sed 's/^/::error::/' || true
       - name: Build the default application
         run: cargo build --workspace --locked --features tauri/custom-protocol
       - name: Native startup smoke (macOS / Windows)
