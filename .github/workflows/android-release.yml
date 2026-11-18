@@ -1,8 +1,12 @@
 name: Android package
 
-# 与桌面发布流程解耦：tag v* 由 publish.yaml 负责，这里单独手动触发打
-# APK / AAB，避免没配置 Android keystore 时把整个 Release 流程带崩。
+# tag v* 与桌面 publish.yaml 并行触发：推一次 tag，桌面 7 个产物 + Android
+# APK/AAB 全部产出。两个流程彼此独立，Android 构建失败不会拖垮桌面发布。
+# 手动触发保留，用于补跑或本地自测（产物只进 Actions artifact，不上 Release）。
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       artifacts:
@@ -24,9 +28,14 @@ on:
         required: true
         default: true
         type: boolean
+      release_tag:
+        description: "手动补跑时把产物上传到哪个 Release tag；留空则只进 Actions artifact"
+        required: false
+        default: ""
+        type: string
 
 permissions:
-  contents: read
+  contents: write # 上传 APK / AAB 到版本 Release
 
 concurrency:
   group: android-package-${{ github.ref }}
@@ -40,6 +49,11 @@ jobs:
     # secrets。secrets 放到该环境下（同名）时优先于仓库级 secrets。
     environment: production
     timeout-minutes: 90
+    # push.tags 触发时 inputs 全为空，这里补默认值；手动触发时沿用输入。
+    env:
+      ANDROID_ARTIFACTS: ${{ github.event_name == 'push' && 'both' || inputs.artifacts }}
+      ANDROID_TARGETS: ${{ github.event_name == 'push' && 'aarch64' || inputs.targets }}
+      ANDROID_SIGNED: ${{ github.event_name == 'push' || inputs.signed }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -82,7 +96,7 @@ jobs:
       # build.gradle.kts 从这四个环境变量读 release signingConfig；
       # 未配置环境变量时会回退 debug 签名（仅可用于本地自测）。
       - name: Decode release keystore
-        if: ${{ inputs.signed }}
+        if: ${{ env.ANDROID_SIGNED == 'true' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -106,8 +120,8 @@ jobs:
       - name: Build Android artifacts
         run: |
           set -euo pipefail
-          TARGETS="${{ inputs.targets }}"
-          case "${{ inputs.artifacts }}" in
+          TARGETS="${{ env.ANDROID_TARGETS }}"
+          case "${{ env.ANDROID_ARTIFACTS }}" in
             aab)
               corepack yarn tauri android build --aab -t $TARGETS --ci
               ;;
@@ -125,7 +139,7 @@ jobs:
       # jarsigner / keytool 对未签名 AAB 也会返回 0，只靠文字描述区分，
       # 因此直接查 META-INF 里的 v1 签名块 + 证书 DN，跨 locale 才可靠。
       - name: Verify AAB is signed with the release key
-        if: ${{ inputs.signed && inputs.artifacts != 'apk' }}
+        if: ${{ env.ANDROID_SIGNED == 'true' && env.ANDROID_ARTIFACTS != 'apk' }}
         run: |
           AAB=$(find src-tauri/gen/android/app/build/outputs -name '*.aab' | head -1)
           if [ -z "$AAB" ]; then echo "::error::未生成 AAB"; exit 1; fi
@@ -157,3 +171,21 @@ jobs:
           path: android-artifacts/
           if-no-files-found: error
           retention-days: 14
+
+      # 只在 tag 触发时挂到版本 Release（draft 也可上传）。
+      # publish.yaml 的 updater.mjs 按 .sig / 安装包名过滤，APK / AAB
+      # 不会混进 latest.json 的桌面更新清单。
+      - name: Upload to GitHub Release
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_TAG: ${{ inputs.release_tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          TAG="${TARGET_TAG}"
+          echo "target release: $TAG"
+          for f in android-artifacts/*; do
+            [ -f "$f" ] || continue
+            echo "uploading $(basename "$f") -> $TAG"
+            gh release upload "$TAG" "$f" --clobber --repo "$GITHUB_REPOSITORY"
+          done
