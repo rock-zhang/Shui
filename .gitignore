@@ -25,6 +25,7 @@ __pycache__/
 
 # WorkBuddy project data
 /.workbuddy/
+/.trae-html-share-packages/
 
 # Android 端单独文档
 README-ANDROID.md

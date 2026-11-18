@@ -509,7 +509,6 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
-
     /**
      * 真机诊断：一次性返回所有决定「提醒能否准时到达」的原生状态。
      * App 内拿不到系统对闹钟的具体 adjustment（那是 dumpsys alarm 的内部字段），

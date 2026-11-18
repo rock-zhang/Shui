@@ -1,13 +1,12 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   BellRing,
   Check,
   CheckCircle2,
   ChevronRight,
-  Power,
   Settings,
   Timer,
   X,
@@ -17,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { emitRefresh, readNotificationHealth, type NotificationHealth } from "@/lib/mobile";
 import { romFromHealth, romProfile, type RomProfile } from "@/lib/rom";
 import { useNotificationPermission } from "./notification-permission-context";
+import { BackgroundGuideCards } from "./background-guide-cards";
 
 /**
  * 国产 ROM「通知三步引导」。
@@ -349,6 +349,8 @@ export function NotificationSetupGuide() {
   const [pending, setPending] = useState(false);
   // 系统名与私有开关叫法随 ROM 变，文案不能写死某一个品牌。
   const [rom, setRom] = useState<RomProfile>(() => romProfile());
+  // 检测守卫或用户手动唤起过：本次挂载内不要再让首启逻辑改 step。
+  const manualOpenRef = useRef(false);
 
   useEffect(() => {
     let alive = true;
@@ -374,6 +376,8 @@ export function NotificationSetupGuide() {
        * 用户眼前。第 1 步本来就是「允许通知」，能自己处理未授权状态。
        */
       if (profile.domestic) {
+        // 已经由检测守卫（或用户手动）打开过的话，别把 step 覆盖回首启进度。
+        if (manualOpenRef.current) return;
         setStep(readStep());
         setVisible(true);
       }
@@ -387,6 +391,7 @@ export function NotificationSetupGuide() {
   // 这里刻意不看 readSeen()，用户主动点进来就是要看，不能因为之前点过「稍后」就拒绝打开。
   useEffect(() => {
     const open = (event: Event) => {
+      manualOpenRef.current = true;
       const requested = (event as CustomEvent<{ step?: number }>).detail?.step;
       const next: Step = requested === 2 ? 2 : requested === 1 ? 1 : 0;
       setStep(next);
@@ -544,7 +549,7 @@ export function NotificationSetupGuide() {
             {step === 1 && (
               <>
                 <StepHeading title="打开 4 个开关">
-                  国产系统（OPPO / 小米 / vivo / 华为等）默认全部关闭。不打开的话，
+                  国产系统（OPPO / 小米 / vivo / 华为等）多数默认关闭。不打开的话，
                   到点只会静静躺在通知栏里——
                   <span className="font-medium text-foreground">
                     不弹窗、不响、不震
@@ -564,51 +569,18 @@ export function NotificationSetupGuide() {
             {step === 2 && (
               <>
                 <StepHeading title="让后台也能准时提醒">
-                  这一步决定「从多任务划掉 App 后还收不收得到」。
+                  两项都要开：只开自启动，锁屏后仍会被系统冻结。
                   <span className="font-medium text-foreground">
-                    第一项不打开，基本就收不到任何提醒
+                    两项都关时，基本收不到任何提醒
                   </span>
-                  。即使打开了，也建议给 Shui 加锁：划掉卡片时系统会连排好的闹钟一起删掉。
+                  。
                 </StepHeading>
 
-                {/* 必开项：视觉上必须压过其余两项，它是「收不到」的头号原因 */}
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => void openSetting("open_autostart_settings")}
-                  className={cn(
-                    "mt-3.5 flex w-full items-start gap-2.5 rounded-2xl border-2 border-amber-500/65 bg-amber-500/[0.09] p-3 text-left",
-                    "transition-all duration-150 hover:border-amber-500 hover:bg-amber-500/[0.13] active:scale-[0.99] disabled:opacity-60"
-                  )}
-                >
-                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
-                    <Power className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-1.5">
-                      <span className="text-[14px] font-semibold text-amber-800 dark:text-amber-200">
-                        后台运行 / 自启动
-                      </span>
-                      <span className="rounded bg-amber-500 px-1.5 py-px text-[9px] font-bold leading-4 text-white dark:text-amber-950">
-                        必开
-                      </span>
-                    </span>
-                    <span className="mt-1 block text-[12px] leading-[18px] text-amber-800/85 dark:text-amber-200/75">
-                      不开这一项，划掉 App 后闹钟会被系统一起清掉，锁屏也不会有任何提醒。
-                    </span>
-                    <span className="mt-1.5 flex flex-wrap gap-1">
-                      {["允许自启动", "允许后台活动", "允许后台运行"].map((alias) => (
-                        <span
-                          key={alias}
-                          className="rounded-md bg-amber-500/12 px-1.5 py-0.5 text-[10px] leading-4 text-amber-700/90 dark:text-amber-300/80"
-                        >
-                          {alias}
-                        </span>
-                      ))}
-                    </span>
-                  </span>
-                  <ChevronRight className="mt-1.5 h-4 w-4 shrink-0 text-amber-600/60 dark:text-amber-400/60" />
-                </button>
+                {/* 与漏提醒弹窗共用同一套分步引导：同样的路径、同样的跳转。
+                    厂商开关读不到状态，每次出现都只请用户按路径检查。 */}
+                <div className="mt-3.5">
+                  <BackgroundGuideCards rom={rom} />
+                </div>
 
                 <div className="mt-2 space-y-1.5">
                   <button

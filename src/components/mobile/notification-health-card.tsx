@@ -297,7 +297,8 @@ export function NotificationHealthCard() {
     );
   }
 
-  const isDomesticRom = romFromHealth(health).domestic;
+  const rom = romFromHealth(health);
+  const isDomesticRom = rom.domestic;
 
   /**
    * 渠道层是否自洽（不代表一定能弹横幅，见组件注释）。
@@ -485,18 +486,18 @@ export function NotificationHealthCard() {
           <span className="min-w-0 flex-1 text-xs leading-5">
             <span className="flex items-center gap-1.5">
               <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">
-                后台运行 / 自启动
+                自启动 + 完全后台行为
               </span>
               <span className="rounded bg-amber-500 px-1.5 py-px text-[9px] font-bold leading-4 text-white dark:text-amber-950">
                 必开
               </span>
             </span>
-            <span className="mt-0.5 block text-amber-700/90 dark:text-amber-300/80">
-              不开这一项，从多任务划掉 App 后闹钟会被系统一起清掉，锁屏也不会有任何提醒。
-              国产系统新装默认就是关闭的。
+            {/* 厂商开关没有公开 API，状态读不到，所以每次都请用户按路径检查。 */}
+            <span className="mt-1 block text-xs leading-4 text-muted-foreground">
+              系统读不到这两项的状态，需要你按路径检查一下。
             </span>
-            <span className="mt-0.5 block text-[10px] leading-4 text-muted-foreground">
-              叫法：「允许自启动」「允许后台活动」「允许后台运行」
+            <span className="mt-0.5 block text-amber-700/90 dark:text-amber-300/80">
+              两项都要开，否则划掉 App 后闹钟会被一起清掉。
             </span>
           </span>
         </p>
@@ -505,10 +506,12 @@ export function NotificationHealthCard() {
           className="mt-2 w-full min-h-9 bg-amber-500 text-white shadow-none hover:bg-amber-600 dark:text-amber-950"
           disabled={busy !== null}
           onClick={() =>
-            void run("open_autostart_settings", "找到 Shui，把「允许自启动 / 后台运行」打开")
+            window.dispatchEvent(
+              new CustomEvent(OPEN_GUIDE_EVENT, { detail: { step: 2 } })
+            )
           }
         >
-          去开启后台运行
+          去检查后台设置
         </Button>
       </div>
 
