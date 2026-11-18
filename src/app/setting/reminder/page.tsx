@@ -70,6 +70,15 @@ export default function Home() {
         timeStart: string;
         timeEnd: string;
       }>("alert");
+      // 正式包的 gapList 不含 1 分钟测试档。旧 debug 配置若残留 gap="1"，
+      // 下拉会显示空白、原生仍按 1 分钟提醒；归一到合法值并写回。
+      if (val?.gap && !gapList.includes(val.gap)) {
+        const normalized = { ...val, gap: "20" };
+        await store.set("alert", normalized);
+        await store.save();
+        setConfig({ ...config, ...normalized });
+        return;
+      }
       setConfig({
         ...config,
         ...val,

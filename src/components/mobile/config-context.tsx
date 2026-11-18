@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import {
   DEFAULT_ALERT,
   DEFAULT_GENERAL,
+  GAP_OPTIONS,
   readConfig,
   rescheduleReminders,
   syncReminderConfig,
@@ -79,8 +80,20 @@ export function MobileConfigProvider({ children }: { children: ReactNode }) {
       readConfig<AlertConfig>("alert", DEFAULT_ALERT),
       readConfig<GeneralConfig>("general", DEFAULT_GENERAL),
     ])
-      .then(([alertConfig, generalConfig]) => {
+      .then(([loadedAlert, generalConfig]) => {
         if (cancelled) return;
+        // release 包不再提供 1 分钟测试档。旧 debug 包可能把它写进了 store，
+        // 若继续沿用，界面上没有任何选项匹配、原生侧也会按 1 分钟疯狂提醒。
+        // 归一到默认值并写回，让前后端口径重新一致。
+        const gapValid = GAP_OPTIONS.includes(loadedAlert.gap);
+        const alertConfig = gapValid
+          ? loadedAlert
+          : { ...loadedAlert, gap: DEFAULT_ALERT.gap };
+        if (!gapValid) {
+          void writeConfig("alert", alertConfig).catch((error) =>
+            console.error("归一化提醒间隔失败", error)
+          );
+        }
         alertRef.current = alertConfig;
         generalRef.current = generalConfig;
         setAlert(alertConfig);

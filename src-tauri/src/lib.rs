@@ -18,6 +18,23 @@ mod mobile;
 #[cfg(feature = "native-smoke")]
 mod native_smoke;
 
+/// 在页面脚本执行前注入构建档位，供前端决定是否显示「1 分钟」测试档。
+///
+/// 前端是同一份 `next build` 静态产物（NODE_ENV 恒为 production），无法自行
+/// 区分 Android debug / release APK；只有 Rust 侧的 `cfg!(debug_assertions)`
+/// 随编译档位变化：`tauri android dev` / `cargo build` 为 true（debug 包），
+/// `tauri android build` 的 release 包为 false。桌面端沿用同一来源，语义一致。
+fn debug_build_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    let enabled = cfg!(debug_assertions);
+    // 幂等赋值：部分 WebView 在导航时可能重复注入初始化脚本，直接
+    // defineProperty(configurable:false) 会在第二次抛错，故先判空再赋值。
+    tauri::plugin::Builder::new("shui-debug-build")
+        .js_init_script(format!(
+            "if (typeof window.__SHUI_DEBUG_BUILD__ === 'undefined') {{ window.__SHUI_DEBUG_BUILD__ = {enabled}; }}"
+        ))
+        .build()
+}
+
 #[cfg(not(target_os = "android"))]
 use crate::core::setup;
 #[cfg(not(target_os = "android"))]
@@ -45,6 +62,7 @@ pub fn run() {
 
     // 桌面与移动端共用：数据存储、通知、对话框、外部打开、剪贴板、系统信息。
     builder = builder
+        .plugin(debug_build_plugin())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())

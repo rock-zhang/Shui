@@ -94,9 +94,33 @@ export const GOLD_OPTIONS = [
   "3500",
   "4000",
 ];
+
+/**
+ * 是否为 debug 构建。Rust 在页面脚本执行前注入 `__SHUI_DEBUG_BUILD__`：
+ * debug 包（tauri dev / debug APK）为 true，release APK 为 false。
+ * 浏览器预览没有原生注入，回退到 NODE_ENV（dev 可见、build 不可见），
+ * 与桌面端设置页保持同一口径。
+ */
+export function isDebugBuild(): boolean {
+  if (typeof window === "undefined") {
+    return process.env.NODE_ENV === "development";
+  }
+  const flag = (
+    window as unknown as { __SHUI_DEBUG_BUILD__?: boolean }
+  ).__SHUI_DEBUG_BUILD__;
+  if (typeof flag === "boolean") {
+    return flag;
+  }
+  return process.env.NODE_ENV === "development";
+}
+
+const BASE_GAP_OPTIONS = ["10", "20", "30", "45", "60"];
 // "1" 分钟是测试档：原生侧（Rust 前台 timer 与 Kotlin 闹钟）会识别 gap==1
 // 并绕过提醒时段/工作日限制，方便随时验证通知链路，不必等到工作时段。
-export const GAP_OPTIONS = ["1", "10", "20", "30", "45", "60"];
+// 只在 debug 构建暴露；release APK 与正式桌面包不显示，避免用户误选。
+export const GAP_OPTIONS = isDebugBuild()
+  ? ["1", ...BASE_GAP_OPTIONS]
+  : BASE_GAP_OPTIONS;
 export const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
 
 export const TIME_LIST = [
