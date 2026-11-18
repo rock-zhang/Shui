@@ -190,6 +190,9 @@ pub struct DesktopNotificationState {
 /// `tauri-plugin-notification` 的 isPermissionGranted 在桌面端又恒为 true；
 /// Electron 生态（macos-notification-state / ncprefs.py）同样读这一位。
 ///
+/// 这条路径现在只用于 dev：正式运行时改用 `user_notification_authorization`。
+/// 实测 macOS 27 上 ncprefs 不再随授权变化更新，用户开了权限也不会新增条目。
+///
 /// 返回 None 表示还没有该 App 的记录：可能尚未发过通知，也可能系统还没写入。
 #[cfg(target_os = "macos")]
 fn ncprefs_notifications_allowed(bundle_id: &str) -> Option<bool> {
@@ -249,15 +252,148 @@ fn ncprefs_notifications_allowed(bundle_id: &str) -> Option<bool> {
     }
 }
 
+/// 读取 ncprefs 记录，映射成对外状态；拿不到记录就算 unknown。
+#[cfg(target_os = "macos")]
+fn ncprefs_status(bundle_id: &str) -> &'static str {
+    match ncprefs_notifications_allowed(bundle_id) {
+        Some(true) => "granted",
+        Some(false) => "denied",
+        None => "unknown",
+    }
+}
+
+/// 提前加载 UserNotifications，保证 `Class::get` 能查到 UNUserNotificationCenter。
+#[cfg(target_os = "macos")]
+#[link(name = "UserNotifications", kind = "framework")]
+extern "C" {}
+
+/// 用官方 UserNotifications 读取本 App 的通知授权状态。
+///
+/// 这是系统设置「通知 → Shui」那个开关的真正数据源；`com.apple.ncprefs`
+/// 的 `apps` 数组在 macOS 27 上已经不再随授权更新（开了权限也不会新增条目）。
+/// 返回值是 `UNAuthorizationStatus` 原始值：
+/// 0 未决定 / 1 拒绝 / 2 允许 / 3 临时允许 / 4 临时允许（App Clip）。
+///
+/// 只能在正式的 .app 进程里调用：dev 下进程由 Terminal 拉起、没有自己的 bundle，
+/// `currentNotificationCenter` 会直接抛 ObjC 异常把进程带崩。
+#[cfg(target_os = "macos")]
+fn user_notification_authorization() -> Option<i64> {
+    use block::ConcreteBlock;
+    use objc::runtime::{Class, Object};
+    use objc::{msg_send, sel, sel_impl};
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    unsafe {
+        let class = Class::get("UNUserNotificationCenter")?;
+        let center: *mut Object = msg_send![class, currentNotificationCenter];
+        if center.is_null() {
+            return None;
+        }
+
+        let (sender, receiver) = mpsc::channel();
+        let completion = ConcreteBlock::new(move |settings: *mut Object| {
+            let status: i64 = if settings.is_null() {
+                -1
+            } else {
+                msg_send![settings, authorizationStatus]
+            };
+            let _ = sender.send(status);
+        })
+        .copy();
+        let _: () =
+            msg_send![center, getNotificationSettingsWithCompletionHandler: &*completion];
+
+        // 回调是毫秒级；超过 2 秒就当作读不到，让调用方退回 ncprefs。
+        match receiver.recv_timeout(Duration::from_secs(2)) {
+            Ok(status) if status >= 0 => Some(status),
+            _ => None,
+        }
+    }
+}
+
+/// Windows 的通知开关记在注册表里（HKCU）：
+/// - 全局：`...\PushNotifications` 的 `ToastEnabled`，0 表示所有 toast 都被关掉；
+/// - 单个 App：`...\Notifications\Settings\<AUMID>` 的 `Enabled`，0 表示该 App 被关闭。
+///
+/// 两者都是 DWORD，键不存在说明系统还没写过这项设置（默认允许），返回 None。
+#[cfg(windows)]
+fn registry_dword(path: &str, name: &str) -> Option<u32> {
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::ERROR_SUCCESS;
+    use windows::Win32::System::Registry::{
+        RegCloseKey, RegOpenKeyExW, RegQueryValueExW, HKEY, HKEY_CURRENT_USER, KEY_READ,
+        REG_DWORD,
+    };
+
+    fn wide(value: &str) -> Vec<u16> {
+        value.encode_utf16().chain(std::iter::once(0)).collect()
+    }
+
+    let path = wide(path);
+    let name = wide(name);
+    let mut key = HKEY::default();
+    unsafe {
+        if RegOpenKeyExW(HKEY_CURRENT_USER, PCWSTR(path.as_ptr()), 0, KEY_READ, &mut key)
+            != ERROR_SUCCESS
+        {
+            return None;
+        }
+        let mut kind = REG_DWORD;
+        let mut data = 0u32;
+        let mut size = std::mem::size_of::<u32>() as u32;
+        let result = RegQueryValueExW(
+            key,
+            PCWSTR(name.as_ptr()),
+            None,
+            Some(&mut kind),
+            Some(&mut data as *mut u32 as *mut u8),
+            Some(&mut size),
+        );
+        let _ = RegCloseKey(key);
+        if result == ERROR_SUCCESS && kind == REG_DWORD && size >= 4 {
+            Some(data)
+        } else {
+            None
+        }
+    }
+}
+
+/// 读 Windows 的通知授权：先看全局总开关，再看当前 AUMID 自己的开关。
+///
+/// 注意 dev 构建不注册 AUMID（见 `send_desktop_reminder_notification`），
+/// 此时通常查不到本 App 的注册表项，会落到 unknown。
+#[cfg(windows)]
+fn windows_notification_status(identifier: &str) -> &'static str {
+    const PUSH_NOTIFICATIONS: &str =
+        r"Software\Microsoft\Windows\CurrentVersion\PushNotifications";
+
+    if registry_dword(PUSH_NOTIFICATIONS, "ToastEnabled") == Some(0) {
+        return "denied";
+    }
+    let app_key =
+        format!(r"Software\Microsoft\Windows\CurrentVersion\Notifications\Settings\{identifier}");
+    match registry_dword(&app_key, "Enabled") {
+        Some(0) => "denied",
+        Some(_) => "granted",
+        None => "unknown",
+    }
+}
+
 /// 读取系统通知授权状态，并给出直达本应用通知设置页的 URL。
 fn notification_state(app: &AppHandle) -> DesktopNotificationState {
     #[cfg(target_os = "macos")]
     {
         let bundle_id = notification_owner(app);
-        let status = match ncprefs_notifications_allowed(&bundle_id) {
-            Some(true) => "granted",
-            Some(false) => "denied",
-            None => "unknown",
+        let status = if tauri::is_dev() {
+            ncprefs_status(&bundle_id)
+        } else {
+            match user_notification_authorization() {
+                Some(2) | Some(3) | Some(4) => "granted",
+                Some(1) => "denied",
+                Some(0) => "unknown",
+                _ => ncprefs_status(&bundle_id),
+            }
         };
         // macOS 13 起「通知」搬进了设置扩展，旧的 preference pane 不存在；
         // ?id= 是设置页用来定位具体 App 的未公开参数。
@@ -287,9 +423,10 @@ fn notification_state(app: &AppHandle) -> DesktopNotificationState {
 
     #[cfg(windows)]
     {
+        let identifier = app.config().identifier.clone();
         DesktopNotificationState {
-            status: "unknown".to_string(),
-            bundle_id: app.config().identifier.clone(),
+            status: windows_notification_status(&identifier).to_string(),
+            bundle_id: identifier,
             settings_url: "ms-settings:notifications".to_string(),
         }
     }

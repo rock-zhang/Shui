@@ -3,7 +3,7 @@
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, ExternalLink } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { load } from "@tauri-apps/plugin-store";
 import { useTray } from "@/hooks/use-tray";
 import { isEnabled, disable } from "@tauri-apps/plugin-autostart";
@@ -39,11 +39,11 @@ export default function Home() {
     isCountDown: false,
     isFullScreen: false, // 新增全屏提醒选项
   });
-  const { isWindows, isMacOS } = usePlatform();
+  const { isWindows, isMacOS, isMobile, isTauri } = usePlatform();
 
   // 全屏提醒关闭后能否收到提醒，取决于系统设置里有没有给 Shui 授权。
-  // macOS 走原生读取授权状态（见 refreshNotificationStatus），打开设置时
-  // 由 Rust 侧拼好带 bundle id 的深链；其他平台只给设置页入口。
+  // 桌面端由 Rust 读取真实状态（macOS 走 UserNotifications，Windows 读注册表，
+  // Linux 无统一接口只能 unknown），打开设置时也由 Rust 拼好深链。
   const goToNotificationSettings = async () => {
     try {
       await openNotificationSettings();
@@ -60,10 +60,10 @@ export default function Home() {
   const [notificationStatus, setNotificationStatus] =
     useState<DesktopNotificationStatus | null>(null);
 
-  // macOS 能读到真实授权状态；用户从系统设置切回来时窗口会重新聚焦，
-  // 这时再读一次，不必关掉设置页重开。
+  // 用户从系统设置切回来时窗口会重新聚焦，这时再读一次，
+  // 不必关掉设置页重开。移动端与浏览器预览没有这条命令。
   const refreshNotificationStatus = useCallback(async () => {
-    if (!isMacOS) return;
+    if (!isTauri || isMobile) return;
     try {
       const state = await getDesktopNotificationState();
       setNotificationStatus(state.status);
@@ -71,7 +71,7 @@ export default function Home() {
       console.warn("读取系统通知授权状态失败", error);
       setNotificationStatus(null);
     }
-  }, [isMacOS]);
+  }, [isTauri, isMobile]);
 
   useEffect(() => {
     void refreshNotificationStatus();
@@ -160,10 +160,9 @@ export default function Home() {
           tone: "border-amber-500/40 bg-amber-50 dark:bg-amber-950/20",
           icon: "text-amber-600 dark:text-amber-400",
           title: "text-amber-800 dark:text-amber-300",
-          titleText: isMacOS ? "未检测到通知授权记录" : "系统通知可能不可达",
-          description: isMacOS
-            ? "还没在系统设置里读到 Shui 的授权记录。若未允许通知，倒计时结束后你将收不到任何提醒。"
-            : "当前使用系统通知提醒。若系统设置中未允许 Shui 发送通知，倒计时结束后你将收不到任何提醒。请在下方开启权限后，再等待下一次提醒验证。",
+          titleText: "系统通知可能不可达",
+          description:
+            "当前使用系统通知提醒。若系统设置中未允许 Shui 发送通知，倒计时结束后你将收不到任何提醒。请在下方开启权限后，再等待下一次提醒验证。",
         };
 
   return (

@@ -16,9 +16,9 @@ __pycache__/
 /artifacts/
 /.next/
 # Next 在已有 .next 上重建会崩（WasmHash），现场习惯改名为 .next.bak-<ts> 保留
-/.next.bak*/
+/.next.bak-*/
 # 同理，重建前端时把旧 dist 改名留档
-/dist.bak*/
+/dist.bak-*/
 
 # TypeScript incremental build
 *.tsbuildinfo

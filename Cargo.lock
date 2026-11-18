@@ -4065,6 +4065,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 name = "shui"
 version = "0.4.1"
 dependencies = [
+ "block",
  "chrono",
  "core-foundation 0.9.4",
  "core-graphics 0.23.2",

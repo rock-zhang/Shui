@@ -82,6 +82,7 @@ core-foundation = "0.9.4"
 core-graphics = "0.23.1"
 objc = "0.2.7"          # Objective-C 运行时绑定
 objc-foundation = "0.1" # Foundation 框架支持
+block = "0.1"           # 把 Rust 闭包包成 ObjC block，用于 UserNotifications 的回调
 
 [target.'cfg(target_os = "linux")'.dependencies]
 dbus = "0.9.7"

@@ -54,8 +54,9 @@ export interface DesktopNotificationState {
 /**
  * 读取桌面端系统通知的授权状态与设置页深链。
  *
- * macOS 的状态来自 `com.apple.ncprefs` 的 flags 位图（系统设置本身就用它）；
- * Windows / Linux 没有可靠的公开查询，返回 unknown，只给设置页地址。
+ * macOS 正式包走 UserNotifications 的 getNotificationSettings，dev 下退回
+ * `com.apple.ncprefs` 里 Terminal 的记录；Windows 读注册表的全局开关与
+ * AUMID 开关；Linux 没有统一接口，恒为 unknown。
  */
 export const getDesktopNotificationState = () =>
   invoke<DesktopNotificationState>("get_desktop_notification_state");
