@@ -65,7 +65,23 @@ jobs:
         with:
           name: frontend-dist
           path: dist
-      - run: cargo test --workspace --locked
+      # --no-fail-fast：一次跑完所有测试，避免第一个失败就中断、掩盖后面的问题。
+      # 输出落盘，失败时再由下一步压成 annotation —— Actions 日志下载要仓库
+      # admin 权限，排障时只能靠 annotation 里的这几行。
+      - name: Run tests
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --workspace --locked --no-fail-fast 2>&1 | tee cargo-test.log
+      - name: Report failing tests
+        if: failure()
+        shell: bash
+        run: |
+          echo "===== 失败测试 / 编译错误 ====="
+          grep -nE "^(test .* FAILED|thread .* panicked|assertion .* failed|error(\[E[0-9]+\])?:|failures:)" cargo-test.log | head -40 || true
+          echo "===== 各测试二进制结果 ====="
+          grep -nE "^test result:" cargo-test.log | head -10 || true
+          grep -E "^(test .* FAILED|error(\[E[0-9]+\])?:)" cargo-test.log | head -20 | sed 's/^/::error::/' || true
       - name: Build the default application
         run: cargo build --workspace --locked --features tauri/custom-protocol
       - name: Native startup smoke (macOS / Windows)
