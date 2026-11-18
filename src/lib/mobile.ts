@@ -295,6 +295,32 @@ export function onRefresh(callback: () => void) {
   return () => window.removeEventListener(REFRESH_EVENT, callback);
 }
 
+/**
+ * 记水后立即广播重锚得到的新排期。
+ *
+ * `record_drink` 的 Receipt 已经带上重锚后的绝对时间，直接用它比「先 refresh
+ * 再 invoke(get_next_reminder) 回来一次」更快，也避免一拍的延迟：1 分钟测试档
+ * 下那 100~300ms 足以让「还有 N 分钟」显示旧值。
+ */
+export const NEXT_REMINDER_EVENT = "shui:next-reminder";
+
+export function emitNextReminder(nextAt: number) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent<number>(NEXT_REMINDER_EVENT, { detail: nextAt })
+  );
+}
+
+export function onNextReminder(callback: (nextAt: number) => void) {
+  if (typeof window === "undefined") return () => {};
+  const handler = (event: Event) => {
+    const detail = (event as CustomEvent<number>).detail;
+    if (typeof detail === "number" && detail > 0) callback(detail);
+  };
+  window.addEventListener(NEXT_REMINDER_EVENT, handler);
+  return () => window.removeEventListener(NEXT_REMINDER_EVENT, handler);
+}
+
 /** Native WebView event: a notification tap asked the front end to check for a
  * pending reminder. The actual pop-up is driven by the Rust command result. */
 export const CHECK_REMINDER_EVENT = "shui:check-reminder";

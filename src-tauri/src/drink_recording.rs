@@ -178,12 +178,13 @@ pub async fn record_drink(
     if request_id.is_empty() || request_id.len() > 128 || !request_id.is_ascii() {
         return Err("无效的请求标识".into());
     }
-    let receipt = save_drink(&app_handle, amount, &format!("manual:{request_id}"))?;
+    #[allow(unused_mut)]
+    let mut receipt = save_drink(&app_handle, amount, &format!("manual:{request_id}"))?;
     // 实际新增一笔才重置节奏；requestId 幂等命中（重复点同一按钮）不动闹钟，
     // 否则连点会把「预计下一杯」无限往后推。
     #[cfg(target_os = "android")]
     if receipt.added {
-        crate::mobile::reanchor_after_drink(&app_handle);
+        receipt.next_at = crate::mobile::reanchor_after_drink(&app_handle);
     }
     Ok(receipt)
 }

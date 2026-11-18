@@ -94,9 +94,12 @@ fn mark_reminder(app: &tauri::AppHandle) {
 ///
 /// 只在 receipt.added / undone 为真时调用：Rust 侧 requestId 幂等命中时
 /// 水量没变，若也重排，连续点同一按钮会把闹钟无限往后推。
-pub fn reanchor_after_drink(app: &tauri::AppHandle) {
+pub fn reanchor_after_drink(app: &tauri::AppHandle) -> i64 {
     mark_reminder(app);
     sync_schedule(app);
+    // 返回重锚后的绝对时间：调用方（record_drink / 通知回灌）可以直接回给前端，
+    // 让「预计下一杯」与账本在同一次往返里保持一致。
+    next_reminder_at(app)
 }
 
 pub fn setup(app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
@@ -252,6 +255,10 @@ fn drain_pending_drinks(app: &tauri::AppHandle) {
     }
     let _ = std::fs::remove_file(&processing);
     if recorded {
+        // 通知栏记的水同样是一次真实补水：必须把账本锚点重置到「现在」，
+        // 否则下一杯仍按「上次提醒 + gap」算，用户刚喝完 5 分钟就会又被提醒。
+        // 这一步要在 emit 之前完成，前端收到事件后读到的才是新排期。
+        reanchor_after_drink(app);
         let _ = app.emit("drink-recorded-from-notification", ());
     }
 }
@@ -351,6 +358,17 @@ pub struct NextReminderState {
 #[tauri::command]
 pub fn get_next_reminder(app: tauri::AppHandle) -> Result<NextReminderState, String> {
     native::<NextReminderState>(&app, "nextReminder", json!({}))
+}
+
+/// 给 Receipt 用的轻量版本：只取下一次时刻，失败按「没有」处理。
+///
+/// 记水后紧接着调，拿到的是重锚后的新值，前端可以直接用它刷新「预计下一杯」，
+/// 不必再走 emitRefresh → get_next_reminder 的往返（那条路中间有一拍延迟，
+/// 1 分钟测试档下会明显看到文案落后）。
+pub fn next_reminder_at(app: &tauri::AppHandle) -> i64 {
+    native::<NextReminderState>(app, "nextReminder", json!({}))
+        .map(|state| state.next_at)
+        .unwrap_or(0)
 }
 
 #[derive(Debug, Deserialize)]

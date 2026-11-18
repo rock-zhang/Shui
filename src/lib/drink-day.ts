@@ -54,4 +54,9 @@ export interface DrinkReceipt {
   goal: number;
   added: boolean;
   goalReached: boolean;
+  /**
+   * 记水后重锚得到的下一次提醒时刻（毫秒）。
+   * Android 且真正新增时才 > 0；0 表示桌面端、幂等命中或已达标。
+   */
+  nextAt?: number;
 }

@@ -23,9 +23,11 @@ import { usePlatform } from "@/hooks/use-platform";
 import { getLocalDateKey } from "@/lib/drink-history";
 import type { DrinkReceipt } from "@/lib/drink-day";
 import {
+  emitNextReminder,
   emitRefresh,
   formatTimeLabel,
   notifyGoalReached,
+  onNextReminder,
   onRefresh,
 } from "@/lib/mobile";
 import {
@@ -107,6 +109,18 @@ function NextReminderLine({
 
   // 记录/撤销、通知记水、全屏提醒结束都会广播 refresh。
   useEffect(() => onRefresh(load), [load]);
+
+  // 记水的 Receipt 直接带回重锚后的排期：先落地它，再等 refresh 的读取结果，
+  // 两者一致时不闪；读取慢一拍时也不会显示成「上次提醒 + gap」的旧值。
+  useEffect(
+    () =>
+      onNextReminder((nextAt) => {
+        setNextAt(nextAt);
+        setNativeState("ready");
+        setNow(Date.now());
+      }),
+    []
+  );
 
   useEffect(() => {
     const tick = window.setInterval(() => setNow(Date.now()), 15_000);
@@ -240,7 +254,12 @@ export function TodayTab() {
       // 成功不弹提示：卡片动画、进度环和「今日明细」已经反馈了结果。
       // 失败才需要 toast（见 catch），避免整页唯一的反馈渠道被噪声占用。
       // 仅真正新增时播放就地庆祝；幂等命中的重复点击不重复播放动画。
-      if (receipt.added) celebrate(draft.amount);
+      if (receipt.added) {
+        celebrate(draft.amount);
+        // 原生重锚后把新排期随 Receipt 带回，立刻刷新「预计下一杯」，
+        // 不等 emitRefresh 触发的那次往返读取。
+        if (receipt.nextAt) emitNextReminder(receipt.nextAt);
+      }
       if (receipt.goalReached) {
         toast.success("🎉 今日目标已完成");
         // 只在真正达标的那一笔发系统通知；幂等重复点击 receipt.added 为 false，

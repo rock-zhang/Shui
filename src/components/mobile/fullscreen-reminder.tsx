@@ -13,7 +13,7 @@ import {
   type DrinkReceipt,
 } from "@/lib/drink-day";
 import { getLocalDateKey } from "@/lib/drink-history";
-import { notifyGoalReached } from "@/lib/mobile";
+import { emitNextReminder, notifyGoalReached } from "@/lib/mobile";
 
 /** Same 15-layer rainbow backdrop as the desktop reminder, scoped to this card. */
 const BACKDROP = [
@@ -165,6 +165,10 @@ export function FullscreenReminder({
             requestId: crypto.randomUUID(),
           });
       setWater({ gold: receipt.goal, drink: receipt.total });
+      if (receipt.added && receipt.nextAt) {
+        // 全屏提醒记的水同样要重锚：下一次从「刚喝完」起算，而不是从提醒响时起算。
+        emitNextReminder(receipt.nextAt);
+      }
       if (receipt.goalReached) {
         toast.success("🎉 今日喝水目标已完成");
         // 全屏提醒正好盖住整屏，用户更容易忽略这条 toast，系统通知补一层。

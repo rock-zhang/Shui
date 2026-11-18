@@ -14,6 +14,9 @@ pub struct Receipt {
     goal: u64,
     pub added: bool,
     goal_reached: bool,
+    /// 重锚后原生排定的下一次提醒（毫秒）。0 表示非 Android、没重排或已达标。
+    /// 前端拿到就能直接刷新「预计下一杯」，不必等 refresh 广播再往返读一次。
+    pub(crate) next_at: i64,
 }
 
 pub(crate) trait History {
@@ -76,6 +79,7 @@ pub(crate) fn record<S: History>(
                     goal,
                     added: false,
                     goal_reached: false,
+                    next_at: 0,
                 });
             }
         }
@@ -120,6 +124,7 @@ pub(crate) fn record<S: History>(
         goal,
         added: true,
         goal_reached: goal > 0 && before < goal && total >= goal,
+        next_at: 0,
     })
 }
 
