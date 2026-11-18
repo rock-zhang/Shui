@@ -14,6 +14,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { STORE_NAME } from "@/lib/constants";
+import { onRefresh } from "@/lib/mobile";
 import { summarizeReminders } from "@/lib/reminder-history";
 import {
   DrinkDaySummary,
@@ -237,6 +238,9 @@ export default function StatisticsPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
+
+  // 系统通知里点「喝一杯」会 recordDrink + emitRefresh；桌面端订阅后统计才会跟着更新。
+  useEffect(() => onRefresh(() => setRevision(value => value + 1)), []);
 
   useEffect(() => {
     let cancelled = false;

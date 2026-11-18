@@ -8,8 +8,8 @@ import {
   registerActionTypes,
   requestPermission,
   sendNotification,
-  type Options,
 } from "@tauri-apps/plugin-notification";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { PLATFORM_OS } from "@/lib/constants";
 import { detectPlatform, emitRefresh, emitShowReminder } from "@/lib/mobile";
 import { recordDrink } from "@/utils/record-drink";
@@ -18,10 +18,16 @@ export const REMINDER_CHANNEL_ID = "reminder";
 export const REMINDER_ACTION_TYPE = "shui-reminder";
 
 /**
- * 桌面通知（plugin-notification）的水量档位，与 Android 原生通知的
- * ReminderScheduler.DRINK_ACTIONS 保持一致。App 内全屏提醒额外提供 300ml。
+ * 桌面通知（plugin-notification）的水量档位。App 内全屏提醒额外提供 300ml。
+ *
+ * 顺序与 Android 的 `ReminderScheduler.DRINK_ACTIONS`（200/100/50）**故意相反**：
+ * macOS 上两个以上 action 会被折叠进 "Options" 菜单，而点击菜单按钮本身会被
+ * 上报成第一个 action（见 tauri-plugin-notification 2.8.1 `desktop.rs` 的
+ * Platform-specific 说明）。把最小的 50ml 放在首位，用户在 macOS 上误点
+ * Options 时最坏只记 50ml，不会凭空多出 200ml。
+ * Android 的 action 是并列按钮、不存在折叠，仍以 200ml 作为主推档位。
  */
-export const DRINK_ACTION_AMOUNTS = [200, 100, 50] as const;
+export const DRINK_ACTION_AMOUNTS = [50, 100, 200] as const;
 
 let actionTypesReady = false;
 
@@ -77,7 +83,13 @@ async function setupReminderActions() {
           .then(emitRefresh)
           .catch((failure) => console.error("通知记录饮水失败", failure));
       } else if (actionId !== "skip") {
+        // 点通知主体（`tap`）：桌面端没有全屏提醒的事件订阅者，直接把设置窗
+        // 唤回来。此前这里只发 emitShowReminder，桌面无监听者，等于点了没反应。
         emitShowReminder();
+        void getCurrentWindow()
+          .show()
+          .then(() => getCurrentWindow().setFocus())
+          .catch((error) => console.warn("唤回设置窗口失败", error));
       }
     });
   } catch (error) {

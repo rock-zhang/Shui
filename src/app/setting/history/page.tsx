@@ -7,6 +7,7 @@ import { ManualDrink } from "@/components/manual-drink";
 import { DrinkDetails } from "@/components/drink-details";
 import { getLocalDateKey, getRecentDates, type DrinkHistoryValue } from "@/lib/drink-day";
 import { STORE_NAME } from "@/lib/constants";
+import { onRefresh } from "@/lib/mobile";
 
 export default function DrinkHistoryPage() {
   const [period, setPeriod] = useState<7 | 30>(7);
@@ -42,6 +43,9 @@ export default function DrinkHistoryPage() {
   }, [period, revision]);
 
   const refresh = () => setRevision(value => value + 1);
+  // 系统通知里点「喝一杯」会 recordDrink + emitRefresh。桌面端此前没有监听者，
+  // 通知记账后本页仍显示旧数据，要手动点刷新或切路由才更新。
+  useEffect(() => onRefresh(refresh), []);
   return <div>
     <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
       <h3 className="text-lg font-medium">饮水记录</h3>
