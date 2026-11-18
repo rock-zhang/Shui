@@ -176,7 +176,7 @@ function NextReminderLine({
 
 export function TodayTab() {
   const { today, goal, loading, error, reload } = useDrinkData(7);
-  const { alert, general, hydrated } = useMobileConfig();
+  const { alert, hydrated } = useMobileConfig();
   const [confirmUndo, setConfirmUndo] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<Celebration | null>(null);
   const busy = useRef(false);

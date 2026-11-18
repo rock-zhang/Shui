@@ -29,7 +29,10 @@ struct Probe {
 
 pub fn init() -> tauri::plugin::TauriPlugin<tauri::Wry> {
     tauri::plugin::Builder::new("native-smoke")
-        .js_init_script(include_str!("native_smoke_init.js").into())
+        // Tauri 2.12 起 `js_init_script` 收 `impl Into<String>`，传入 `&'static str`
+        // 时 `.into()` 会有多重候选（bytes / reqwest / zune 都实现了 From<&str>），
+        // 类型推断直接失败。`&str` 本身已满足 `Into<String>`，不要多余转换。
+        .js_init_script(include_str!("native_smoke_init.js"))
         .setup(|app, _| {
             if app.config().identifier != "com.shui.native-smoke"
                 || app.package_info().name != "Shui Native Smoke"

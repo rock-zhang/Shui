@@ -84,17 +84,15 @@ test("themeColor 元信息同样跟随 CSS 主题 token", () => {
   assert.equal(pick("dark"), cssBackground(css, "\\.dark"));
 });
 
-test("亮/暗主题都显式声明了状态栏、导航条与图标明暗", () => {
+test("亮/暗主题冷启动首帧只设背景，系统栏交给运行时接管", () => {
   const cases = [
     {
       file: "values/themes.xml",
       surface: "@color/shui_surface_light",
-      lightIcons: "true",
     },
     {
       file: "values-night/themes.xml",
       surface: "@color/shui_surface_dark",
-      lightIcons: "false",
     },
   ];
 
@@ -102,22 +100,25 @@ test("亮/暗主题都显式声明了状态栏、导航条与图标明暗", () =
     const xml = read(
       `src-tauri/gen/android/app/src/main/res/${item.file}`
     );
+    // targetSdk 36 强制 edge-to-edge：状态栏/导航条强制透明，下面这些属性
+    // 会被系统忽略。栏底色与图标明暗改由 ReminderPlugin.applySystemBarTheme
+    // 在运行时按 App 内主题设置，这里只负责冷启动首帧不闪 MDC 紫色。
     for (const attr of [
-      "android:windowBackground",
       "android:statusBarColor",
       "android:navigationBarColor",
       "android:windowLightStatusBar",
       "android:windowLightNavigationBar",
     ]) {
-      assert.ok(xml.includes(attr), `${item.file} 缺少 ${attr}`);
+      assert.ok(
+        !xml.includes(attr),
+        `${item.file} 不应再声明被系统忽略的 ${attr}`
+      );
     }
-    assert.ok(xml.includes(item.surface), `${item.file} 未引用 ${item.surface}`);
     assert.ok(
-      xml.includes(
-        `<item name="android:windowLightStatusBar">${item.lightIcons}</item>`
-      ),
-      `${item.file} 的状态栏图标明暗不对`
+      xml.includes("android:windowBackground"),
+      `${item.file} 缺少 windowBackground`
     );
+    assert.ok(xml.includes(item.surface), `${item.file} 未引用 ${item.surface}`);
   }
 });
 
