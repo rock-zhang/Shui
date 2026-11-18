@@ -12,6 +12,7 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.os.Build
 import android.os.PowerManager
@@ -246,6 +247,50 @@ object ReminderScheduler {
     /** 「提醒音效」开关；缺省为有声，与前端默认值一致。 */
     fun isSoundEnabled(context: Context): Boolean =
         config(context)?.optJSONObject("general")?.optBoolean("isSound", true) ?: true
+
+    /**
+     * 通知栏记水后的「叮」。
+     *
+     * 在通知里点按钮时 App 处于后台，屏幕上唯一的变化是通知被撤掉；没有声音
+     * 就完全没有「记上了」的确认感，容易让人怀疑没点中而再点一次。
+     *
+     * 三条约束：
+     * - 跟随「提醒音效」开关：用户明确关掉声音时不该被这一声回马枪打扰；
+     * - 走 USAGE_NOTIFICATION_EVENT：音量随通知音量，勿扰模式下由系统抑制；
+     * - 静音 / 震动档直接跳过，播放也听不见，白耗一次解码。
+     */
+    fun playConfirmTone(context: Context) {
+        if (!isSoundEnabled(context)) return
+        val audio = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        if (audio?.ringerMode == AudioManager.RINGER_MODE_SILENT) return
+        if (audio != null) {
+            val max = audio.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION)
+            if (max > 0 && audio.getStreamVolume(AudioManager.STREAM_NOTIFICATION) == 0) return
+        }
+        // 每次新建播放器：接收器可能被系统单独拉起，缓存全局句柄在进程回收后
+        // 会变成失效引用；播放完由 completion 回调释放。
+        try {
+            val attrs = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            val afd = context.resources.openRawResourceFd(R.raw.confirm_ding) ?: return
+            val player = MediaPlayer()
+            player.setAudioAttributes(attrs)
+            player.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+            afd.close()
+            player.setOnCompletionListener { it.release() }
+            player.setOnErrorListener { mp, _, _ ->
+                mp.release()
+                true
+            }
+            player.prepare()
+            player.start()
+        } catch (error: Exception) {
+            // 音效失败绝不能影响记水本身，静默降级。
+            Log.w(TAG, "提示音播放失败：${error.message}")
+        }
+    }
 
     /** 当前生效的渠道：开启音效走有声渠道，关闭后走静音渠道。 */
     fun channelId(context: Context): String =
@@ -742,7 +787,11 @@ class ReminderReceiver : BroadcastReceiver() {
             }
             action.startsWith(ReminderScheduler.ACTION_DRINK_PREFIX) -> {
                 val amount = action.removePrefix(ReminderScheduler.ACTION_DRINK_PREFIX).toIntOrNull()
-                if (amount != null && amount > 0) ReminderScheduler.appendPendingDrink(context, amount)
+                if (amount != null && amount > 0) {
+                    ReminderScheduler.appendPendingDrink(context, amount)
+                    // 先出声再撤通知：声音和「通知消失」几乎同时发生，反馈才连贯。
+                    ReminderScheduler.playConfirmTone(context)
+                }
                 cancelNotification(context)
                 ReminderScheduler.scheduleNext(context)
             }
