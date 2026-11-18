@@ -121,12 +121,28 @@ error[E0599]: no associated function or constant named `default` found for struc
 
 这是本轮最关键的一步：Windows 的编译错误**只有在这一层才能暴露**，本机 macOS 与 Linux CI 都看不见。
 
+## 四之三、真机实测反馈后的通知链路重做（本轮）
+
+真机实测暴露了 plugin-notification 在桌面的三处硬伤，最终把桌面通知整体从 JS 通道挪到 Rust（`src-tauri/src/desktop_notification.rs`）：
+
+| 现象 | 根因 | 处理 |
+| --- | --- | --- |
+| Windows 能收到通知，点「喝水」按钮无任何反应、明细无记录 | plugin 文档明确：Windows **只在 toast 还在屏幕上时**上报点击，收进操作中心后再点没有回调 | 自建发送：`notify-rust` + `Urgency::Critical`（映射成 toast `Scenario::Reminder`，常驻到用户处理），点击稳定可回收 |
+| macOS 通知里多出一个英文「Options」 | 两个以上 action 在 macOS 上必然折叠成一个下拉按钮，标题默认 `Options`，plugin 不暴露该参数 | 自建发送，且 **macOS 只发一个动作**（取最小档 50ml）→ 渲染成真实按钮，无下拉、一次点击完成；连带去掉 macOS 的「稍后再说」 |
+| macOS 每次点通知都把设置窗拉到前台 | `RunEvent::Reopen` 无差别调 `show_main_window`；点通知会激活 App → 触发 Reopen → 弹窗 | 通知动作打标记（2 秒窗口），Reopen 命中就只隐藏窗口不弹窗；通知发出时窗口是收起的，动作处理完再收一次 |
+| 记水没声音（Android 有） | 桌面没有确认音反馈 | Rust 记水成功后广播 `shui:drink-recorded`，前端桥接层 `emitRefresh()` + `playConfirmSound()`（复用 Android 的 `confirm_ding.wav`） |
+
+顺带统一的文案：按钮一律带动词——macOS 单按钮「喝了 50ml」，Windows / Linux 为「喝了 50ml / 喝了 100ml / 喝了 200ml」+「稍后再说」，**每一档都带动词**，脱离正文上下文也读得懂；Android 同步为同一份文案与同一升序档位（`ReminderReceiver.DRINK_ACTIONS`）。
+
+为什么动作落盘放在 Rust 而不是继续用 JS 回调：通知点击发生在 WebView 之外，窗口隐藏、脚本被节流或 Channel 掉线时 JS 收不到回调，记录会静默丢失；Rust 直接写库再广播事件，界面层只负责刷新和播放声音。
+
 ## 五、仍需人工确认或依赖 CI 的项
 
 本机为锁屏状态且无 GUI 权限，下面这些**没有**在本轮验证，不做勾选：
 
 - [ ] 桌面端通知的真实弹出与外观（macOS 走 `notify-rust`，需解锁的交互式会话）
-- [ ] 通知里各 Action 的真实点击（含 macOS Options 折叠、Windows 进操作中心后点击无响应）
+- [ ] 通知里各 Action 的真实点击：**三端都还没在真机上复验**。要看的点：macOS 是否只有一个「喝了 50ml」按钮（点它记水后窗口不再弹到前台且有一声 ding）；Windows 的 toast 是否按预期常驻、从操作中心点按钮能否记水
+- [ ] 记水确认音的实际音量（`confirm_ding.wav`，`volume = 0.5`，跟随「提醒音效」开关）
 - [ ] macOS 标题栏拖拽区、红绿灯位置（`usePlatform` 首帧 `isMacOS` 已由冒烟间接证明，但视觉留白需目视）
 - [ ] 全屏提醒的实际视觉与多显示器落位
 - [ ] 深浅色切换后的即时视觉、同源多窗口同步

@@ -1,6 +1,8 @@
 mod commands;
 mod core;
 mod data_backup;
+#[cfg(not(target_os = "android"))]
+mod desktop_notification;
 mod drink_recording;
 mod drink_store;
 mod reminder_history;
@@ -144,6 +146,9 @@ pub fn run() {
         crate::autostart::enable_silent_autostart,
         crate::drink_recording::record_drink,
         crate::drink_recording::undo_drink,
+        crate::desktop_notification::send_desktop_reminder_notification,
+        crate::desktop_notification::get_desktop_notification_state,
+        crate::desktop_notification::open_desktop_notification_settings,
         commands::call_reminder,
         commands::setting,
         commands::hide_reminder_windows,
@@ -213,6 +218,16 @@ pub fn run() {
             // Finder reopens an existing app without spawning a second process.
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { .. } = _event {
+                // 点通知的按钮同样会激活 App 并触发 Reopen。用户只是想在通知里
+                // 记一杯水，不该被设置窗口打断，所以这条路径要按掉：既不走下面
+                // 的 show_main_window，也要把 AppKit 已经带到前台（Accessory
+                // 应用激活时会顺带把可视窗口前置）的窗口重新收起来。
+                if desktop_notification::action_reopen_pending() {
+                    if let Some(window) = _app.get_webview_window("main") {
+                        let _ = window.hide();
+                    }
+                    return;
+                }
                 if let Err(error) = startup::show_main_window(_app) {
                     eprintln!("重新打开设置窗口失败: {error}");
                 }

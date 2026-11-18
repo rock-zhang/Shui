@@ -239,7 +239,8 @@ export default function StatisticsPage() {
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
 
-  // 系统通知里点「喝一杯」会 recordDrink + emitRefresh；桌面端订阅后统计才会跟着更新。
+  // 系统通知里点「喝了 Xml」由 Rust 落盘后广播，桥接层转成 emitRefresh；
+  // 桌面端订阅后统计才会跟着更新。
   useEffect(() => onRefresh(() => setRevision(value => value + 1)), []);
 
   useEffect(() => {

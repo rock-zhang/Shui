@@ -29,7 +29,7 @@ import java.util.Locale
 import java.util.UUID
 
 
-/** 后台保底通道：精确闹钟 + 带「喝一杯」快捷操作的系统通知。 */
+/** 后台保底通道：精确闹钟 + 带「喝了 Xml」快捷操作的系统通知。 */
 object ReminderScheduler {
     /**
      * 通知全链路的诊断日志统一走这个 TAG：
@@ -122,10 +122,15 @@ object ReminderScheduler {
     const val GOAL_NOTIFICATION_ID = 2002
 
     /**
-     * 与桌面 `registerActionTypes` 的档位保持一致（见 utils/notification.ts）。
+     * 与桌面 `DRINK_ACTION_AMOUNTS` 保持一致（见 utils/notification.ts）：
+     * 档位相同、顺序相同（升序）、按钮文案相同。
      * Android 的闹钟通知与「测试通知」共用这一份配置，只有一套档位。
+     *
+     * 升序不是随便定的：macOS 会把多个动作折叠进下拉菜单，直接点下拉按钮会被
+     * 系统上报成第一个动作，50ml 排首位时误点代价最小；三端顺序统一也省得
+     * 用户换端后重新找按钮。
      */
-    val DRINK_ACTIONS = listOf(200, 100, 50)
+    val DRINK_ACTIONS = listOf(50, 100, 200)
 
     private fun config(context: Context): JSONObject? {
         val raw = context.getSharedPreferences(ReminderPlugin.PREFS, Context.MODE_PRIVATE)
@@ -846,7 +851,7 @@ class ReminderReceiver : BroadcastReceiver() {
     /**
      * 达标后的收尾通知：一天最多一条。
      *
-     * 为什么放在闹钟回调而不是 record_drink 之后：通知栏「喝一杯」由 Rust 回灌，
+     * 为什么放在闹钟回调而不是 record_drink 之后：通知栏「喝了 Xml」由原生直接落盘，
      * WebView 根本没启动，前端那条 goalReached 分支永远走不到；全屏提醒、通知
      * Action 两条路径都必须由原生兜住。
      */
@@ -978,10 +983,11 @@ class ReminderReceiver : BroadcastReceiver() {
             }
 
         ReminderScheduler.DRINK_ACTIONS.forEachIndexed { index, amount ->
-            val label = if (index == 0) "喝一杯 ${amount}ml" else "${amount}ml"
+            // 三档一律「动词 + 数量」：桌面端（macOS 折叠菜单）和 Android 的
+            // 收起态都用得上，纯 "100ml" 单独出现读不出是「喝了」还是「目标」。
             builder.addAction(
                 R.drawable.ic_stat_water,
-                label,
+                "喝了 ${amount}ml",
                 drinkAction(amount, 2 + index)
             )
         }

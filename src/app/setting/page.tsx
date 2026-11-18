@@ -1,7 +1,9 @@
 "use client";
 
 import { Switch } from "@/components/ui/switch";
-import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle, ExternalLink } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { load } from "@tauri-apps/plugin-store";
 import { useTray } from "@/hooks/use-tray";
 import { isEnabled, disable } from "@tauri-apps/plugin-autostart";
@@ -19,6 +21,11 @@ import {
 } from "@/components/ui/select";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
+import {
+  getDesktopNotificationState,
+  openNotificationSettings,
+  type DesktopNotificationStatus,
+} from "@/utils/notification";
 
 const themeOptions = [
   { value: "system", label: "跟随系统" },
@@ -32,7 +39,47 @@ export default function Home() {
     isCountDown: false,
     isFullScreen: false, // 新增全屏提醒选项
   });
-  const { isWindows } = usePlatform();
+  const { isWindows, isMacOS } = usePlatform();
+
+  // 全屏提醒关闭后能否收到提醒，取决于系统设置里有没有给 Shui 授权。
+  // macOS 走原生读取授权状态（见 refreshNotificationStatus），打开设置时
+  // 由 Rust 侧拼好带 bundle id 的深链；其他平台只给设置页入口。
+  const goToNotificationSettings = async () => {
+    try {
+      await openNotificationSettings();
+    } catch {
+      toast.info(
+        isMacOS
+          ? "请打开「系统设置 → 通知 → Shui」，开启「允许通知」"
+          : isWindows
+            ? "请打开「设置 → 系统 → 通知」，找到 Shui 开启通知"
+            : "请在系统设置的通知页面中找到 Shui 并开启通知"
+      );
+    }
+  };
+  const [notificationStatus, setNotificationStatus] =
+    useState<DesktopNotificationStatus | null>(null);
+
+  // macOS 能读到真实授权状态；用户从系统设置切回来时窗口会重新聚焦，
+  // 这时再读一次，不必关掉设置页重开。
+  const refreshNotificationStatus = useCallback(async () => {
+    if (!isMacOS) return;
+    try {
+      const state = await getDesktopNotificationState();
+      setNotificationStatus(state.status);
+    } catch (error) {
+      console.warn("读取系统通知授权状态失败", error);
+      setNotificationStatus(null);
+    }
+  }, [isMacOS]);
+
+  useEffect(() => {
+    void refreshNotificationStatus();
+    const onFocus = () => void refreshNotificationStatus();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshNotificationStatus]);
+
   const { theme, setTheme } = useTheme();
   const [themeMounted, setThemeMounted] = useState(false);
   const [autoStartPending, setAutoStartPending] = useState(true);
@@ -98,6 +145,27 @@ export default function Home() {
     }
   };
 
+  // 有权限时整块提示都不展示，只有 denied / unknown 才需要提醒用户去授权。
+  const notificationCard =
+    notificationStatus === "denied"
+      ? {
+          tone: "border-destructive/40 bg-destructive/5",
+          icon: "text-destructive",
+          title: "text-destructive",
+          titleText: "系统通知已被关闭",
+          description:
+            "系统设置中关闭了 Shui 的通知，倒计时结束后你将收不到任何提醒。请打开通知设置重新允许。",
+        }
+      : {
+          tone: "border-amber-500/40 bg-amber-50 dark:bg-amber-950/20",
+          icon: "text-amber-600 dark:text-amber-400",
+          title: "text-amber-800 dark:text-amber-300",
+          titleText: isMacOS ? "未检测到通知授权记录" : "系统通知可能不可达",
+          description: isMacOS
+            ? "还没在系统设置里读到 Shui 的授权记录。若未允许通知，倒计时结束后你将收不到任何提醒。"
+            : "当前使用系统通知提醒。若系统设置中未允许 Shui 发送通知，倒计时结束后你将收不到任何提醒。请在下方开启权限后，再等待下一次提醒验证。",
+        };
+
   return (
     <div>
       <h3 className="mb-4 text-lg font-medium">通用</h3>
@@ -161,9 +229,49 @@ export default function Home() {
           checked={config.isFullScreen}
           onCheckedChange={async (checked) => {
             await saveConfig("isFullScreen", checked);
+            if (!checked) {
+              // 关闭全屏提醒的当下就把话说清楚：能否收到取决于系统通知权限。
+              // toast 的 action 让用户可以一键直达，不必自己翻系统设置。
+              toast.warning("提醒将改用系统通知，请确认已允许 Shui 发送通知", {
+                duration: 8000,
+                action: {
+                  label: "去授权",
+                  onClick: () => void goToNotificationSettings(),
+                },
+              });
+            }
           }}
         />
       </div>
+
+      {!autoStartPending &&
+        !config.isFullScreen &&
+        notificationStatus !== "granted" && (
+          <div
+            className={`flex flex-row items-start gap-3 rounded-lg border p-3 shadow-xs mb-4 ${notificationCard.tone}`}
+          >
+            <AlertTriangle
+              className={`mt-0.5 size-4 shrink-0 ${notificationCard.icon}`}
+            />
+            <div className="flex-1">
+              <p className={`text-sm font-medium leading-none ${notificationCard.title}`}>
+                {notificationCard.titleText}
+              </p>
+              <p className="mt-1.5 text-[0.8rem] text-muted-foreground">
+                {notificationCard.description}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2.5"
+                onClick={() => void goToNotificationSettings()}
+              >
+                <ExternalLink className="mr-1.5 size-3.5" />
+                打开系统通知设置
+              </Button>
+            </div>
+          </div>
+        )}
 
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs">
         <div>

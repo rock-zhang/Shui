@@ -6,7 +6,7 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { Toaster } from "@/components/ui/sonner";
 import { usePlatform } from "@/hooks/use-platform";
-import { sendReminderNotification } from "@/utils/notification";
+import { sendReminderNotification, setupDesktopNotificationBridge } from "@/utils/notification";
 import { getGeneralConfig } from "@/utils/store";
 import { MobileApp } from "@/components/mobile/mobile-app";
 import { detectPlatform } from "@/lib/mobile";
@@ -27,6 +27,9 @@ export default function RootLayout({
     const isMobileHost = kind === "android" || kind === "ios";
     setMobile(isMobileHost);
     if (isMobileHost) return;
+
+    // 通知里的「喝了 Xml」由 Rust 记进库，这里只订阅它的广播来刷新明细 + 播确认音。
+    void setupDesktopNotificationBridge();
 
     const unlisten = listen("timer-complete", async (event) => {
       console.log("Timer completed", event);

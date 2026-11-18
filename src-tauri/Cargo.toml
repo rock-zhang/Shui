@@ -68,6 +68,14 @@ windows = { version = "0.48", features = [
     "Win32_System_Power",
 ] }
 
+# 桌面通知由 desktop_notification.rs 直接调 notify-rust，绕开
+# plugin-notification 的 JS 通道：Windows 需要 Urgency::Critical（映射成
+# Scenario::Reminder 常驻 toast，否则收进通知中心后点击不再上报）、macOS 需要
+# actions_label 把折叠下拉的英文 "Options" 改成中文，且动作要在 WebView
+# 之外落盘。版本与 plugin-notification 2.8.1 内部依赖保持一致，避免重复编译。
+[target.'cfg(any(target_os = "macos", windows))'.dependencies]
+notify-rust = "4.18"
+
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel.workspace = true
 core-foundation = "0.9.4"

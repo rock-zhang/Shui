@@ -43,8 +43,9 @@ export default function DrinkHistoryPage() {
   }, [period, revision]);
 
   const refresh = () => setRevision(value => value + 1);
-  // 系统通知里点「喝一杯」会 recordDrink + emitRefresh。桌面端此前没有监听者，
-  // 通知记账后本页仍显示旧数据，要手动点刷新或切路由才更新。
+  // 系统通知里点「喝了 Xml」由 Rust 直接落盘，再广播 shui:drink-recorded，
+  // 前端桥接层转成 emitRefresh。桌面端此前没有监听者，通知记账后本页仍显示
+  // 旧数据，要手动点刷新或切路由才更新。
   useEffect(() => onRefresh(refresh), []);
   return <div>
     <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
