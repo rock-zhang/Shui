@@ -70,6 +70,9 @@ jobs:
       # admin 权限，排障时只能靠 annotation 里的这几行。
       - name: Run tests
         shell: bash
+        env:
+          # CI 里 cargo 会带 ANSI 颜色码，行首 `^error` 一类锚定会失效。
+          CARGO_TERM_COLOR: never
         run: |
           set -o pipefail
           cargo test --workspace --locked --no-fail-fast 2>&1 | tee cargo-test.log
@@ -77,11 +80,11 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          echo "===== 失败测试 / 编译错误 ====="
-          grep -nE "^(test .* FAILED|thread .* panicked|assertion .* failed|error(\[E[0-9]+\])?:|failures:)" cargo-test.log | head -40 || true
-          echo "===== 各测试二进制结果 ====="
-          grep -nE "^test result:" cargo-test.log | head -10 || true
-          grep -E "^(test .* FAILED|error(\[E[0-9]+\])?:)" cargo-test.log | head -20 | sed 's/^/::error::/' || true
+          echo "===== 最后 80 行 ====="
+          tail -80 cargo-test.log || true
+          echo "===== 关键行 ====="
+          grep -aE "FAILED|panicked at|assertion|error\[E[0-9]+\]|could not compile|^error:" cargo-test.log | head -40 || true
+          grep -aE "^(test .* FAILED|error:)" cargo-test.log | head -15 | sed 's/^/::error::/' || true
       - name: Build the default application
         run: cargo build --workspace --locked --features tauri/custom-protocol
       - name: Native startup smoke (macOS / Windows)
