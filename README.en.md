@@ -57,7 +57,7 @@ A cross-platform desktop app focused on water intake reminders, promoting office
 - ✅ macOS
 - ✅ Windows
 - ✅ Linux
-- 🚧 Android (standalone app — see [Android notes](README-ANDROID.en.md))
+- ✅ Android
 
 ### Download and Installation
 
@@ -73,6 +73,17 @@ Download the latest version from the [Releases](https://github.com/rock-zhang/Sh
 - 64-bit System: Download `Shui_x.x.x_x64-setup.exe`
 - 32-bit System: Download `Shui_x.x.x_x86-setup.exe`
 - ARM64 Architecture: Download `Shui_x.x.x_arm64-setup.exe`
+
+#### Linux
+
+- x86_64 Architecture: Download `Shui_x.x.x_amd64.deb`
+- ARM64 Architecture: Download `Shui_x.x.x_arm64.deb`
+
+#### Android
+
+The Android build is released together with the desktop builds, and its artifacts live on the same Release page (arm64 universal package only for now):
+
+- Sideload: download `app-universal-release.apk`, allow "Install unknown apps" on your phone, then install
 
 #### Note
 

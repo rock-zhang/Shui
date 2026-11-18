@@ -57,7 +57,7 @@
 - ✅ macOS
 - ✅ Windows
 - ✅ Linux
-- 🚧 Android（独立 App，见 [Android 文档](README-ANDROID.md)）
+- ✅ Android
 
 ### 下载安装
 
@@ -78,6 +78,12 @@
 
 - x86_64 架构：下载 `Shui_x.x.x_amd64.deb`
 - ARM64 架构：下载 `Shui_x.x.x_arm64.deb`
+
+#### Android
+
+Android 端与桌面端同批发布，产物位于同一个 Release 页面（目前仅提供 arm64 通用包）：
+
+- 侧载安装：下载 `app-universal-release.apk`，在手机上允许「安装未知来源应用」后直接安装
 
 #### 注意
 
