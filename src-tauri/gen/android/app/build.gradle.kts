@@ -93,6 +93,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    // AGP 9 的 lintVital 与 Kotlin 2.2 的 FIR 分析器不兼容，release 构建会
+    // 在 lintVitalAnalyzeUniversalRelease 崩溃（findFirCompiledSymbol 报
+    // "declaration is not compiled"，lint 自报是自身 bug）。lint 只做静态
+    // 检查、不参与产物生成，关闭 release 阶段的 vital 检查不影响 APK/AAB；
+    // 需要体检时可单独跑 ./gradlew lintDebug。
+    lint {
+        checkReleaseBuilds = false
+    }
 }
 
 // Kotlin 2.2 移除了 `android.kotlinOptions`，jvmTarget 改由 Kotlin DSL 配置。
