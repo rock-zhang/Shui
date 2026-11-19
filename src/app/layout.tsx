@@ -19,7 +19,8 @@ export const metadata: Metadata = {
     default: "喝水提醒",
     template: "%s - 喝水提醒",
   },
-  description: "一个帮助你保持健康饮水习惯的应用",
+  // 静态导出下 metadata 在构建期固定，无法随界面语言切换；用中英双语覆盖两种受众。
+  description: "帮助你保持健康饮水习惯的应用 · A healthy hydration reminder app",
 };
 
 export const viewport: Viewport = {

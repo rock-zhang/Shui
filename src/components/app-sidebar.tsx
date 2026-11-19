@@ -16,40 +16,41 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { usePlatform } from "@/hooks/use-platform";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 
-const items = [
+const items: Array<{ titleKey: MessageKey; url: string; icon: typeof Settings }> = [
   {
-    title: "通用",
+    titleKey: "settings.nav.general",
     url: "/setting/",
     icon: Settings,
   },
   {
-    title: "提醒",
+    titleKey: "settings.nav.reminder",
     url: "/setting/reminder/",
     icon: AlarmClock,
   },
   {
-    title: "饮水记录",
+    titleKey: "settings.nav.history",
     url: "/setting/history/",
     icon: Droplets,
   },
   {
-    title: "快捷键",
+    titleKey: "settings.nav.shortcut",
     url: "/setting/shortcut/",
     icon: Keyboard, // 使用 Keyboard 图标替换 Search
   },
   {
-    title: "备份与导入",
+    titleKey: "settings.nav.data",
     url: "/setting/data/",
     icon: DatabaseBackup,
   },
   {
-    title: "统计",
+    titleKey: "settings.nav.statistics",
     url: "/setting/statistics/",
     icon: ChartNoAxesCombined,
   },
   {
-    title: "关于",
+    titleKey: "settings.nav.about",
     url: "/setting/about/",
     icon: Info,
   },
@@ -57,6 +58,7 @@ const items = [
 
 export function AppSidebar() {
   const { isMacOS } = usePlatform();
+  const { t } = useI18n();
 
   const pathname = usePathname();
   console.log("pathname", pathname);
@@ -68,7 +70,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton
                     asChild
                     className={cn(
@@ -78,7 +80,7 @@ export function AppSidebar() {
                   >
                     <Link href={item.url}>
                       <item.icon />
-                      <span>{item.title}</span>
+                      <span>{t(item.titleKey)}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

@@ -20,17 +20,32 @@ import {
   DrinkDaySummary,
   DrinkHistoryValue,
   DrinkPatternAnalysis,
+  DrinkTimeBucket,
   analyzeDrinkPatterns,
   exportDrinkHistoryCsv,
   getLocalDateKey,
   getRecentDates,
   summarizeDrinkDays,
 } from "@/lib/drink-history";
+import { useI18n, type Locale, type MessageKey } from "@/lib/i18n";
 
 const PERIODS = [7, 30] as const;
 
-function formatShortDate(date: Date) {
-  return `${date.getMonth() + 1}/${date.getDate()}`;
+type Translate = ReturnType<typeof useI18n>["t"];
+
+const BUCKET_LABEL_KEYS: Record<DrinkTimeBucket["key"], MessageKey> = {
+  overnight: "settings.statistics.bucket.overnight",
+  morning: "settings.statistics.bucket.morning",
+  afternoon: "settings.statistics.bucket.afternoon",
+  evening: "settings.statistics.bucket.evening",
+};
+
+function formatShortDate(date: Date, locale: Locale) {
+  return date.toLocaleDateString(locale, { month: "numeric", day: "numeric" });
+}
+
+function formatCount(value: number, locale: Locale) {
+  return new Intl.NumberFormat(locale).format(value);
 }
 
 function WaterTrendChart({
@@ -42,6 +57,7 @@ function WaterTrendChart({
   period: number;
   goal: number;
 }) {
+  const { t, locale } = useI18n();
   const highestValue = Math.max(goal, ...days.map((day) => day.total), 1);
   const chartMax = Math.ceil(highestValue / 500) * 500;
   const goalHeight = Math.min((goal / chartMax) * 100, 100);
@@ -50,24 +66,29 @@ function WaterTrendChart({
     <div className="rounded-lg border p-4 shadow-xs">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h4 className="text-sm font-medium">饮水量趋势</h4>
-          <p className="text-xs text-muted-foreground">每日累计饮水量（ml）</p>
+          <h4 className="text-sm font-medium">
+            {t("settings.statistics.chart.title")}
+          </h4>
+          <p className="text-xs text-muted-foreground">
+            {t("settings.statistics.chart.description")}
+          </p>
         </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
-            <span className="h-2 w-2 rounded-sm bg-blue-500" />饮水量
+            <span className="h-2 w-2 rounded-sm bg-blue-500" />
+            {t("settings.statistics.chart.intake")}
           </span>
           <span className="flex items-center gap-1">
             <span className="h-px w-3 border-t border-dashed border-emerald-500" />
-            当前目标
+            {t("settings.statistics.chart.goal")}
           </span>
         </div>
       </div>
 
       <div className="flex gap-2">
         <div className="flex h-40 w-8 shrink-0 flex-col justify-between pb-5 text-right text-[10px] text-muted-foreground">
-          <span>{chartMax}</span>
-          <span>{Math.round(chartMax / 2)}</span>
+          <span>{formatCount(chartMax, locale)}</span>
+          <span>{formatCount(Math.round(chartMax / 2), locale)}</span>
           <span>0</span>
         </div>
         <div className="relative h-40 flex-1">
@@ -91,7 +112,11 @@ function WaterTrendChart({
                   <div
                     key={day.key}
                     className="group relative flex h-full min-w-0 flex-1 items-end"
-                    title={`${formatShortDate(day.date)}：${day.total}ml / 目标 ${day.goal}ml`}
+                    title={t("settings.statistics.chart.tooltip", {
+                      date: formatShortDate(day.date, locale),
+                      total: day.total,
+                      goal: day.goal,
+                    })}
                   >
                     <div
                       className="w-full min-w-[3px] rounded-t-sm bg-blue-500 transition-[height] duration-300 group-hover:bg-blue-600"
@@ -102,7 +127,7 @@ function WaterTrendChart({
                     />
                     {showLabel && (
                       <span className="absolute top-full left-1/2 mt-1 -translate-x-1/2 whitespace-nowrap text-[9px] text-muted-foreground">
-                        {formatShortDate(day.date)}
+                        {formatShortDate(day.date, locale)}
                       </span>
                     )}
                   </div>
@@ -116,36 +141,45 @@ function WaterTrendChart({
   );
 }
 
-function formatInterval(minutes: number | null) {
+function formatInterval(minutes: number | null, t: Translate) {
   if (minutes === null) return "--";
-  if (minutes < 1) return "不足 1 分钟";
-  minutes = Math.round(minutes);
-  if (minutes < 60) return `${minutes} 分钟`;
+  if (minutes < 1) return t("settings.statistics.interval.lessThanMinute");
+  const rounded = Math.round(minutes);
+  if (rounded < 60)
+    return t("settings.statistics.interval.minutes", { minutes: rounded });
 
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
+  const hours = Math.floor(rounded / 60);
+  const remainingMinutes = rounded % 60;
   return remainingMinutes
-    ? `${hours} 小时 ${remainingMinutes} 分`
-    : `${hours} 小时`;
+    ? t("settings.statistics.interval.hoursMinutes", {
+        hours,
+        minutes: remainingMinutes,
+      })
+    : t("settings.statistics.interval.hours", { hours });
 }
 
 function DrinkPatternCards({ analysis }: { analysis: DrinkPatternAnalysis }) {
+  const { t } = useI18n();
   return (
     <div className="mt-4 grid grid-cols-1 gap-3">
       <div className="rounded-lg border p-4 shadow-xs">
         <div className="mb-3 flex items-center gap-2">
           <Clock3 className="h-4 w-4 text-cyan-500" />
           <div>
-            <h4 className="text-sm font-medium">饮水时间分布</h4>
+            <h4 className="text-sm font-medium">
+              {t("settings.statistics.pattern.timing.title")}
+            </h4>
             <p className="text-[11px] text-muted-foreground">
-              按当前本地时间统计，基于 {analysis.totalEntries} 次有效记录
+              {t("settings.statistics.pattern.timing.description", {
+                count: analysis.totalEntries,
+              })}
             </p>
           </div>
         </div>
 
         {analysis.totalEntries === 0 ? (
           <div className="flex h-28 items-center justify-center text-center text-xs leading-5 text-muted-foreground">
-            新记录积累后，将显示各时段的饮水分布
+            {t("settings.statistics.pattern.timing.empty")}
           </div>
         ) : (
           <div className="space-y-2.5">
@@ -153,13 +187,16 @@ function DrinkPatternCards({ analysis }: { analysis: DrinkPatternAnalysis }) {
               <div key={bucket.key}>
                 <div className="mb-1 flex items-baseline justify-between gap-2">
                   <span className="text-xs font-medium">
-                    {bucket.label}
+                    {t(BUCKET_LABEL_KEYS[bucket.key])}
                     <span className="ml-1 text-[10px] font-normal text-muted-foreground">
                       {bucket.range}
                     </span>
                   </span>
                   <span className="whitespace-nowrap text-[10px] text-muted-foreground">
-                    {bucket.amount}ml · {bucket.count}次
+                    {t("settings.statistics.pattern.timing.entry", {
+                      amount: bucket.amount,
+                      count: bucket.count,
+                    })}
                   </span>
                 </div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-muted">
@@ -178,45 +215,57 @@ function DrinkPatternCards({ analysis }: { analysis: DrinkPatternAnalysis }) {
         <div className="mb-3 flex items-center gap-2">
           <TimerReset className="h-4 w-4 text-violet-500" />
           <div>
-            <h4 className="text-sm font-medium">饮水间隔分析</h4>
+            <h4 className="text-sm font-medium">
+              {t("settings.statistics.pattern.interval.title")}
+            </h4>
             <p className="text-[11px] text-muted-foreground">
-              仅计算同一天内的相邻记录
+              {t("settings.statistics.pattern.interval.description")}
             </p>
           </div>
         </div>
 
         {analysis.intervalCount === 0 ? (
           <div className="flex h-28 items-center justify-center text-center text-xs leading-5 text-muted-foreground">
-            同一天至少记录两次饮水后，即可分析间隔
+            {t("settings.statistics.pattern.interval.empty")}
           </div>
         ) : (
           <>
-            <p className="text-[11px] text-muted-foreground">平均间隔</p>
+            <p className="text-[11px] text-muted-foreground">
+              {t("settings.statistics.pattern.interval.average")}
+            </p>
             <p className="mb-3 text-xl font-semibold">
-              {formatInterval(analysis.averageIntervalMinutes)}
+              {formatInterval(analysis.averageIntervalMinutes, t)}
             </p>
             <div className="grid grid-cols-3 gap-1.5 border-t pt-3 text-center">
               <div>
-                <p className="text-[10px] text-muted-foreground">最短</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {t("settings.statistics.pattern.interval.shortest")}
+                </p>
                 <p className="mt-0.5 text-xs font-medium">
-                  {formatInterval(analysis.shortestIntervalMinutes)}
+                  {formatInterval(analysis.shortestIntervalMinutes, t)}
                 </p>
               </div>
               <div>
-                <p className="text-[10px] text-muted-foreground">中位</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {t("settings.statistics.pattern.interval.median")}
+                </p>
                 <p className="mt-0.5 text-xs font-medium">
-                  {formatInterval(analysis.medianIntervalMinutes)}
+                  {formatInterval(analysis.medianIntervalMinutes, t)}
                 </p>
               </div>
               <div>
-                <p className="text-[10px] text-muted-foreground">最长</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {t("settings.statistics.pattern.interval.longest")}
+                </p>
                 <p className="mt-0.5 text-xs font-medium">
-                  {formatInterval(analysis.longestIntervalMinutes)}
+                  {formatInterval(analysis.longestIntervalMinutes, t)}
                 </p>
               </div>
             </div>
             <p className="mt-3 text-[10px] text-muted-foreground">
-              基于 {analysis.intervalCount} 个有效间隔
+              {t("settings.statistics.pattern.interval.basis", {
+                count: analysis.intervalCount,
+              })}
             </p>
           </>
         )}
@@ -226,6 +275,7 @@ function DrinkPatternCards({ analysis }: { analysis: DrinkPatternAnalysis }) {
 }
 
 export default function StatisticsPage() {
+  const { t } = useI18n();
   const [period, setPeriod] = useState<(typeof PERIODS)[number]>(7);
   const [revision, setRevision] = useState(0);
   const [goal, setGoal] = useState(0);
@@ -237,7 +287,7 @@ export default function StatisticsPage() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(false);
 
   // 系统通知里点「+Xml」由 Rust 落盘后广播，桥接层转成 emitRefresh；
   // 桌面端订阅后统计才会跟着更新。
@@ -248,7 +298,7 @@ export default function StatisticsPage() {
 
     async function loadStatistics() {
       setLoading(true);
-      setError("");
+      setError(false);
 
       try {
         const [configStore, historyStore] = await Promise.all([
@@ -290,7 +340,7 @@ export default function StatisticsPage() {
         }
       } catch (loadError) {
         console.error("加载饮水统计失败:", loadError);
-        if (!cancelled) setError("暂时无法读取饮水记录，请稍后重试");
+        if (!cancelled) setError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -334,22 +384,23 @@ export default function StatisticsPage() {
       const historyEntries = entries.filter(([key]) => /^\d{8}$/.test(key));
 
       if (historyEntries.length === 0) {
-        toast.info("还没有可导出的饮水记录");
+        toast.info(t("settings.statistics.export.empty"));
         return;
       }
 
       const csv = exportDrinkHistoryCsv(
         historyEntries,
-        Number(alertConfig?.gold) || 0
+        Number(alertConfig?.gold) || 0,
+        (key) => t(key)
       );
       const savedPath = await invoke<string | null>("save_drink_history_csv", {
         content: csv,
       });
 
-      if (savedPath) toast.success("饮水记录已导出");
+      if (savedPath) toast.success(t("settings.statistics.export.success"));
     } catch (exportError) {
       console.error("导出饮水记录失败:", exportError);
-      toast.error("导出失败，请稍后重试");
+      toast.error(t("settings.statistics.export.failed"));
     } finally {
       setExporting(false);
     }
@@ -359,13 +410,15 @@ export default function StatisticsPage() {
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-lg font-medium">饮水统计</h3>
+          <h3 className="text-lg font-medium">
+            {t("settings.statistics.title")}
+          </h3>
           <p className="text-[0.8rem] text-muted-foreground">
-            看见变化，更容易坚持健康饮水习惯
+            {t("settings.statistics.description")}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="ghost" disabled={loading} onClick={() => setRevision(value => value + 1)}>刷新</Button>
+          <Button size="sm" variant="ghost" disabled={loading} onClick={() => setRevision(value => value + 1)}>{t("settings.statistics.refresh")}</Button>
           <Button
             size="sm"
             variant="outline"
@@ -374,7 +427,9 @@ export default function StatisticsPage() {
             onClick={handleExport}
           >
             <Download className="h-3.5 w-3.5" />
-            {exporting ? "导出中" : "导出 CSV"}
+            {exporting
+              ? t("settings.statistics.exporting")
+              : t("settings.statistics.export")}
           </Button>
           <div className="flex rounded-md border p-0.5">
             {PERIODS.map((value) => (
@@ -385,7 +440,7 @@ export default function StatisticsPage() {
                 className="h-7 px-2.5 text-xs"
                 onClick={() => setPeriod(value)}
               >
-                {value} 天
+                {t("settings.statistics.period", { days: value })}
               </Button>
             ))}
           </div>
@@ -394,14 +449,15 @@ export default function StatisticsPage() {
 
       {error ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          {error}
+          {t("settings.statistics.error.load")}
         </div>
       ) : (
         <>
           <div className="mb-4 grid grid-cols-3 gap-3">
             <div className="rounded-lg border p-3 shadow-xs">
               <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-                <Droplets className="h-4 w-4 text-blue-500" />今日饮水
+                <Droplets className="h-4 w-4 text-blue-500" />
+                {t("settings.statistics.today")}
               </div>
               <p className="text-xl font-semibold">
                 {loading ? "--" : summary.today}
@@ -410,7 +466,8 @@ export default function StatisticsPage() {
             </div>
             <div className="rounded-lg border p-3 shadow-xs">
               <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-                <TrendingUp className="h-4 w-4 text-indigo-500" />周期日均
+                <TrendingUp className="h-4 w-4 text-indigo-500" />
+                {t("settings.statistics.average")}
               </div>
               <p className="text-xl font-semibold">
                 {loading ? "--" : summary.average}
@@ -419,57 +476,99 @@ export default function StatisticsPage() {
             </div>
             <div className="rounded-lg border p-3 shadow-xs">
               <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-                <Target className="h-4 w-4 text-emerald-500" />达标天数
+                <Target className="h-4 w-4 text-emerald-500" />
+                {t("settings.statistics.completedDays")}
               </div>
               <p className="text-xl font-semibold">
                 {loading ? "--" : summary.completedDays}
-                <span className="ml-1 text-xs font-normal text-muted-foreground">天</span>
+                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                  {t("settings.statistics.daysUnit")}
+                </span>
               </p>
             </div>
           </div>
 
           {loading ? (
             <div className="flex h-56 items-center justify-center rounded-lg border text-sm text-muted-foreground">
-              正在整理饮水记录...
+              {t("settings.statistics.loading")}
             </div>
           ) : (
             <>
               <WaterTrendChart days={days} period={period} goal={goal} />
               <DrinkPatternCards analysis={patternAnalysis} />
-              <section className="mt-4 rounded-lg border p-4 shadow-xs" aria-label="休息提醒统计">
-                <h4 className="text-sm font-medium">休息提醒统计</h4>
+              <section
+                className="mt-4 rounded-lg border p-4 shadow-xs"
+                aria-label={t("settings.statistics.reminder.title")}
+              >
+                <h4 className="text-sm font-medium">
+                  {t("settings.statistics.reminder.title")}
+                </h4>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  仅统计已结束的全屏提醒（含托盘立即休息），多屏合并为一次，按开始日期归档。
+                  {t("settings.statistics.reminder.description")}
                 </p>
                 {reminderError ? (
-                  <p role="alert" className="mt-3 text-sm text-destructive">提醒统计暂时无法读取</p>
+                  <p role="alert" className="mt-3 text-sm text-destructive">
+                    {t("settings.statistics.reminder.error")}
+                  </p>
                 ) : (
                   <>
                     <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
                       {[
-                        ["已结束提醒", `${reminders.completed} 次`],
-                        ["确认饮水", `${reminders.confirmed} 次`],
-                        ["跳过 / Esc", `${reminders.skipped} 次`],
-                        ["自动关闭", `${reminders.timedOut} 次`],
-                        ["累计展示时长", `${Math.floor(reminders.displaySeconds / 60)} 分 ${reminders.displaySeconds % 60} 秒`],
+                        [
+                          t("settings.statistics.reminder.completed"),
+                          t("settings.statistics.reminder.count", {
+                            count: reminders.completed,
+                          }),
+                        ],
+                        [
+                          t("settings.statistics.reminder.confirmed"),
+                          t("settings.statistics.reminder.count", {
+                            count: reminders.confirmed,
+                          }),
+                        ],
+                        [
+                          t("settings.statistics.reminder.skipped"),
+                          t("settings.statistics.reminder.count", {
+                            count: reminders.skipped,
+                          }),
+                        ],
+                        [
+                          t("settings.statistics.reminder.timedOut"),
+                          t("settings.statistics.reminder.count", {
+                            count: reminders.timedOut,
+                          }),
+                        ],
+                        [
+                          t("settings.statistics.reminder.duration"),
+                          t("settings.statistics.reminder.durationValue", {
+                            minutes: Math.floor(reminders.displaySeconds / 60),
+                            seconds: reminders.displaySeconds % 60,
+                          }),
+                        ],
                       ].map(([label, value]) => (
                         <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="mt-1 font-medium">{value}</dd></div>
                       ))}
                     </dl>
-                    {reminders.completed === 0 && <p className="mt-3 text-xs text-muted-foreground">此时间范围内暂无已结束提醒，记录从本版本开始积累。</p>}
+                    {reminders.completed === 0 && (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        {t("settings.statistics.reminder.empty")}
+                      </p>
+                    )}
                   </>
                 )}
-                <p className="mt-3 text-xs text-muted-foreground">展示时长不是实际休息时长；单次最多计入 30 秒。不包含系统通知，异常退出的提醒不计入。</p>
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {t("settings.statistics.reminder.note")}
+                </p>
               </section>
               <p className="mt-2 text-[11px] text-muted-foreground">
-                时间分析仅包含有时间信息的记录；旧版总量及未记录的饮水不参与分析。间隔不跨日，相同时间的记录不产生间隔。
+                {t("settings.statistics.note")}
               </p>
             </>
           )}
 
           {hasLegacyData && (
             <p className="mt-2 text-[11px] text-muted-foreground">
-              旧版记录未保存当天目标，达标结果按当前目标 {goal}ml 估算。
+              {t("settings.statistics.legacy", { goal })}
             </p>
           )}
         </>

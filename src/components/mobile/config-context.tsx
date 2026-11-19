@@ -23,6 +23,7 @@ import {
   type AlertConfig,
   type GeneralConfig,
 } from "@/lib/mobile";
+import { useI18n } from "@/lib/i18n";
 
 interface MobileConfigValue {
   alert: AlertConfig;
@@ -111,6 +112,7 @@ function scheduleChanged<T extends object>(
  * switch) and keeps Today's "提醒节奏" in sync with the reminder settings.
  */
 export function MobileConfigProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const [alert, setAlert] = useState<AlertConfig>(DEFAULT_ALERT);
   const [general, setGeneral] = useState<GeneralConfig>(DEFAULT_GENERAL);
   const [hydrated, setHydrated] = useState(false);
@@ -176,10 +178,10 @@ export function MobileConfigProvider({ children }: { children: ReactNode }) {
         syncAnalyticsProperties();
       } catch (failure) {
         console.error("保存提醒配置失败", failure);
-        toast.error("设置未能保存，请重试");
+        toast.error(t("mobile.config.saveFailed"));
       }
     },
-    []
+    [t]
   );
 
   const patchAlert = useCallback(

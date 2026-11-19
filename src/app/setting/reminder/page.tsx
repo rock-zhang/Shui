@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { usePlatform } from "@/hooks/use-platform";
 import { track } from "@/lib/analytics";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type Locale } from "@/lib/i18n";
 
 const goldList = ["1000", "1500", "2000", "2500", "3000", "3500", "4000"];
 const gapList = ["10", "20", "30", "45", "60"];
@@ -51,7 +51,7 @@ if (process.env.NODE_ENV === "development") {
 }
 
 export default function Home() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [config, setConfig] = useState({
     gold: goldList[0],
     gap: gapList[0],
@@ -188,7 +188,7 @@ export default function Home() {
           <p
             id=":r233:-form-item-description"
             className="text-[0.8rem] text-muted-foreground"
-          ></p>
+          >{t("mobile.reminder.gap.description")}</p>
         </div>
         <Select
           value={config.gap}
@@ -271,7 +271,7 @@ export default function Home() {
             }}
             defaultValue={config.timeStart}
           >
-            <SelectTrigger className="w-[90px]">
+            <SelectTrigger className="w-[104px]">
               <SelectValue
                 placeholder={t("settings.reminder.time.start")}
               />
@@ -280,7 +280,7 @@ export default function Home() {
               <SelectGroup>
                 {timeList.slice(0, -1).map((time) => (
                   <SelectItem key={time} value={time}>
-                    {time}
+                    {formatTimeOption(time, locale)}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -296,7 +296,7 @@ export default function Home() {
             }}
             defaultValue={config.timeEnd}
           >
-            <SelectTrigger className="w-[90px]">
+            <SelectTrigger className="w-[104px]">
               <SelectValue placeholder={t("settings.reminder.time.end")} />
             </SelectTrigger>
             <SelectContent>
@@ -306,7 +306,7 @@ export default function Home() {
                   "00:00",
                 ].map((time) => (
                   <SelectItem key={time} value={time}>
-                    {time}
+                    {formatTimeOption(time, locale)}
                   </SelectItem>
                 ))}
               </SelectGroup>
@@ -413,3 +413,12 @@ const timeList = [
   }).flat(),
   "00:00", // 添加 0 点选项
 ];
+
+/** 存储值始终是 24h 字符串，仅在显示层按语言派生 12/24 小时制标签。 */
+function formatTimeOption(value: string, locale: Locale): string {
+  if (locale !== "en-US") return value;
+  const [hour, minute] = value.split(":").map(Number);
+  const suffix = hour < 12 ? "AM" : "PM";
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${hour12}:${minute.toString().padStart(2, "0")} ${suffix}`;
+}

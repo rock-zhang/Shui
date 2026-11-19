@@ -3,6 +3,8 @@ mod core;
 mod data_backup;
 #[cfg(not(target_os = "android"))]
 mod desktop_notification;
+#[cfg(not(target_os = "android"))]
+mod localization;
 mod drink_recording;
 mod drink_store;
 mod reminder_history;
@@ -43,7 +45,7 @@ fn debug_build_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
 use crate::core::setup;
 #[cfg(not(target_os = "android"))]
 use tauri_plugin_autostart::MacosLauncher;
-use tauri::Manager;
+use tauri::{Listener, Manager};
 
 /// `mobile_entry_point` is required by the Tauri Android/iOS runtime: the
 /// native Activity loads the cdylib and calls this symbol instead of `main`.
@@ -120,6 +122,24 @@ pub fn run() {
             #[cfg(not(target_os = "android"))]
             {
                 setup::default(&app_handle);
+
+                // 原生侧本地化：启动时读取语言偏好；前端改偏好会写 config store 的
+                // `language` 键并广播 `store://change`，这里据此刷新进程内缓存。
+                // 托盘 title/tooltip 由计时器循环每秒重设、通知在发送时取当前语言，
+                // 因此切换语言无需重启即可生效。
+                localization::init(&app_handle);
+                let locale_handle = app_handle.clone();
+                app_handle.listen("store://change", move |event| {
+                    let Ok(payload) = serde_json::from_str::<serde_json::Value>(event.payload())
+                    else {
+                        return;
+                    };
+                    if payload.get("key").and_then(|key| key.as_str())
+                        == Some(localization::LANGUAGE_STORE_KEY)
+                    {
+                        localization::refresh_from_store(&locale_handle);
+                    }
+                });
 
                 // The main webview and tray load even when the window stays hidden.
                 let silent = startup::is_silent_launch(std::env::args_os());

@@ -23,6 +23,7 @@ import {
   track,
 } from "@/lib/analytics";
 import { MOBILE_TABS, MobileTabBar } from "./mobile-tab-bar";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 import { MobileConfigProvider, useMobileConfig } from "./config-context";
 import { NotificationPermissionProvider } from "./notification-permission-context";
 import { TodayTab } from "./today-tab";
@@ -34,11 +35,26 @@ import { NotificationSetupGuide } from "./notification-setup-guide";
 import { OnboardingTour } from "./onboarding-tour";
 import { MissedAlarmDialog } from "./missed-alarm-dialog";
 
-const HEADERS: Record<MobileTabId, { title: string; subtitle: string }> = {
-  today: { title: "今日", subtitle: "少量多次，慢慢喝就好" },
-  reminder: { title: "提醒", subtitle: "设定属于你的喝水节奏" },
-  data: { title: "数据", subtitle: "看见每一天的坚持" },
-  me: { title: "我的", subtitle: "偏好、备份与关于" },
+const HEADERS: Record<
+  MobileTabId,
+  { titleKey: MessageKey; subtitleKey: MessageKey }
+> = {
+  today: {
+    titleKey: "mobile.tab.today",
+    subtitleKey: "mobile.header.today.subtitle",
+  },
+  reminder: {
+    titleKey: "mobile.tab.reminder",
+    subtitleKey: "mobile.header.reminder.subtitle",
+  },
+  data: {
+    titleKey: "mobile.tab.data",
+    subtitleKey: "mobile.header.data.subtitle",
+  },
+  me: {
+    titleKey: "mobile.tab.me",
+    subtitleKey: "mobile.header.me.subtitle",
+  },
 };
 
 const TAB_STORAGE_KEY = "shui:mobile-tab";
@@ -139,6 +155,7 @@ function ReminderEvents({
 type ActiveReminder = { session: string | null; trigger: ReminderTrigger };
 
 export function MobileApp() {
+  const { t, locale } = useI18n();
   const [tab, setTab] = useState<MobileTabId>("today");
   const [activeReminder, setActiveReminder] = useState<ActiveReminder | undefined>(
     undefined
@@ -231,7 +248,7 @@ export function MobileApp() {
   useEffect(() => onShowReminder(() => openReminder("preview")), [openReminder]);
 
   const header = HEADERS[tab];
-  const dateLabel = new Date().toLocaleDateString("zh-CN", {
+  const dateLabel = new Date().toLocaleDateString(locale, {
     month: "long",
     day: "numeric",
     weekday: "long",
@@ -244,18 +261,18 @@ export function MobileApp() {
         <div className="mobile-root flex flex-col overflow-hidden bg-background text-foreground">
           <header className="shrink-0 px-5 pb-3 pt-1.5">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Shui · 喝水提醒
+              Shui · {t("mobile.brand")}
             </p>
             <div className="mt-1 flex items-baseline justify-between gap-2">
               <h1 className="text-[26px] font-semibold leading-tight tracking-tight">
-                {header.title}
+                {t(header.titleKey)}
               </h1>
               <span className="shrink-0 text-xs text-muted-foreground">
                 {dateLabel}
               </span>
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {header.subtitle}
+              {t(header.subtitleKey)}
             </p>
           </header>
 
@@ -266,7 +283,7 @@ export function MobileApp() {
                 ref={(node) => {
                   scrollNodes.current[id] = node;
                 }}
-                aria-label={HEADERS[id].title}
+                aria-label={t(HEADERS[id].titleKey)}
                 aria-hidden={tab !== id}
                 style={{ display: tab === id ? "block" : "none" }}
                 onScroll={(event) => {

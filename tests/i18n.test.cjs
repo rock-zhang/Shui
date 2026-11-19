@@ -73,3 +73,33 @@ test('english copy does not keep chinese-only sentences', () => {
     ['language.zh']
   );
 });
+
+test('placeholders match between the two dictionaries for every key', () => {
+  const placeholders = (value) =>
+    [...value.matchAll(/\{(\w+)\}/g)].map((match) => match[1]).sort();
+  for (const key of Object.keys(dictionaries.zhCN)) {
+    const zh = placeholders(dictionaries.zhCN[key]);
+    const en = placeholders(dictionaries.enUS[key]);
+    assert.deepEqual(
+      en,
+      zh,
+      `${key}: placeholders differ (zh=${zh.join(',')}, en=${en.join(',')})`
+    );
+  }
+});
+
+test('weekday key maps cover all seven days in both dictionaries', () => {
+  assert.equal(dictionaries.WEEKDAY_SHORT_KEYS.length, 7);
+  assert.equal(dictionaries.WEEKDAY_LONG_KEYS.length, 7);
+  for (let day = 0; day < 7; day += 1) {
+    assert.equal(
+      dictionaries.WEEKDAY_SHORT_KEYS[day],
+      `weekday.short.${day}`
+    );
+    assert.equal(dictionaries.WEEKDAY_LONG_KEYS[day], `weekday.long.${day}`);
+    assert.ok(dictionaries.zhCN[dictionaries.WEEKDAY_SHORT_KEYS[day]]);
+    assert.ok(dictionaries.enUS[dictionaries.WEEKDAY_SHORT_KEYS[day]]);
+    assert.ok(dictionaries.zhCN[dictionaries.WEEKDAY_LONG_KEYS[day]]);
+    assert.ok(dictionaries.enUS[dictionaries.WEEKDAY_LONG_KEYS[day]]);
+  }
+});

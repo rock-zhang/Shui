@@ -9,16 +9,17 @@ import {
 } from "lucide-react";
 import type { MobileTabId } from "@/lib/mobile";
 import { cn } from "@/lib/utils";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 
 export const MOBILE_TABS: ReadonlyArray<{
   id: MobileTabId;
-  label: string;
+  labelKey: MessageKey;
   icon: LucideIcon;
 }> = [
-  { id: "today", label: "今日", icon: Droplets },
-  { id: "reminder", label: "提醒", icon: BellRing },
-  { id: "data", label: "数据", icon: ChartNoAxesCombined },
-  { id: "me", label: "我的", icon: UserRound },
+  { id: "today", labelKey: "mobile.tab.today", icon: Droplets },
+  { id: "reminder", labelKey: "mobile.tab.reminder", icon: BellRing },
+  { id: "data", labelKey: "mobile.tab.data", icon: ChartNoAxesCombined },
+  { id: "me", labelKey: "mobile.tab.me", icon: UserRound },
 ];
 
 export function MobileTabBar({
@@ -28,10 +29,11 @@ export function MobileTabBar({
   active: MobileTabId;
   onChange: (id: MobileTabId) => void;
 }) {
+  const { t } = useI18n();
   return (
     <nav
       className="mobile-tab-bar flex shrink-0 items-stretch px-2 pt-1.5"
-      aria-label="主导航"
+      aria-label={t("mobile.nav.label")}
     >
       {MOBILE_TABS.map((tab) => {
         const selected = active === tab.id;
@@ -57,7 +59,7 @@ export function MobileTabBar({
                 selected && "font-semibold"
               )}
             >
-              {tab.label}
+              {t(tab.labelKey)}
             </span>
           </button>
         );

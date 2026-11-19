@@ -34,9 +34,8 @@ use crate::reminder_session::{ClosedSession, Outcome};
 pub const DRINK_RECORDED_EVENT: &str = "shui:drink-recorded";
 
 const SKIP_ACTION_ID: &str = "skip";
-/// Windows / Linux 的第四个按钮。macOS 走单按钮方案，多一个动作就会被折叠成下拉，所以不发。
-#[cfg(not(target_os = "macos"))]
-const SKIP_ACTION_LABEL: &str = "稍后再说";
+// Windows / Linux 的第四个按钮文案由 localization::t("notification.skip_action") 提供；
+// macOS 走单按钮方案，多一个动作就会被折叠成下拉，所以不发。
 
 /// macOS 单按钮的兜底档位：前端没给档位（或全为 0）时用它。
 #[cfg(target_os = "macos")]
@@ -190,6 +189,12 @@ fn commit_drink(app: &AppHandle, amount: u64) {
 ///
 /// 未设置目标时只展示已喝量，连一口都还没喝就不占副标题这一行。
 fn progress_label(total: u64, goal: u64) -> String {
+    progress_label_for(crate::localization::current_locale(), total, goal)
+}
+
+/// 按指定语言生成副标题（供测试确认中英取值）。
+fn progress_label_for(locale: crate::localization::Locale, total: u64, goal: u64) -> String {
+    use crate::localization::{format_message, t_in};
     if goal > 0 {
         let ratio = (total as f64 / goal as f64).clamp(0.0, 1.0);
         // 达标前最多显示 99%，避免 1999/2000 时看起来像已经完成。
@@ -198,9 +203,19 @@ fn progress_label(total: u64, goal: u64) -> String {
         } else {
             ((ratio * 100.0) as u64).min(99)
         };
-        format!("已喝 {total} / {goal}ml · {percent}%")
+        format_message(
+            t_in(locale, "notification.progress"),
+            &[
+                ("total", total.to_string()),
+                ("goal", goal.to_string()),
+                ("percent", percent.to_string()),
+            ],
+        )
     } else if total > 0 {
-        format!("今日已喝 {total}ml")
+        format_message(
+            t_in(locale, "notification.progress_no_goal"),
+            &[("total", total.to_string())],
+        )
     } else {
         String::new()
     }
@@ -211,82 +226,29 @@ fn progress_label(total: u64, goal: u64) -> String {
 /// 与 Android `ReminderReceiver.kt` 的 `ReminderCopy` 逐条一致——固定文案用久了会被
 /// 当成背景噪音直接划掉，进度不同给不同的鼓励也更贴合当下。改文案时两端要同步。
 mod copy {
+    use crate::localization::{self, Locale};
     use std::sync::Mutex;
     use std::time::{SystemTime, UNIX_EPOCH};
-
-    const START: [&str; 12] = [
-        "新的一天从一杯水开始，来一杯吧",
-        "刚起步，先喝口水润润嗓子",
-        "身体刚开始补水，别停下",
-        "现在喝一杯，今天会很轻松",
-        "第一杯水永远最值，先从这杯开始",
-        "还早，慢慢把节奏建立起来",
-        "起身走走，顺便接杯水",
-        "提醒一下：该补水了",
-        "别等到口渴才喝，现在正好",
-        "一小口水也是进步，来吧",
-        "给身体开个好头，干杯",
-        "先来一杯，给今天开个好头",
-    ];
-
-    const HALF: [&str; 12] = [
-        "已经四分之一了，继续保持",
-        "进度不错，再来一杯稳稳推进",
-        "节奏起来了，别断",
-        "喝一口，离目标更近一点",
-        "身体正在变好，别停下来",
-        "这一杯下去，状态会更清醒",
-        "补水进行中，保持这个势头",
-        "再补几杯，进度会更稳",
-        "现在的你比刚起床时更水润了",
-        "不必大口，小口多次最有效",
-        "继续按节奏来，稳稳的",
-        "记得喝水，也记得起身活动",
-    ];
-
-    const NEAR: [&str; 12] = [
-        "已经过半，胜利在望",
-        "再补几杯，今天就很稳了",
-        "势头很好，别松懈",
-        "今天的目标越来越近了",
-        "继续喝，身体会感谢你",
-        "过半的进度，值得再喝一杯",
-        "保持住，这个节奏刚刚好",
-        "再来一杯，向目标冲刺",
-        "你已经比大多数人喝得多了",
-        "喝口水，给自己一个小小的奖励",
-        "补水过半，状态在线",
-        "剩下的交给每一杯水",
-    ];
-
-    const ALMOST: [&str; 12] = [
-        "只差最后几杯，别放弃",
-        "快到目标了，一鼓作气",
-        "胜利就在眼前，再来一杯",
-        "最后冲刺，今天的目标马上达成",
-        "已经很接近了，坚持一下",
-        "再喝一杯就离目标更近了",
-        "收尾阶段，稳稳喝完",
-        "今天的你非常自律，继续",
-        "最后这一段，交给这杯水",
-        "差距不大了，喝完就达标",
-        "保持住，马上就能完成目标",
-        "再补一杯，今天就算圆满",
-    ];
 
     /// 每档上一次用过的下标：连续两条不重复，固定文案更容易被当成噪音。
     static LAST: Mutex<[Option<usize>; 4]> = Mutex::new([None; 4]);
 
     pub(super) fn pick(ratio: f64) -> &'static str {
-        let (bucket, pool): (usize, &'static [&'static str]) = if ratio >= 0.75 {
-            (3, &ALMOST)
+        pick_in(ratio, localization::current_locale())
+    }
+
+    /// 按指定语言挑文案（供测试确认中英取值）。
+    pub(super) fn pick_in(ratio: f64, locale: Locale) -> &'static str {
+        let bucket = if ratio >= 0.75 {
+            3
         } else if ratio >= 0.5 {
-            (2, &NEAR)
+            2
         } else if ratio >= 0.25 {
-            (1, &HALF)
+            1
         } else {
-            (0, &START)
+            0
         };
+        let pool = localization::reminder_copy_pool(locale, bucket);
 
         let mut index = random_index(pool.len());
         let mut last = LAST.lock().unwrap();
@@ -736,8 +698,8 @@ pub fn send_desktop_reminder_notification(app: AppHandle, amounts: Vec<u64>) -> 
     let mut notification = notify_rust::Notification::new();
     let body = copy::pick(ratio);
     notification
-        .summary("该喝水啦")
-        .body(&body)
+        .summary(crate::localization::t("notification.title"))
+        .body(body)
         .auto_icon();
     let progress = progress_label(total, goal);
     if !progress.is_empty() {
@@ -771,7 +733,10 @@ pub fn send_desktop_reminder_notification(app: AppHandle, amounts: Vec<u64>) -> 
             notification.action(&drink_action_id(amount), &drink_action_label(amount));
             count += 1;
         }
-        notification.action(SKIP_ACTION_ID, SKIP_ACTION_LABEL);
+        notification.action(
+            SKIP_ACTION_ID,
+            crate::localization::t("notification.skip_action"),
+        );
         count + 1
     };
 
@@ -818,7 +783,7 @@ pub fn send_desktop_reminder_notification(app: AppHandle, amounts: Vec<u64>) -> 
             .spawn(move || {
                 let started = Instant::now();
                 let mut mac_notification = mac_usernotifications::Notification::new()
-                    .title("该喝水啦")
+                    .title(crate::localization::t("notification.title"))
                     .message(body);
                 if !progress.is_empty() {
                     mac_notification = mac_notification.subtitle(progress);
@@ -1008,8 +973,8 @@ pub fn send_desktop_test_notification(app: AppHandle) -> Result<(), String> {
             #[cfg(target_os = "macos")]
             {
                 let notification = mac_usernotifications::Notification::new()
-                    .title("通知正常")
-                    .message("以后提醒会以这个形式出现，看到这一条说明链路通了");
+                    .title(crate::localization::t("notification.test.title"))
+                    .message(crate::localization::t("notification.test.body"));
                 match tauri::async_runtime::block_on(notification.send()) {
                     Ok(_handle) => {
                         report("发送测试通知");
@@ -1027,8 +992,8 @@ pub fn send_desktop_test_notification(app: AppHandle) -> Result<(), String> {
             {
                 let mut notification = notify_rust::Notification::new();
                 notification
-                    .summary("通知正常")
-                    .body("以后提醒会以这个形式出现，看到这一条说明链路通了")
+                    .summary(crate::localization::t("notification.test.title"))
+                    .body(crate::localization::t("notification.test.body"))
                     .auto_icon();
 
                 match notification.show() {
@@ -1088,10 +1053,36 @@ mod tests {
     }
 
     #[test]
+    fn progress_label_is_localized() {
+        use crate::localization::Locale;
+        assert_eq!(
+            progress_label_for(Locale::En, 1000, 2000),
+            "1000 / 2000ml · 50%"
+        );
+        assert_eq!(progress_label_for(Locale::En, 250, 0), "250ml today");
+        assert_eq!(progress_label_for(Locale::En, 0, 0), "");
+    }
+
+    #[test]
     fn copy_pool_never_repeats_back_to_back() {
         let first = copy::pick(0.1);
         let second = copy::pick(0.1);
         assert_ne!(first, second);
+    }
+
+    #[test]
+    fn copy_pool_uses_requested_language() {
+        use crate::localization::{self, Locale};
+        // 用 0.8（ALMOST 档），避免与 no-repeat 测试争用同一档的 LAST 下标。
+        // 文案是随机挑的，所以断言「取自对应语言的池」而不是固定下标。
+        let zh = copy::pick_in(0.8, Locale::Zh);
+        let en = copy::pick_in(0.8, Locale::En);
+        let zh_pool = localization::reminder_copy_pool(Locale::Zh, 3);
+        let en_pool = localization::reminder_copy_pool(Locale::En, 3);
+        assert!(zh_pool.contains(&zh));
+        assert!(en_pool.contains(&en));
+        // 两种语言的文案池没有交集，确保按语言切换确实生效。
+        assert!(en_pool.iter().all(|copy| !zh_pool.contains(copy)));
     }
 
     #[test]

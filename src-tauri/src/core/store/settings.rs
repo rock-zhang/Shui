@@ -229,15 +229,19 @@ impl AppSettings {
     }
 
     pub fn get_status_message(&self) -> (&'static str, &'static str) {
+        use crate::localization::t;
         if self.today_drink_amount >= self.gold {
-            ("已达标", "太棒啦，再接再厉")
+            (
+                t("status.goal_reached.title"),
+                t("status.goal_reached.tooltip"),
+            )
         } else if self.is_paused {
             // 手动暂停与「非工作日/非工作时间」要分开说，否则用户会以为是时段问题。
-            ("已暂停", "提醒已暂停，可在托盘菜单点「重新计时」")
+            (t("status.paused.title"), t("status.paused.tooltip"))
         } else if !self.is_work_day {
-            ("", "今天不是提醒日")
+            ("", t("status.not_workday.tooltip"))
         } else {
-            ("", "不在提醒时段")
+            ("", t("status.out_of_range.tooltip"))
         }
     }
 }
@@ -325,5 +329,43 @@ mod tests {
     #[test]
     fn treats_invalid_drink_amount_as_zero() {
         assert_eq!(drink_amount_from_value(&json!({ "total": "unknown" })), 0);
+    }
+
+    #[test]
+    fn status_messages_pick_the_localized_key_for_each_state() {
+        use crate::localization::t;
+
+        // 未 init 的测试环境回退中文；这里验证每个状态取到的是对应文案的 key。
+        assert_eq!(
+            running_settings().get_status_message(),
+            ("", t("status.out_of_range.tooltip"))
+        );
+        let paused = AppSettings {
+            is_paused: true,
+            ..running_settings()
+        };
+        assert_eq!(
+            paused.get_status_message(),
+            (t("status.paused.title"), t("status.paused.tooltip"))
+        );
+        let goal_met = AppSettings {
+            today_drink_amount: 1500,
+            ..running_settings()
+        };
+        assert_eq!(
+            goal_met.get_status_message(),
+            (
+                t("status.goal_reached.title"),
+                t("status.goal_reached.tooltip")
+            )
+        );
+        let off_day = AppSettings {
+            is_work_day: false,
+            ..running_settings()
+        };
+        assert_eq!(
+            off_day.get_status_message(),
+            ("", t("status.not_workday.tooltip"))
+        );
     }
 }

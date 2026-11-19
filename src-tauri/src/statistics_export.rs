@@ -10,7 +10,7 @@ pub async fn save_drink_history_csv(
     let selected_path = app_handle
         .dialog()
         .file()
-        .set_title("导出饮水记录")
+        .set_title(crate::localization::t("dialog.export_csv.title"))
         .set_file_name(file_name)
         .add_filter("CSV", &["csv"])
         .blocking_save_file();

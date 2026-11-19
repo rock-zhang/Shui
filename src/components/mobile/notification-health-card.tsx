@@ -28,6 +28,7 @@ import {
 } from "@/lib/mobile";
 import { romFromHealth } from "@/lib/rom";
 import { track } from "@/lib/analytics";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 import { useNotificationPermission } from "./notification-permission-context";
 import { OPEN_GUIDE_EVENT } from "./notification-setup-guide";
 import { MobileSection } from "./ui";
@@ -48,9 +49,9 @@ type Check = {
   action: React.ReactNode;
 };
 
-function clock(ms: number): string {
+function clock(ms: number, locale: string): string {
   if (!ms || ms <= 0) return "—";
-  return new Date(ms).toLocaleTimeString("zh-CN", {
+  return new Date(ms).toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
@@ -58,17 +59,28 @@ function clock(ms: number): string {
   });
 }
 
+type Translate = ReturnType<typeof useI18n>["t"];
+
 /** 把快照转成可复制的纯文本，便于在真机上取证后贴出来分析。 */
-function toReport(health: NotificationHealth | null, diag: Diagnostics): string {
+function toReport(
+  health: NotificationHealth | null,
+  diag: Diagnostics,
+  t: Translate,
+  locale: string
+): string {
+  const on = t("mobile.health.on");
+  const off = t("mobile.health.off");
+  const yes = t("mobile.health.yes");
+  const no = t("mobile.health.no");
   return [
-    `Shui 诊断 ${diag.appVersion}`,
-    `时间 ${clock(diag.now)} · 间隔 ${diag.gapMinutes} 分钟`,
-    `闹钟排期 ${clock(diag.nextAt)} · 上次提醒 ${clock(diag.lastReminderAt)}`,
-    `精确闹钟 ${diag.exactAlarm ? "开" : "关"} · 通知权限 ${diag.notificationsEnabled ? "开" : "关"}`,
-    `渠道重要度 ${diag.channelImportance} · 横幅 ${health?.headsUp ? "是" : "否"} · 声音 ${health?.channelSound ? "是" : "否"} · 震动 ${health?.channelVibration ? "是" : "否"}`,
-    `电池白名单 ${diag.batteryIgnored ? "是" : "否"} · ${diag.dozing ? "深睡 Doze" : "活跃"} · ${diag.interactive ? "亮屏" : "熄屏"}`,
-    `漏提醒 ${diag.missedAlarmAt > 0 ? clock(diag.missedAlarmAt) : "无"}`,
-    `机型 ${health?.manufacturer ?? "?"} / ${health?.brand ?? "?"} · SDK ${health?.sdkInt ?? "?"}`,
+    `${t("mobile.health.report.title")} ${diag.appVersion}`,
+    `${t("mobile.health.report.time")} ${clock(diag.now, locale)} · ${t("mobile.health.report.gap")} ${diag.gapMinutes} ${t("mobile.health.minutes")}`,
+    `${t("mobile.health.report.scheduled")} ${clock(diag.nextAt, locale)} · ${t("mobile.health.report.lastReminder")} ${clock(diag.lastReminderAt, locale)}`,
+    `${t("mobile.health.report.exact")} ${diag.exactAlarm ? on : off} · ${t("mobile.health.report.permission")} ${diag.notificationsEnabled ? on : off}`,
+    `${t("mobile.health.report.importance")} ${diag.channelImportance} · ${t("mobile.health.report.headsUp")} ${health?.headsUp ? yes : no} · ${t("mobile.health.report.sound")} ${health?.channelSound ? yes : no} · ${t("mobile.health.report.vibration")} ${health?.channelVibration ? yes : no}`,
+    `${t("mobile.health.report.whitelist")} ${diag.batteryIgnored ? yes : no} · ${diag.dozing ? t("mobile.health.report.dozing") : t("mobile.health.report.active")} · ${diag.interactive ? t("mobile.health.report.screenOn") : t("mobile.health.report.screenOff")}`,
+    `${t("mobile.health.report.missed")} ${diag.missedAlarmAt > 0 ? clock(diag.missedAlarmAt, locale) : t("mobile.health.report.none")}`,
+    `${t("mobile.health.report.device")} ${health?.manufacturer ?? "?"} / ${health?.brand ?? "?"} · SDK ${health?.sdkInt ?? "?"}`,
   ].join("\n");
 }
 
@@ -118,6 +130,7 @@ function ManualRow({
  * 中性状态 + 一个真正能弹出标准授权框的入口。
  */
 export function NotificationHealthCard() {
+  const { t, locale } = useI18n();
   const { canRequest, request } = useNotificationPermission();
   const [health, setHealth] = useState<NotificationHealth | null>(null);
   const [diag, setDiag] = useState<Diagnostics | null>(null);
@@ -157,14 +170,14 @@ export function NotificationHealthCard() {
    * visibilitychange（WebView 一直是 visible），只能主动轮询确认。
    */
   const watchUntil = useCallback(
-    (predicate: (value: NotificationHealth) => boolean, successText: string) => {
+    (predicate: (value: NotificationHealth) => boolean, successKey: MessageKey) => {
       stopWatching();
       const deadline = Date.now() + WATCH_TOTAL_MS;
       const tick = async () => {
         const next = await read();
         if (next && predicate(next)) {
           stopWatching();
-          toast.success(successText);
+          toast.success(t(successKey));
           // 精确闹钟刚授予：已排的那一次仍是非精确的，必须立刻按原锚点重排。
           if (next.exactAlarm) void rescheduleReminders();
           return;
@@ -174,7 +187,7 @@ export function NotificationHealthCard() {
       void tick();
       watchTimer.current = window.setInterval(() => void tick(), WATCH_INTERVAL_MS);
     },
-    [read, stopWatching]
+    [read, stopWatching, t]
   );
 
   /**
@@ -227,12 +240,12 @@ export function NotificationHealthCard() {
         await invoke(command);
         if (successText) toast.info(successText);
       } catch {
-        toast.error("无法打开该设置页，请到系统设置中手动完成");
+        toast.error(t("mobile.notif.openSettingsFailed"));
       } finally {
         setBusy(null);
       }
     },
-    []
+    [t]
   );
 
   /** 渠道被系统改坏时重建：这是渠道层面唯一能自愈的手段。 */
@@ -242,13 +255,13 @@ export function NotificationHealthCard() {
     try {
       await invoke("repair_notification_channels");
       await read();
-      toast.success("通知渠道已重建，发一条测试通知看看横幅");
+      toast.success(t("mobile.health.repaired"));
     } catch {
-      toast.error("修复失败，请到系统通知设置里手动调整");
+      toast.error(t("mobile.health.repairFailed"));
     } finally {
       setBusy(null);
     }
-  }, [read]);
+  }, [read, t]);
 
   /**
    * 加入标准电池白名单：优先弹系统的「忽略电池优化？」对话框，
@@ -260,28 +273,28 @@ export function NotificationHealthCard() {
     try {
       const res = await invoke<{ result: string }>("open_battery_settings");
       if (res?.result === "already") {
-        toast.info("已在白名单中，可在列表里确认或撤销");
+        toast.info(t("mobile.health.alreadyWhitelisted"));
       } else {
-        watchUntil((value) => value.batteryIgnored, "已加入电池优化白名单");
+        watchUntil((value) => value.batteryIgnored, "mobile.health.addedWhitelist");
       }
     } catch {
-      toast.error("无法打开电池优化设置，请到系统设置里手动添加");
+      toast.error(t("mobile.health.whitelistFailed"));
     } finally {
       setBusy(null);
     }
-  }, [watchUntil]);
+  }, [watchUntil, t]);
 
   const copyReport = useCallback(async () => {
     if (!diag) return;
     try {
-      await navigator.clipboard.writeText(toReport(health, diag));
+      await navigator.clipboard.writeText(toReport(health, diag, t, locale));
       track("health_diagnostics_copy", { result: "success" });
-      toast.success("诊断信息已复制");
+      toast.success(t("mobile.health.reportCopied"));
     } catch {
       track("health_diagnostics_copy", { result: "failed" });
-      toast.error("复制失败，请截图");
+      toast.error(t("mobile.health.copyFailed"));
     }
-  }, [diag, health]);
+  }, [diag, health, t, locale]);
 
   // 体检卡浏览一次记一次：用失败项数量做维度，能看出「哪类问题最常见」。
   const viewLogged = useRef(false);
@@ -310,7 +323,10 @@ export function NotificationHealthCard() {
 
   if (loading) {
     return (
-      <MobileSection title="通知体检" description="正在读取系统通知配置…">
+      <MobileSection
+        title={t("mobile.health.title")}
+        description={t("mobile.health.loading")}
+      >
         <div className="h-20 animate-pulse rounded-xl bg-muted" />
       </MobileSection>
     );
@@ -319,15 +335,18 @@ export function NotificationHealthCard() {
   // 桌面预览没有这套系统概念：如实说明，不摆一堆永远红的勾。
   if (!health) {
     return (
-      <MobileSection title="通知体检" description="仅在 Android App 内可用">
+      <MobileSection
+        title={t("mobile.health.title")}
+        description={t("mobile.health.androidOnly")}
+      >
         <p className="text-xs leading-5 text-muted-foreground">
-          当前环境没有 Android 通知通道。请在手机上打开 App 查看检查结果。
+          {t("mobile.health.noChannel")}
         </p>
       </MobileSection>
     );
   }
 
-  const rom = romFromHealth(health);
+  const rom = romFromHealth(health, locale);
   const isDomesticRom = rom.domestic;
 
   /**
@@ -346,25 +365,25 @@ export function NotificationHealthCard() {
 
   const channelIssues: string[] = [];
   if (!health.channelExists) {
-    channelIssues.push("渠道尚未创建");
+    channelIssues.push(t("mobile.health.channelMissing"));
   } else {
     if (!health.headsUp) {
       channelIssues.push(
         health.channelImportance < CHANNEL_IMPORTANCE.HIGH
-          ? `重要度 ${health.channelImportance}（需 4「紧急」才弹横幅）`
-          : "重要度不足"
+          ? t("mobile.health.lowImportance", { level: health.channelImportance })
+          : t("mobile.health.importanceLow")
       );
     }
-    if (!health.channelSound) channelIssues.push("提示音为空");
-    if (!health.channelVibration) channelIssues.push("震动被关");
+    if (!health.channelSound) channelIssues.push(t("mobile.health.noSound"));
+    if (!health.channelVibration) channelIssues.push(t("mobile.health.noVibration"));
   }
 
   const checks: Check[] = [
     {
       key: "permission",
-      label: "通知权限",
+      label: t("mobile.health.check.permission"),
       ok: health.notificationsEnabled,
-      hint: "系统未允许 Shui 发送通知，所有提醒会被静默丢弃",
+      hint: t("mobile.health.check.permissionHint"),
       action: (
         <Button
           size="sm"
@@ -378,15 +397,15 @@ export function NotificationHealthCard() {
             void request("health_card");
           }}
         >
-          {canRequest ? "允许" : "去开启"}
+          {canRequest ? t("mobile.health.allow") : t("mobile.health.goEnable")}
         </Button>
       ),
     },
     {
       key: "exact",
-      label: "精确闹钟",
+      label: t("mobile.health.check.exact"),
       ok: health.exactAlarm,
-      hint: "未开启，到点提醒会被系统推迟十几分钟甚至更久",
+      hint: t("mobile.health.check.exactHint"),
       action: (
         <Button
           size="sm"
@@ -398,12 +417,12 @@ export function NotificationHealthCard() {
               item: "exact_alarm",
               action: "open_settings",
             });
-            void run("open_exact_alarm_settings", "请允许 Shui 使用「闹钟和提醒」").then(
-              () => watchUntil((value) => value.exactAlarm, "精确闹钟已开启")
+            void run("open_exact_alarm_settings", t("mobile.health.allowExact")).then(
+              () => watchUntil((value) => value.exactAlarm, "mobile.health.exactEnabled")
             );
           }}
         >
-          去开启
+          {t("mobile.health.goEnable")}
         </Button>
       ),
     },
@@ -435,11 +454,11 @@ export function NotificationHealthCard() {
 
   return (
     <MobileSection
-      title="通知体检"
+      title={t("mobile.health.title")}
       description={
         todo.length === 0
-          ? "可自动检测的项目全部通过（下方「必开」项需你自己确认）"
-          : `还有 ${todo.length} 项需要处理，否则提醒可能被系统静默拦掉`
+          ? t("mobile.health.allPassed")
+          : t("mobile.health.todo", { count: todo.length })
       }
     >
       {/* 运行异常优先于配置项：配置全绿但闹钟根本不响，这才是用户真正遇到的场景。 */}
@@ -448,9 +467,11 @@ export function NotificationHealthCard() {
           <p className="flex items-start gap-2 text-xs leading-5 text-destructive">
             <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              <span className="font-semibold">闹钟没响：</span>
-              排期 {clock(diag.nextAt)} 已过去 {overdueSeconds} 秒仍未触发，通常是后台运行被关
-              或进程被系统冻结。先处理下面的「后台运行」。
+              <span className="font-semibold">{t("mobile.health.overdue.title")}</span>
+              {t("mobile.health.overdue.body", {
+                time: clock(diag.nextAt, locale),
+                seconds: overdueSeconds,
+              })}
             </span>
           </p>
         </div>
@@ -465,7 +486,7 @@ export function NotificationHealthCard() {
               className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
             />
             <p className="text-xs leading-5 text-emerald-700 dark:text-emerald-300">
-              通知渠道正常 · 横幅 / 提示音 / 震动都已配置
+              {t("mobile.health.channelOk")}
             </p>
           </div>
         ) : (
@@ -473,7 +494,7 @@ export function NotificationHealthCard() {
             <p className="flex items-start gap-2 text-xs leading-5 text-amber-700 dark:text-amber-300">
               <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
-                <span className="font-semibold">通知渠道有问题：</span>
+                <span className="font-semibold">{t("mobile.health.channelBad")}</span>
                 {channelIssues.join(" · ")}
               </span>
             </p>
@@ -485,7 +506,7 @@ export function NotificationHealthCard() {
                 onClick={() => void repair()}
               >
                 <Wrench className="mr-1 h-3.5 w-3.5" />
-                一键修复
+                {t("mobile.health.repair")}
               </Button>
               <Button
                 size="sm"
@@ -500,7 +521,7 @@ export function NotificationHealthCard() {
                   void run("open_notification_settings");
                 }}
               >
-                去设置
+                {t("mobile.health.goSettings")}
               </Button>
             </div>
           </div>
@@ -539,18 +560,18 @@ export function NotificationHealthCard() {
           <span className="min-w-0 flex-1 text-xs leading-5">
             <span className="flex items-center gap-1.5">
               <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">
-                自启动 + 完全后台行为
+                {t("mobile.health.background.title")}
               </span>
               <span className="rounded bg-amber-500 px-1.5 py-px text-[9px] font-bold leading-4 text-white dark:text-amber-950">
-                必开
+                {t("mobile.health.mustEnable")}
               </span>
             </span>
             {/* 厂商开关没有公开 API，状态读不到，所以每次都请用户按路径检查。 */}
             <span className="mt-1 block text-xs leading-4 text-muted-foreground">
-              系统读不到这两项的状态，需要你按路径检查一下。
+              {t("mobile.health.background.cannotRead")}
             </span>
             <span className="mt-0.5 block text-amber-700/90 dark:text-amber-300/80">
-              两项都要开，否则划掉 App 后闹钟会被一起清掉。
+              {t("mobile.health.background.mustBoth")}
             </span>
           </span>
         </p>
@@ -570,25 +591,25 @@ export function NotificationHealthCard() {
             );
           }}
         >
-          去检查后台设置
+          {t("mobile.health.background.check")}
         </Button>
       </div>
 
       {/* 系统私有开关：读不到状态，只有跳转入口，不装作能检测。 */}
       <div className="mt-3">
         <p className="mb-1.5 text-xs font-medium text-foreground">
-          其他系统私有开关
+          {t("mobile.health.private.title")}
           <span className="ml-1 font-normal text-muted-foreground">
-            （App 读不到状态，需你确认一次）
+            {t("mobile.health.private.note")}
           </span>
         </p>
         <div className="space-y-1.5">
           <ManualRow
-            label="横幅 / 锁屏 / 铃声 / 振动"
+            label={t("mobile.health.private.fourToggles")}
             hint={
               isDomesticRom
-                ? "国产系统默认全关，不打开就只会躺在通知栏"
-                : "确认这四项在本机通知设置里都已打开"
+                ? t("mobile.health.private.domesticHint")
+                : t("mobile.health.private.genericHint")
             }
             disabled={busy !== null}
             onClick={() => {
@@ -596,7 +617,7 @@ export function NotificationHealthCard() {
                 item: "channel",
                 action: "open_settings",
               });
-              void run("open_notification_settings", "在这页打开这四项开关");
+              void run("open_notification_settings", t("mobile.health.private.openHint"));
             }}
           />
         </div>
@@ -608,9 +629,9 @@ export function NotificationHealthCard() {
         <details className="group mt-3 rounded-xl border border-border/70 bg-background/40">
           <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs [&::-webkit-details-marker]:hidden">
             <Activity aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <span className="font-medium">运行详情</span>
+            <span className="font-medium">{t("mobile.health.details.title")}</span>
             <span className="ml-auto font-mono text-[11px] tabular-nums text-muted-foreground">
-              下次 {clock(diag.nextAt)}
+              {t("mobile.health.details.next", { time: clock(diag.nextAt, locale) })}
             </span>
             <ChevronDown
               aria-hidden="true"
@@ -621,42 +642,42 @@ export function NotificationHealthCard() {
           <div className="border-t border-border/60 px-3 pb-3 pt-2.5">
             <div className="space-y-1 text-[11px] leading-5">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">闹钟排期</span>
-                <span className="font-mono tabular-nums">{clock(diag.nextAt)}</span>
+                <span className="text-muted-foreground">{t("mobile.health.report.scheduled")}</span>
+                <span className="font-mono tabular-nums">{clock(diag.nextAt, locale)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">上次提醒</span>
-                <span className="font-mono tabular-nums">{clock(diag.lastReminderAt)}</span>
+                <span className="text-muted-foreground">{t("mobile.health.report.lastReminder")}</span>
+                <span className="font-mono tabular-nums">{clock(diag.lastReminderAt, locale)}</span>
               </div>
               {diag.missedAlarmAt > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">最近漏提醒</span>
+                  <span className="text-muted-foreground">{t("mobile.health.details.recentMissed")}</span>
                   <span className="tabular-nums text-amber-600 dark:text-amber-400">
-                    {clock(diag.missedAlarmAt)} 未送达
+                    {t("mobile.health.details.notDelivered", { time: clock(diag.missedAlarmAt, locale) })}
                   </span>
                 </div>
               )}
               {diag.alarmCleared && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">闹钟句柄</span>
-                  <span className="text-amber-600 dark:text-amber-400">已被系统清除</span>
+                  <span className="text-muted-foreground">{t("mobile.health.details.alarmHandle")}</span>
+                  <span className="text-amber-600 dark:text-amber-400">{t("mobile.health.details.clearedBySystem")}</span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-muted-foreground">间隔</span>
-                <span className="tabular-nums">{diag.gapMinutes} 分钟</span>
+                <span className="text-muted-foreground">{t("mobile.health.report.gap")}</span>
+                <span className="tabular-nums">{diag.gapMinutes} {t("mobile.health.minutes")}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">设备状态</span>
+                <span className="text-muted-foreground">{t("mobile.health.details.deviceState")}</span>
                 <span className="tabular-nums">
-                  {diag.dozing ? "深睡（Doze）" : "活跃"} · {diag.interactive ? "亮屏" : "熄屏"}
+                  {diag.dozing ? t("mobile.health.report.dozing") : t("mobile.health.report.active")} · {diag.interactive ? t("mobile.health.report.screenOn") : t("mobile.health.report.screenOff")}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">渠道重要度</span>
+                <span className="text-muted-foreground">{t("mobile.health.report.importance")}</span>
                 <span className="tabular-nums">
                   {diag.channelImportance}
-                  {diag.channelImportance > 0 && diag.channelImportance < 4 && "（低于 4 不弹横幅）"}
+                  {diag.channelImportance > 0 && diag.channelImportance < 4 && t("mobile.health.details.belowFour")}
                 </span>
               </div>
             </div>
@@ -669,7 +690,7 @@ export function NotificationHealthCard() {
                 className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
               />
               <span className="min-w-0 flex-1 text-[11px] leading-4">
-                <span className="text-muted-foreground">电池优化白名单</span>{" "}
+                <span className="text-muted-foreground">{t("mobile.health.report.whitelist")}</span>{" "}
                 <span
                   className={
                     diag.batteryIgnored
@@ -677,11 +698,11 @@ export function NotificationHealthCard() {
                       : "text-muted-foreground"
                   }
                 >
-                  {diag.batteryIgnored ? "已加入" : "未加入"}
+                  {diag.batteryIgnored ? t("mobile.health.joined") : t("mobile.health.notJoined")}
                 </span>
                 {!diag.batteryIgnored && (
                   <span className="block text-[10px] leading-4 text-muted-foreground/80">
-                    非必开项，加上只是更稳一点
+                    {t("mobile.health.whitelistOptional")}
                   </span>
                 )}
               </span>
@@ -692,7 +713,7 @@ export function NotificationHealthCard() {
                   onClick={() => void addToWhitelist()}
                   className="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-sky-600 transition-colors hover:bg-sky-500/10 disabled:opacity-60 dark:text-sky-400"
                 >
-                  加入
+                  {t("mobile.health.join")}
                 </button>
               )}
             </div>
@@ -709,7 +730,7 @@ export function NotificationHealthCard() {
                 }}
               >
                 <RefreshCw className="mr-1 h-3 w-3" />
-                刷新
+                {t("common.refresh")}
               </Button>
               <Button
                 variant="outline"
@@ -718,12 +739,12 @@ export function NotificationHealthCard() {
                 onClick={() => void copyReport()}
               >
                 <Activity className="mr-1 h-3 w-3" />
-                复制诊断
+                {t("mobile.health.copyReport")}
               </Button>
             </div>
 
             <p className="mt-2 text-[10px] leading-4 text-muted-foreground/80">
-              v{diag.appVersion} · {health.manufacturer || "未知机型"} / SDK {health.sdkInt}
+              v{diag.appVersion} · {health.manufacturer || t("mobile.health.unknownDevice")} / SDK {health.sdkInt}
             </p>
           </div>
         </details>
@@ -738,7 +759,7 @@ export function NotificationHealthCard() {
           className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-500 px-3 py-2.5 text-[13px] font-semibold text-white shadow-lg shadow-sky-500/20 transition-all duration-150 active:scale-[0.985]"
         >
           <BellRing aria-hidden="true" className="h-4 w-4" />
-          打开「3 步设置」引导
+          {t("mobile.health.openGuide")}
           <ChevronRight aria-hidden="true" className="h-4 w-4" />
         </button>
       ) : (
@@ -748,7 +769,7 @@ export function NotificationHealthCard() {
           className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border px-3 py-2 text-xs text-muted-foreground transition-colors hover:border-sky-400/60 hover:text-foreground"
         >
           <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
-          重新查看「3 步设置」引导
+          {t("mobile.health.reviewGuide")}
         </button>
       )}
     </MobileSection>

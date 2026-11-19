@@ -588,7 +588,8 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
                 putExtra(Intent.EXTRA_STREAM, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            activity.startActivity(Intent.createChooser(share, "分享 Shui 文件"))
+            val chooserTitle = if (AppLocale.isEnglish(activity)) "Share Shui file" else "分享 Shui 文件"
+            activity.startActivity(Intent.createChooser(share, chooserTitle))
             invoke.resolve()
         } catch (error: Exception) {
             invoke.reject("分享失败：${error.message}")

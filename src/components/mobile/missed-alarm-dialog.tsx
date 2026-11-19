@@ -5,7 +5,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { AlarmClockOff, CheckCircle2, Settings, X } from "lucide-react";
 import { readDiagnostics } from "@/lib/mobile";
 import { minutesBucket, track } from "@/lib/analytics";
-import { romProfile, type RomProfile } from "@/lib/rom";
+import { localizeRomProfile, romProfile, type RomProfile } from "@/lib/rom";
+import { useI18n } from "@/lib/i18n";
 import { useMobileConfig } from "./config-context";
 import { OPEN_GUIDE_EVENT } from "./notification-setup-guide";
 import { BackgroundGuideCards } from "./background-guide-cards";
@@ -16,8 +17,8 @@ import { BackgroundGuideCards } from "./background-guide-cards";
  */
 const STALE_MS = 12 * 60 * 60 * 1000;
 
-function clockLabel(ms: number): string {
-  return new Date(ms).toLocaleTimeString("zh-CN", {
+function clockLabel(ms: number, locale: string): string {
+  return new Date(ms).toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -36,6 +37,7 @@ function clockLabel(ms: number): string {
  * 一起清掉，此后一条都收不到；这个弹窗就是那次失败的唯一可见证据。
  */
 export function MissedAlarmDialog() {
+  const { t, locale } = useI18n();
   const { general, alert, hydrated } = useMobileConfig();
   const [open, setOpen] = useState(false);
   const [missedAt, setMissedAt] = useState(0);
@@ -47,7 +49,9 @@ export function MissedAlarmDialog() {
   const [cleared, setCleared] = useState(false);
   // 认不出系统时用中性档案：文案写通用的两项叫法，
   // 绝不把 ColorOS 的叫法写给小米用户看。
-  const [rom, setRom] = useState<RomProfile>(() => romProfile());
+  // state 只存识别结果，文案在渲染时按当前语言取。
+  const [romProfileState, setRom] = useState<RomProfile>(() => romProfile());
+  const rom = localizeRomProfile(romProfileState, locale);
 
   const read = useCallback(async () => {
     const diag = await readDiagnostics();
@@ -199,15 +203,15 @@ export function MissedAlarmDialog() {
                 id="missed-alarm-title"
                 className="text-[15px] font-semibold leading-5 tracking-tight"
               >
-                {clockLabel(missedAt)} 的提醒没送到
+                {t("mobile.missed.title", { time: clockLabel(missedAt, locale) })}
               </h2>
               <p className="mt-1 text-[12px] leading-[18px] text-muted-foreground">
-                {cleared ? "系统把排好的闹钟清掉了" : "闹钟排上了，但通知没弹出来"}
+                {t(cleared ? "mobile.missed.cleared" : "mobile.missed.notShown")}
               </p>
             </div>
             <button
               type="button"
-              aria-label="关闭"
+              aria-label={t("common.close")}
               onClick={() => close("close")}
               className="-mr-1.5 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
             >
@@ -218,14 +222,12 @@ export function MissedAlarmDialog() {
 
         <div className="px-5 pb-1">
           <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground">
-            检查这两项是否已开启
+            {t("mobile.missed.checkTwo")}
           </p>
           <BackgroundGuideCards rom={rom} source="missed_dialog" />
 
           <p className="mt-2.5 text-xs leading-[18px] text-muted-foreground">
-            {cleared
-              ? "另外：用返回键或 Home 退出，别从多任务划掉。"
-              : "另外：确认精确闹钟已允许。"}
+            {t(cleared ? "mobile.missed.tipSwipe" : "mobile.missed.tipExact")}
           </p>
         </div>
 
@@ -237,7 +239,7 @@ export function MissedAlarmDialog() {
               className="flex items-center gap-1 rounded-lg px-1.5 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
             >
               <Settings className="h-3.5 w-3.5" aria-hidden="true" />
-              看设置步骤
+              {t("mobile.missed.viewSteps")}
             </button>
             <button
               type="button"
@@ -245,7 +247,7 @@ export function MissedAlarmDialog() {
               className="flex items-center gap-1 rounded-lg px-1.5 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
             >
               <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-              知道了
+              {t("mobile.missed.gotIt")}
             </button>
           </div>
         </footer>

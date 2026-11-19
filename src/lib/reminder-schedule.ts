@@ -23,7 +23,18 @@ export type NextReminder =
   | { kind: "none" }
   | { kind: "time"; date: Date };
 
-const DAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
+/**
+ * 供渲染层翻译的结构化文案。纯函数不持有任何语言文案，周几用 0-6 的
+ * getDay() 下标表示，`weekday: null` 表示「明天」。
+ */
+export type NextReminderText =
+  | { kind: "paused" }
+  | { kind: "goalReached" }
+  | { kind: "none" }
+  | { kind: "imminent" }
+  | { kind: "today"; time: string; minutes: number | null }
+  | { kind: "later"; weekday: number | null; time: string };
+
 const EVERY_DAY = new Set([0, 1, 2, 3, 4, 5, 6]);
 
 function clamp(value: number, min: number, max: number) {
@@ -109,23 +120,26 @@ export function findNextReminder(
 export function describeNextReminder(
   result: NextReminder,
   now: Date = new Date()
-): string {
+): NextReminderText {
   switch (result.kind) {
     case "paused":
-      return "提醒已暂停";
+      return { kind: "paused" };
     case "goalReached":
-      return "今日目标已达成，暂停提醒";
+      return { kind: "goalReached" };
     case "none":
-      return "当前设置下没有下一次提醒";
+      return { kind: "none" };
     case "time": {
       const time = clock(result.date);
-      if (isSameDay(result.date, now)) return `预计下一杯约 ${time}`;
+      if (isSameDay(result.date, now)) {
+        return { kind: "today", time, minutes: null };
+      }
       const tomorrow = new Date(now.getTime());
       tomorrow.setDate(tomorrow.getDate() + 1);
-      const when = isSameDay(result.date, tomorrow)
-        ? "明天"
-        : `周${DAY_LABELS[result.date.getDay()]}`;
-      return `今天不提醒 · 下次${when} ${time}`;
+      return {
+        kind: "later",
+        weekday: isSameDay(result.date, tomorrow) ? null : result.date.getDay(),
+        time,
+      };
     }
   }
 }
@@ -136,13 +150,16 @@ export function describeNextReminder(
  * 原生返回的是一个固定的时间点，重渲染不会改变它；这里只负责按 `now`
  * 更新「还有 N 分钟」这类相对描述。`now` 可注入，便于回归测试。
  */
-export function describeNextAt(nextAt: number, now: number = Date.now()): string {
+export function describeNextAt(
+  nextAt: number,
+  now: number = Date.now()
+): NextReminderText {
   const target = new Date(nextAt);
   if (!Number.isFinite(target.getTime())) {
-    return "当前设置下没有下一次提醒";
+    return { kind: "none" };
   }
   if (target.getTime() <= now) {
-    return "预计下一杯随时到达";
+    return { kind: "imminent" };
   }
 
   const time = clock(target);
@@ -152,13 +169,14 @@ export function describeNextAt(nextAt: number, now: number = Date.now()): string
     // 明显）。调用方的时间快照可能有几秒滞后，round 也能把它吸收掉，不会
     // 因为多出几秒就凭空多报一分钟。
     const minutes = Math.max(1, Math.round((target.getTime() - now) / 60_000));
-    return `预计下一杯约 ${time} · 还有 ${minutes} 分钟`;
+    return { kind: "today", time, minutes };
   }
 
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const when = isSameDay(target, tomorrow)
-    ? "明天"
-    : `周${DAY_LABELS[target.getDay()]}`;
-  return `今天不提醒 · 下次${when} ${time}`;
+  return {
+    kind: "later",
+    weekday: isSameDay(target, tomorrow) ? null : target.getDay(),
+    time,
+  };
 }

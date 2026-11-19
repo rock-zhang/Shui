@@ -10,13 +10,16 @@ import { invoke } from "@tauri-apps/api/core";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getVersion } from "@tauri-apps/api/app";
 import { platform } from "@tauri-apps/plugin-os";
+import { useI18n } from "@/lib/i18n";
 
 const TRAY_ID = "main-tray";
 
 export function useTray() {
+  const { t, locale } = useI18n();
+  // 语言切换后用当前语言重建托盘菜单。
   useEffect(() => {
-    setMenu();
-  }, []);
+    void setMenu();
+  }, [locale]);
 
   const checkTauriAndInit = async () => {
     try {
@@ -44,14 +47,14 @@ export function useTray() {
 
     await menu.append(
       await MenuItem.new({
-        text: "偏好设置",
+        text: t("tray.preferences"),
         action: openSettings,
       })
     );
     await menu.append(await PredefinedMenuItem.new({ item: "Separator" }));
     await menu.append(
       await MenuItem.new({
-        text: "立即休息",
+        text: t("tray.restNow"),
         action: async () => {
           invoke("call_reminder");
         },
@@ -60,16 +63,16 @@ export function useTray() {
 
     // 创建子菜单
     const submenu = await Submenu.new({
-      text: "计时控制",
+      text: t("tray.timerControl"),
       items: [
         {
-          text: "暂停计时",
+          text: t("tray.pause"),
           action: async () => {
             invoke("pause_timer");
           },
         },
         {
-          text: "重新计时",
+          text: t("tray.restart"),
           action: async () => {
             invoke("start_timer");
           },
@@ -86,7 +89,7 @@ export function useTray() {
       // Linux 系统使用普通的 MenuItem
       await menu.append(
         await MenuItem.new({
-          text: "退出",
+          text: t("tray.quit"),
           action: async () => {
             console.log("退出应用");
             invoke("quit");
@@ -96,12 +99,12 @@ export function useTray() {
     } else {
       // 其他平台使用 PredefinedMenuItem
       await menu.append(
-        await PredefinedMenuItem.new({ text: "退出", item: "Quit" })
+        await PredefinedMenuItem.new({ text: t("tray.quit"), item: "Quit" })
       );
     }
 
     return menu;
-  }, []);
+  }, [t]);
 
   const setMenu = useCallback(async () => {
     let trayInstance: TrayIcon | null = null;

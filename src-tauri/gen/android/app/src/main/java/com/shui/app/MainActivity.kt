@@ -77,6 +77,8 @@ class MainActivity : TauriActivity() {
         // 看到「喝水提醒」，确认横幅是否开启——这也是微信那类 App 的做法。
         try {
             ReminderScheduler.ensureChannels(this)
+            // 记下当前渠道语言；后续语言偏好变化时由 onResume 用新文案刷新名称。
+            ReminderScheduler.syncChannelLocale(this)
         } catch (_: Exception) {
             // 建渠道失败不影响提醒：发送时会再建一次。
         }
@@ -94,6 +96,14 @@ class MainActivity : TauriActivity() {
 
     override fun onResume() {
         super.onResume()
+        // 语言偏好可能在 WebView 内刚切换：变化时用新文案刷新渠道名/描述。
+        // createNotificationChannel 只更新名称，不覆盖用户的渠道设置；仅在
+        // locale 真的变化时才会执行，正常启动不会重建渠道。
+        try {
+            ReminderScheduler.syncChannelLocale(this)
+        } catch (_: Exception) {
+            // 渠道刷新失败不影响提醒，发通知时还会再建一次。
+        }
         // 从系统设置 / 分享 chooser 回来后，部分 ROM 会把系统栏染回主题默认色。
         ReminderPlugin.applySystemBarTheme(this)
         // 系统设置页、电池优化「允许/不允许」弹窗返回时，WebView 不一定派发

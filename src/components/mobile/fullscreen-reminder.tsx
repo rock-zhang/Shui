@@ -7,6 +7,7 @@ import { ArrowRight, Droplets } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { STORE_NAME } from "@/lib/constants";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 import {
   normalizeDrinkDay,
   type DrinkHistoryValue,
@@ -37,14 +38,14 @@ const BACKDROP = [
   "rgba(255, 255, 255, 0.8)",
 ].join(", ");
 
-const TEXTS = [
-  "每天建议饮水 1500~1700ml，约 7~8 杯，保持健康水分 💧",
-  "少量多次，每次不超过 200ml，呵护心肾健康 ❤️",
-  "观察尿液颜色：淡黄色最健康，深黄需补水 🌟",
-  "久坐办公记得每小时喝水 100~150ml，保持清醒专注 💻",
-  "不要等到口渴才喝水，那时已经轻度脱水啦 💦",
-  "喝 35~40℃ 的水最好，太烫可能伤害身体 🌡️",
-  "白开水和矿泉水是最佳选择，安全又健康 ✨",
+const TEXT_KEYS: MessageKey[] = [
+  "mobile.fullscreen.tip1",
+  "mobile.fullscreen.tip2",
+  "mobile.fullscreen.tip3",
+  "mobile.fullscreen.tip4",
+  "mobile.fullscreen.tip5",
+  "mobile.fullscreen.tip6",
+  "mobile.fullscreen.tip7",
 ];
 
 const OPTIONS = [50, 100, 200, 300];
@@ -66,12 +67,16 @@ export function FullscreenReminder({
   trigger: ReminderTrigger;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
   const [water, setWater] = useState({ gold: 0, drink: 0 });
   const [saving, setSaving] = useState(false);
   const [closing, setClosing] = useState(false);
-  const [error, setError] = useState("");
-  const [text] = useState(() => TEXTS[Math.floor(Math.random() * TEXTS.length)]);
+  const [error, setError] = useState<MessageKey | null>(null);
+  // 存索引而非文案：语言切换后同一条贴士跟着切到对应语言。
+  const [textIndex] = useState(() =>
+    Math.floor(Math.random() * TEXT_KEYS.length)
+  );
   const busy = useRef(false);
   const closed = useRef(false);
   const openedAt = useRef(Date.now());
@@ -181,7 +186,7 @@ export function FullscreenReminder({
     if (busy.current || closed.current) return;
     busy.current = true;
     setSaving(true);
-    setError("");
+    setError(null);
     track("fullscreen_drink_click", { amount, source: "fullscreen" });
     try {
       const receipt = session
@@ -200,14 +205,14 @@ export function FullscreenReminder({
         emitNextReminder(receipt.nextAt);
       }
       if (receipt.goalReached) {
-        toast.success("🎉 今日喝水目标已完成");
+        toast.success(t("mobile.today.goalToast"));
         // 全屏提醒正好盖住整屏，用户更容易忽略这条 toast，系统通知补一层。
         if (receipt.added) void notifyGoalReached(receipt.total, receipt.goal);
       }
       await finish("confirmed");
     } catch (failure) {
       console.error("保存饮水记录失败", failure);
-      setError("保存失败，请重试，或在「今日」页补记");
+      setError("mobile.fullscreen.saveFailed");
       busy.current = false;
       setSaving(false);
     }
@@ -221,7 +226,7 @@ export function FullscreenReminder({
       style={{ background: BACKDROP, opacity: closing ? 0 : 1 }}
       role="dialog"
       aria-modal="true"
-      aria-label="喝水提醒"
+      aria-label={t("mobile.brand")}
     >
       <div
         className="w-full max-w-sm rounded-3xl border border-white/50 bg-white/60 p-6 shadow-xl backdrop-blur-md transition-transform duration-200"
@@ -229,22 +234,24 @@ export function FullscreenReminder({
       >
         <div className="mb-4 flex items-center justify-between">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium text-slate-700">
-            <Droplets className="h-3.5 w-3.5" /> 该喝水啦
+            <Droplets className="h-3.5 w-3.5" /> {t("mobile.fullscreen.timeToDrink")}
           </span>
           <span className="rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium tabular-nums text-slate-600">
-            {countdown}s 后关闭
+            {t("mobile.fullscreen.closeIn", { seconds: countdown })}
           </span>
         </div>
 
-        <h2 className="text-center text-2xl font-bold text-blue-700">喝了么</h2>
+        <h2 className="text-center text-2xl font-bold text-blue-700">
+          {t("mobile.fullscreen.heading")}
+        </h2>
         <p className="mt-2 min-h-10 text-center text-sm leading-5 text-slate-600">
-          {text}
+          {t(TEXT_KEYS[textIndex])}
         </p>
 
         <div className="mb-5 mt-4">
           <div className="mb-2 flex justify-between text-xs text-slate-600">
-            <span>今日已喝 {water.drink} ml</span>
-            <span>目标 {water.gold || "--"} ml</span>
+            <span>{t("mobile.fullscreen.drank", { amount: water.drink })}</span>
+            <span>{t("mobile.fullscreen.goal", { amount: water.gold || "--" })}</span>
           </div>
           <Progress value={Math.min(progress, 100)} className="h-2" />
         </div>
@@ -268,7 +275,7 @@ export function FullscreenReminder({
 
         {error && (
           <p role="alert" className="mt-3 text-center text-xs text-red-600">
-            {error}
+            {t(error)}
           </p>
         )}
 
@@ -277,10 +284,10 @@ export function FullscreenReminder({
           onClick={() => void finish("skipped")}
           className="mx-auto mt-4 flex min-h-11 items-center gap-1 px-4 text-sm text-slate-600"
         >
-          跳过 <ArrowRight className="h-4 w-4" />
+          {t("mobile.fullscreen.skip")} <ArrowRight className="h-4 w-4" />
         </button>
         <p className="mt-1 text-center text-[11px] leading-4 text-slate-500">
-          没打开 App 时，这条提醒会以系统通知到达，通知里也能直接记一杯
+          {t("mobile.fullscreen.notificationHint")}
         </p>
       </div>
     </div>

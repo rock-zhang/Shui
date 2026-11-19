@@ -368,12 +368,12 @@ pub async fn export_drink_backup(app_handle: AppHandle) -> Result<Option<String>
     let file = app_handle
         .dialog()
         .file()
-        .set_title("备份饮水记录")
+        .set_title(crate::localization::t("dialog.export_backup.title"))
         .set_file_name(format!(
             "shui-drink-backup-{}.json",
             Local::now().format("%Y%m%d")
         ))
-        .add_filter("Shui JSON 备份", &["json"])
+        .add_filter(crate::localization::t("dialog.backup_filter"), &["json"])
         .blocking_save_file();
     let Some(file) = file else {
         return Ok(None);
@@ -397,8 +397,8 @@ pub async fn preview_drink_import(app_handle: AppHandle) -> Result<Option<Import
     let file = app_handle
         .dialog()
         .file()
-        .set_title("选择饮水记录备份")
-        .add_filter("Shui JSON 备份", &["json"])
+        .set_title(crate::localization::t("dialog.import_backup.title"))
+        .add_filter(crate::localization::t("dialog.backup_filter"), &["json"])
         .blocking_pick_file();
     let Some(file) = file else {
         return Ok(None);

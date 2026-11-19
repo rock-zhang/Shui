@@ -21,6 +21,7 @@ import { STORE_NAME } from "@/lib/constants";
 import { usePlatform } from "@/hooks/use-platform";
 import { normalizeDrinkDay, type DrinkHistoryValue, type DrinkReceipt } from "@/lib/drink-day";
 import { progressBucket, track, trackDrinkRecorded } from "@/lib/analytics";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 
 async function hideWindowAction(outcome: "confirmed" | "skipped" = "confirmed", expectedSession?: string) {
   track("reminder_outcome", { outcome, trigger: "desktop" });
@@ -49,7 +50,7 @@ const playSound = () => {
   audio.play().catch((err) => console.log("音频播放失败:", err));
 };
 
-const sendNativeNotification = async () => {
+const sendNativeNotification = async (title: string, body: string) => {
   let permissionGranted = await isPermissionGranted();
 
   if (!permissionGranted) {
@@ -61,10 +62,7 @@ const sendNativeNotification = async () => {
   if (permissionGranted) {
     playSound(); // 添加音效
 
-    sendNotification({
-      title: "🎉 太棒了！完成今日喝水目标",
-      body: "再接再厉，继续保持健康好习惯！",
-    });
+    sendNotification({ title, body });
   }
 };
 
@@ -78,27 +76,28 @@ function getTodayDate() {
 
 const waterOptions = [{ ml: 50 }, { ml: 100 }, { ml: 200 }, { ml: 300 }];
 
-const reminderTexts = [
-  "每天建议饮水1500~1700ml，约7~8杯，保持健康水分 💧",
-  "建议少量多次饮水，每次不超过200ml，呵护心肾健康 ❤️",
-  "观察尿液颜色：淡黄色最健康，深黄需补水，无色可能过量 🌟",
-  "晨起来杯温水(200~300ml)，补充夜间水分，促进代谢 🌅",
-  "餐前1小时喝水(100~150ml)，帮助消化，事半功倍 🍽️",
-  "睡前1小时少量饮水(约100ml)，但别太多影响睡眠 😴",
-  "运动后15分钟内补充200~300ml，平衡身体电解质 💪",
-  "久坐办公记得每小时喝水100~150ml，保持清醒专注 💻",
-  "喝35~40℃的水最好，太烫可能伤害身体，要适温 🌡️",
-  "白开水和矿泉水是最佳选择，安全又健康 ✨",
-  "不要用饮料代替水，果汁奶茶糖分高，咖啡浓茶会利尿 🥤",
-  "饭中少喝水，可能影响消化，建议餐后半小时再补水 ⏰",
-  "不要等到口渴才喝水，那时已经轻度脱水啦 💦",
-  "水肿不是因为喝太多水，反而可能是喝得太少 💭",
-  "高温天气补充淡盐水，平衡身体流失的钠钾 🌞",
-  "乘坐飞机要多喝水，机舱很干燥，每小时喝100~150ml ✈️",
+const REMINDER_TEXT_KEYS: MessageKey[] = [
+  "desktop.reminder.tip1",
+  "desktop.reminder.tip2",
+  "desktop.reminder.tip3",
+  "desktop.reminder.tip4",
+  "desktop.reminder.tip5",
+  "desktop.reminder.tip6",
+  "desktop.reminder.tip7",
+  "desktop.reminder.tip8",
+  "desktop.reminder.tip9",
+  "desktop.reminder.tip10",
+  "desktop.reminder.tip11",
+  "desktop.reminder.tip12",
+  "desktop.reminder.tip13",
+  "desktop.reminder.tip14",
+  "desktop.reminder.tip15",
+  "desktop.reminder.tip16",
 ];
 
 export default function ReminderPage() {
-  const [reminderText, setReminderText] = useState("");
+  const { t } = useI18n();
+  const [reminderTextKey, setReminderTextKey] = useState<MessageKey | null>(null);
   const shownLogged = useRef(false);
   const [water, setWater] = useState({
     gold: 0,
@@ -108,7 +107,7 @@ export default function ReminderPage() {
   const [monitorName, setMonitorName] = useState("");
   const { isLinux } = usePlatform();
   const saving = useRef(false);
-  const [saveError, setSaveError] = useState("");
+  const [saveError, setSaveError] = useState<MessageKey | null>(null);
   // 按天存储饮水量
   const todayDate = getTodayDate();
 
@@ -116,11 +115,11 @@ export default function ReminderPage() {
   useEffect(() => {
     setTimeout(
       () => {
-        setReminderText(
-          reminderTexts[Math.floor(Math.random() * reminderTexts.length)]
+        setReminderTextKey(
+          REMINDER_TEXT_KEYS[Math.floor(Math.random() * REMINDER_TEXT_KEYS.length)]
         );
       },
-      reminderText ? 1000 : 0
+      reminderTextKey ? 1000 : 0
     );
   }, [water.drink]);
 
@@ -224,17 +223,22 @@ export default function ReminderPage() {
   const handleWaterSelection = async (ml: number) => {
     if (saving.current) return;
     saving.current = true;
-    setSaveError("");
+    setSaveError(null);
     track("fullscreen_drink_click", { amount: ml, source: "fullscreen" });
     try {
       // Refresh on click: a reused window can still hold the previous session
       // before the first countdown event of its next presentation arrives.
       const session = await invoke<string | null>("get_reminder_session");
-      if (!session) throw new Error("本次提醒已结束");
+      if (!session) throw new Error(t("mobile.fullscreen.sessionEnded"));
       const updated = await invoke<DrinkReceipt>("record_reminder_drink", { amount: ml, session });
       setWater({ gold: updated.goal, drink: updated.total });
       trackDrinkRecorded(updated, ml, "fullscreen");
-      if (updated.goalReached) sendNativeNotification().catch(console.error);
+      if (updated.goalReached) {
+        sendNativeNotification(
+          t("desktop.reminder.goalToast.title"),
+          t("desktop.reminder.goalToast.body")
+        ).catch(console.error);
+      }
       setIsClosing(true);
       setTimeout(() => {
         hideWindowAction("confirmed", session).catch(console.error);
@@ -243,7 +247,7 @@ export default function ReminderPage() {
       }, isLinux ? 100 : 300);
     } catch (error) {
       console.error("保存饮水记录失败:", error);
-      setSaveError("保存失败，请重试，或在饮水记录页添加");
+      setSaveError("desktop.reminder.saveFailed");
       saving.current = false;
     }
   };
@@ -260,7 +264,7 @@ export default function ReminderPage() {
       }`}
     >
       <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-white/30 backdrop-blur-sm px-4 py-2 rounded-full text-gray-700 text-base font-medium shadow-sm border border-white/20 transition-transform duration-300">
-        {countdown}s 后自动关闭
+        {t("desktop.reminder.autoClose", { seconds: countdown })}
       </div>
       <div
         className={`bg-white/30 backdrop-blur-sm p-8 rounded-2xl shadow-lg max-w-lg w-full z-10 border border-white/20 transition-all duration-100 ${
@@ -268,14 +272,16 @@ export default function ReminderPage() {
         }`}
       >
         <h2 className="text-2xl font-bold text-center mb-6 text-blue-600">
-          喝了么
+          {t("mobile.fullscreen.heading")}
         </h2>
-        <p className="text-gray-600 text-center mb-8">{reminderText}</p>
+        <p className="text-gray-600 text-center mb-8">
+          {reminderTextKey ? t(reminderTextKey) : ""}
+        </p>
 
         <div className="mb-8">
           <div className="flex justify-between text-sm text-gray-600 mb-2">
-            <span>今日已喝: {water.drink}ml</span>
-            <span>目标: {water.gold}ml</span>
+            <span>{t("desktop.reminder.drank", { amount: water.drink })}</span>
+            <span>{t("desktop.reminder.goal", { amount: water.gold })}</span>
           </div>
           <Progress value={progress <= 100 ? progress : 100} className="h-2" />
         </div>
@@ -297,13 +303,13 @@ export default function ReminderPage() {
         </div>
 
         <div className="mt-6 text-center">
-          {saveError && <p role="alert" className="mb-2 text-red-600">{saveError}</p>}
+          {saveError && <p role="alert" className="mb-2 text-red-600">{t(saveError)}</p>}
           <button
             onClick={() => hideWindowAction("skipped")}
             tabIndex={-1}
             className="text-gray-500 hover:text-gray-700 text-sm inline-flex items-center gap-1.5 transition-colors duration-300 cursor-pointer"
           >
-            跳过
+            {t("mobile.fullscreen.skip")}
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

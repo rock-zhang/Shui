@@ -34,20 +34,24 @@ import {
 import {
   describeNextAt,
   findNextReminder,
+  type NextReminderText,
 } from "@/lib/reminder-schedule";
 import { useMobileConfig } from "./config-context";
 import { NotificationNudge } from "./notification-nudge";
 import { MobileEmpty, MobileSection, ProgressRing } from "./ui";
+import { useI18n, WEEKDAY_LONG_KEYS, type MessageKey } from "@/lib/i18n";
+
+type Translate = ReturnType<typeof useI18n>["t"];
 
 const QUICK_AMOUNTS: Array<{
   amount: number;
-  hint: string;
+  hintKey: MessageKey;
   Icon: LucideIcon;
 }> = [
-  { amount: 50, hint: "小口", Icon: Droplet },
-  { amount: 100, hint: "几口", Icon: Droplets },
-  { amount: 200, hint: "一杯", Icon: GlassWater },
-  { amount: 300, hint: "大杯", Icon: CupSoda },
+  { amount: 50, hintKey: "mobile.today.hint.50", Icon: Droplet },
+  { amount: 100, hintKey: "mobile.today.hint.100", Icon: Droplets },
+  { amount: 200, hintKey: "mobile.today.hint.200", Icon: GlassWater },
+  { amount: 300, hintKey: "mobile.today.hint.300", Icon: CupSoda },
 ];
 
 /** 同一金额在该窗口内的重复点击复用同一 requestId，交给 Rust 幂等去重。 */
@@ -56,6 +60,33 @@ const QUICK_DEDUPE_MS = 1200;
 const CELEBRATE_MS = 1400;
 
 type Celebration = { amount: number; token: number };
+
+function nextReminderText(description: NextReminderText, t: Translate): string {
+  switch (description.kind) {
+    case "paused":
+      return t("mobile.today.next.paused");
+    case "goalReached":
+      return t("mobile.today.next.goalReached");
+    case "none":
+      return t("mobile.today.next.none");
+    case "imminent":
+      return t("mobile.today.next.imminent");
+    case "today":
+      return description.minutes === null
+        ? t("mobile.today.next.today", { time: description.time })
+        : t("mobile.today.next.todayMinutes", {
+            time: description.time,
+            minutes: description.minutes,
+          });
+    case "later":
+      return description.weekday === null
+        ? t("mobile.today.next.tomorrow", { time: description.time })
+        : t("mobile.today.next.weekday", {
+            weekday: t(WEEKDAY_LONG_KEYS[description.weekday]),
+            time: description.time,
+          });
+  }
+}
 
 /**
  * 提醒节奏卡片的第二行。
@@ -74,6 +105,7 @@ function NextReminderLine({
   goal: number;
   todayTotal: number;
 }) {
+  const { t } = useI18n();
   const { alert, general, hydrated, scheduleRevision } = useMobileConfig();
   const { isTauri } = usePlatform();
   const [nextAt, setNextAt] = useState<number | null | undefined>(undefined);
@@ -141,16 +173,22 @@ function NextReminderLine({
 
   if (!hydrated) {
     return (
-      <p className="mt-0.5 text-xs text-muted-foreground">正在读取提醒设置…</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        {t("mobile.today.next.loadingSettings")}
+      </p>
     );
   }
   if (general.isPaused) {
-    return <p className="mt-0.5 text-xs text-muted-foreground">提醒已暂停</p>;
+    return (
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        {t("mobile.today.next.paused")}
+      </p>
+    );
   }
   if (goalReached) {
     return (
       <p className="mt-0.5 text-xs text-muted-foreground">
-        今日目标已达成，暂停提醒
+        {t("mobile.today.next.goalReached")}
       </p>
     );
   }
@@ -159,10 +197,10 @@ function NextReminderLine({
   if (isTauri && nativeState === "ready") {
     text =
       nextAt === null || nextAt === undefined
-        ? "当前设置下没有下一次提醒"
-        : describeNextAt(nextAt, now);
+        ? t("mobile.today.next.none")
+        : nextReminderText(describeNextAt(nextAt, now), t);
   } else if (isTauri && nativeState === "idle") {
-    text = "正在读取提醒时间…";
+    text = t("mobile.today.next.loadingTime");
   } else {
     // 桌面浏览器预览 / 原生命令不可用：退回同一套纯函数推算。
     const result = findNextReminder(
@@ -182,14 +220,15 @@ function NextReminderLine({
     );
     text =
       result.kind === "time"
-        ? describeNextAt(result.date.getTime(), now)
-        : "当前设置下没有下一次提醒";
+        ? nextReminderText(describeNextAt(result.date.getTime(), now), t)
+        : t("mobile.today.next.none");
   }
 
   return <p className="mt-0.5 text-xs text-muted-foreground">{text}</p>;
 }
 
 export function TodayTab() {
+  const { t, locale } = useI18n();
   const { today, goal, loading, error, reload } = useDrinkData(7);
   const { alert, hydrated } = useMobileConfig();
   const [confirmUndo, setConfirmUndo] = useState<string | null>(null);
@@ -263,7 +302,7 @@ export function TodayTab() {
       }
       trackDrinkRecorded(receipt, draft.amount, "manual_today");
       if (receipt.goalReached) {
-        toast.success("🎉 今日目标已完成");
+        toast.success(t("mobile.today.goalToast"));
         // 只在真正达标的那一笔发系统通知；幂等重复点击 receipt.added 为 false，
         // 原生侧另有「今天已播报」去重，两处都拦一遍才不会被连点骗出两条。
         if (receipt.added) void notifyGoalReached(receipt.total, receipt.goal);
@@ -273,7 +312,7 @@ export function TodayTab() {
       emitRefresh();
     } catch (failure) {
       console.error("记录饮水失败", failure);
-      toast.error("保存未确认，请再点一次原按钮（不会重复累加）");
+      toast.error(t("mobile.today.saveUnconfirmed"));
     } finally {
       busy.current = false;
     }
@@ -290,11 +329,11 @@ export function TodayTab() {
       track("drink_undo", { result: "success" });
       setConfirmUndo(null);
       setCelebration(null);
-      toast.success("已撤销这笔记录");
+      toast.success(t("mobile.today.undoSuccess"));
       emitRefresh();
     } catch (failure) {
       console.error("撤销失败", failure);
-      toast.error("撤销未确认，请再试一次（重复撤销不会重复扣减）");
+      toast.error(t("mobile.today.undoFailed"));
     } finally {
       busy.current = false;
     }
@@ -307,20 +346,23 @@ export function TodayTab() {
       <MobileSection className="pt-5">
         <ProgressRing total={today.total} goal={goal || today.goal} />
         <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
-          建议每天 1500~1700ml，少量多次，每次不超过 200ml
+          {t("mobile.today.tip")}
         </p>
       </MobileSection>
 
-      <MobileSection title="记录刚喝的水" description="点一下就记，重复点击同一笔不会累加">
+      <MobileSection
+        title={t("mobile.today.record.title")}
+        description={t("mobile.today.record.description")}
+      >
         <div className="grid grid-cols-2 gap-2.5">
-          {QUICK_AMOUNTS.map(({ amount, hint, Icon }) => {
+          {QUICK_AMOUNTS.map(({ amount, hintKey, Icon }) => {
             const celebrating = celebration?.amount === amount ? celebration : null;
             return (
               <button
                 key={amount}
                 type="button"
                 onClick={() => submit(amount)}
-                aria-label={`记录 ${amount} 毫升饮水`}
+                aria-label={t("mobile.today.record.aria", { amount })}
                 className={cn(
                   "group relative flex min-h-[108px] flex-col justify-between overflow-hidden rounded-2xl border bg-card p-3.5 text-left shadow-sm transition-all duration-150 hover:shadow-md active:scale-[0.97]",
                   celebrating
@@ -348,7 +390,7 @@ export function TodayTab() {
                       <Check className="h-5 w-5" strokeWidth={2.6} />
                     </span>
                     <span className="mt-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                      已记录 +{amount} ml
+                      {t("mobile.today.record.done", { amount })}
                     </span>
                   </span>
                 ) : (
@@ -367,7 +409,7 @@ export function TodayTab() {
                         </span>
                       </span>
                       <span className="mt-1.5 block text-[11px] text-muted-foreground">
-                        {hint}
+                        {t(hintKey)}
                       </span>
                     </span>
                   </>
@@ -378,7 +420,7 @@ export function TodayTab() {
         </div>
       </MobileSection>
 
-      <MobileSection title="提醒节奏">
+      <MobileSection title={t("mobile.today.rhythm.title")}>
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
             <Clock3 className="h-5 w-5 text-muted-foreground" />
@@ -387,7 +429,11 @@ export function TodayTab() {
             {hydrated ? (
               <>
                 <p className="text-sm font-medium">
-                  每 {alert.gap} 分钟 · {alert.timeStart}–{alert.timeEnd}
+                  {t("mobile.today.rhythm.summary", {
+                    gap: alert.gap,
+                    start: alert.timeStart,
+                    end: alert.timeEnd,
+                  })}
                 </p>
                 <NextReminderLine
                   goalReached={goalReached}
@@ -406,8 +452,8 @@ export function TodayTab() {
       </MobileSection>
 
       <MobileSection
-        title="今日明细"
-        description="点撤销可修正误记，二次确认后生效"
+        title={t("mobile.today.details.title")}
+        description={t("mobile.today.details.description")}
       >
         <div className="mb-2 flex justify-end">
           <Button
@@ -418,17 +464,17 @@ export function TodayTab() {
             className="min-h-10"
           >
             <RefreshCw className="mr-1 h-3.5 w-3.5" />
-            刷新
+            {t("common.refresh")}
           </Button>
         </div>
         {error ? (
           <p role="alert" className="text-sm text-destructive">
-            {error}
+            {t("mobile.data.error")}
           </p>
         ) : today.entries.length === 0 ? (
           <MobileEmpty
-            title="今天还没有记录"
-            description="喝第一杯水后，这里会显示时间和水量"
+            title={t("mobile.today.details.emptyTitle")}
+            description={t("mobile.today.details.emptyDescription")}
           />
         ) : (
           <ul className="space-y-2">
@@ -438,7 +484,11 @@ export function TodayTab() {
                 className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-muted/50 px-3 py-2.5"
               >
                 <span className="min-w-0 flex-1 text-sm tabular-nums">
-                  {formatTimeLabel(entry.timestamp)}
+                  {formatTimeLabel(
+                    entry.timestamp,
+                    t("common.details.unknownTime"),
+                    locale
+                  )}
                 </span>
                 <span className="text-sm font-medium tabular-nums">
                   {entry.amount} ml
@@ -447,7 +497,7 @@ export function TodayTab() {
                   (confirmUndo === entry.requestId ? (
                     <span className="flex w-full items-center justify-end gap-1 pt-1">
                       <span className="mr-auto text-xs text-muted-foreground">
-                        确认撤销？
+                        {t("common.details.confirmUndo")}
                       </span>
                       <Button
                         size="sm"
@@ -455,7 +505,7 @@ export function TodayTab() {
                         className="min-h-9"
                         onClick={() => undo(entry.requestId!)}
                       >
-                        确认
+                        {t("common.details.confirm")}
                       </Button>
                       <Button
                         size="sm"
@@ -463,14 +513,14 @@ export function TodayTab() {
                         className="min-h-9"
                         onClick={() => setConfirmUndo(null)}
                       >
-                        取消
+                        {t("common.cancel")}
                       </Button>
                     </span>
                   ) : (
                     <Button
                       size="sm"
                       variant="ghost"
-                      aria-label="撤销这笔记录"
+                      aria-label={t("mobile.today.details.undoAria")}
                       className="h-9 w-9 p-0"
                       onClick={() => setConfirmUndo(entry.requestId!)}
                     >

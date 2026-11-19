@@ -8,19 +8,21 @@ import { DrinkDetails } from "@/components/drink-details";
 import { getLocalDateKey, getRecentDates, type DrinkHistoryValue } from "@/lib/drink-day";
 import { STORE_NAME } from "@/lib/constants";
 import { onRefresh } from "@/lib/mobile";
+import { useI18n } from "@/lib/i18n";
 
 export default function DrinkHistoryPage() {
+  const { t } = useI18n();
   const [period, setPeriod] = useState<7 | 30>(7);
   const [revision, setRevision] = useState(0);
   const [entries, setEntries] = useState<Array<[string, DrinkHistoryValue]>>([]);
   const [goal, setGoal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setError("");
+    setError(false);
     (async () => {
       const [config, history] = await Promise.all([
         load(STORE_NAME.config, { autoSave: false }),
@@ -37,7 +39,7 @@ export default function DrinkHistoryPage() {
       }
     })().catch(error => {
       console.error("读取饮水记录失败", error);
-      if (!cancelled) setError("暂时无法读取记录，请刷新重试。");
+      if (!cancelled) setError(true);
     }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [period, revision]);
@@ -49,15 +51,15 @@ export default function DrinkHistoryPage() {
   useEffect(() => onRefresh(refresh), []);
   return <div>
     <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-      <h3 className="text-lg font-medium">饮水记录</h3>
+      <h3 className="text-lg font-medium">{t("settings.history.title")}</h3>
       <div className="flex gap-2">
-        <Button size="sm" variant="ghost" disabled={loading} onClick={refresh}>刷新</Button>
-        {([7, 30] as const).map(value => <Button key={value} size="sm" variant={period === value ? "secondary" : "ghost"} onClick={() => setPeriod(value)}>{value} 天</Button>)}
+        <Button size="sm" variant="ghost" disabled={loading} onClick={refresh}>{t("common.refresh")}</Button>
+        {([7, 30] as const).map(value => <Button key={value} size="sm" variant={period === value ? "secondary" : "ghost"} onClick={() => setPeriod(value)}>{t("settings.statistics.period", { days: value })}</Button>)}
       </div>
     </div>
     <ManualDrink onRecorded={refresh} />
-    {error ? <p role="alert" className="text-sm text-destructive">{error}</p>
-      : loading ? <p className="text-sm text-muted-foreground">正在读取饮水记录…</p>
+    {error ? <p role="alert" className="text-sm text-destructive">{t("settings.history.error")}</p>
+      : loading ? <p className="text-sm text-muted-foreground">{t("settings.history.loading")}</p>
         : <DrinkDetails entries={entries} goal={goal} onChanged={refresh} />}
   </div>;
 }

@@ -7,8 +7,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { toast } from "sonner";
 import { useUpdaterCheck, useUpdaterDownload } from "@/hooks/use-updater";
+import { useI18n } from "@/lib/i18n";
 
 export default function About() {
+  const { t } = useI18n();
   const [version, setVersion] = useState("");
   const { checking, updateAvailable, updateInfo, checkForUpdate } =
     useUpdaterCheck();
@@ -25,20 +27,20 @@ export default function About() {
   const handleCopyAppInfo = async () => {
     const appInfo = await invoke("get_app_runtime_info");
     await writeText(JSON.stringify(appInfo));
-    toast.success("复制成功");
+    toast.success(t("settings.about.copySuccess"));
   };
 
   const handleCheck = async () => {
     await checkForUpdate();
 
     if (updateAvailable && updateInfo) {
-      toast.success(`发现新版本: ${updateInfo.version}`);
+      toast.success(t("settings.about.updateFound", { version: updateInfo.version }));
     }
   };
 
   return (
     <div>
-      <h3 className="mb-4 text-lg font-medium">关于</h3>
+      <h3 className="mb-4 text-lg font-medium">{t("settings.about.title")}</h3>
 
       <div className="relative overflow-hidden rounded-lg border bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-3 shadow-xs mb-4 dark:from-blue-950/50 dark:via-indigo-950/40 dark:to-purple-950/40">
         <div className="relative z-10 p-2">
@@ -57,14 +59,14 @@ export default function About() {
               />
             </svg>
             <label className="text-lg font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent dark:from-blue-300 dark:to-indigo-300">
-              关于项目
+              {t("settings.about.project.title")}
             </label>
           </div>
           <p className="text-sm leading-relaxed text-blue-800/70 dark:text-blue-200/80">
-            这是一个帮助你养成健康饮水习惯的小工具。它会根据你设定的目标，在合适的时间提醒你喝水，帮助你保持充足的水分摄入，提升身体健康。
+            {t("settings.about.project.description1")}
           </p>
           <p className="text-sm leading-relaxed text-blue-800/70 mt-2 dark:text-blue-200/80">
-            如果你有任何想法或遇到问题，欢迎通过以下方式与我们联系。你的反馈将帮助我们做得更好！
+            {t("settings.about.project.description2")}
           </p>
         </div>
       </div>
@@ -72,7 +74,7 @@ export default function About() {
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            版本
+            {t("settings.about.version")}
           </label>
           <p className="text-[0.8rem] text-muted-foreground">{version}</p>
         </div>
@@ -82,11 +84,13 @@ export default function About() {
             onClick={handleCheck}
             disabled={checking || installing}
           >
-            {checking ? "检查中..." : "检查更新"}
+            {checking ? t("settings.about.checking") : t("settings.about.check")}
           </Button>
           {updateAvailable && (
             <Button onClick={downloadAndInstall} disabled={installing}>
-              {installing ? `更新中 ${progress}%` : "立即更新"}
+              {installing
+                ? t("settings.about.installing", { progress })
+                : t("settings.about.updateNow")}
             </Button>
           )}
         </div>
@@ -95,23 +99,25 @@ export default function About() {
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            软件信息
+            {t("settings.about.appInfo")}
           </label>
           <p
             id=":r233:-form-item-description"
             className="text-[0.8rem] text-muted-foreground"
           >
-            复制软件信息并提供给 Bug Issue
+            {t("settings.about.appInfo.description")}
           </p>
         </div>
-        <Button onClick={handleCopyAppInfo}>复制</Button>
+        <Button onClick={handleCopyAppInfo}>{t("settings.about.copy")}</Button>
       </div>
 
       <div className="rounded-lg border p-3 shadow-xs space-y-4 mb-4">
-        <label className="block text-sm font-medium">联系我们</label>
+        <label className="block text-sm font-medium">
+          {t("settings.about.contact")}
+        </label>
 
-        <div className="flex gap-4">
-          <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 w-4/10">
+        <div className="grid grid-cols-[2fr_3fr] gap-4">
+          <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 min-w-0">
             <div className="flex-shrink-0">
               <svg
                 className="h-5 w-5 text-muted-foreground"
@@ -124,10 +130,12 @@ export default function About() {
               </svg>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-muted-foreground">微信号：slash__z</p>
+              <p className="break-words text-sm text-muted-foreground">
+                {t("settings.about.wechat", { id: "slash__z" })}
+              </p>
             </div>
           </div>
-          <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 w-6/10">
+          <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 min-w-0">
             <div className="flex-shrink-0">
               <svg
                 className="h-5 w-5 text-muted-foreground"
@@ -140,7 +148,7 @@ export default function About() {
               </svg>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-muted-foreground">
+              <p className="break-all text-sm text-muted-foreground">
                 hey47_zhang@163.com
               </p>
             </div>

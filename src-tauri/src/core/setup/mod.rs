@@ -128,7 +128,11 @@ fn run_timer(app_handle: &tauri::AppHandle, is_running: &std::sync::atomic::Atom
         // 处理白名单应用
         if is_frontapp_in_whitelist(&app_settings.whitelist_apps) {
             elapsed_total = elapsed_secs;
-            update_tray_status(&mut tray, "暂停", "白名单应用前台运行中");
+            update_tray_status(
+                &mut tray,
+                crate::localization::t("tray.whitelist_paused.title"),
+                crate::localization::t("tray.whitelist_paused.tooltip"),
+            );
             thread::sleep(Duration::from_secs(1));
             timer = Instant::now();
             continue;

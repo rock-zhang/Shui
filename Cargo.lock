@@ -4272,6 +4272,7 @@ dependencies = [
  "scopeguard",
  "serde",
  "serde_json",
+ "sys-locale",
  "tauri",
  "tauri-build",
  "tauri-nspanel",

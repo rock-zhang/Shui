@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
 
 /** Mobile design primitives. All colours come from the existing oklch tokens. */
 export function MobileSection({
@@ -192,6 +193,7 @@ export function ProgressRing({
   goal: number;
   size?: number;
 }) {
+  const { t } = useI18n();
   const displayTotal = useCountUp(total);
   const [pulseToken, setPulseToken] = useState(0);
   const previousTotal = useRef(total);
@@ -211,7 +213,7 @@ export function ProgressRing({
       className="relative mx-auto shrink-0"
       style={{ width: size, height: size }}
       role="img"
-      aria-label={`今日已喝 ${total} 毫升，目标 ${goal} 毫升`}
+      aria-label={t("mobile.ring.aria", { total, goal })}
     >
       {pulseToken > 0 && (
         <span
@@ -264,7 +266,11 @@ export function ProgressRing({
               : "bg-muted text-muted-foreground"
           )}
         >
-          {reached ? "今日目标已达成" : `还差 ${Math.max(goal - total, 0)} ml`}
+          {reached
+            ? t("mobile.ring.reached")
+            : t("mobile.ring.remaining", {
+                amount: Math.max(goal - total, 0),
+              })}
         </span>
       </div>
     </div>

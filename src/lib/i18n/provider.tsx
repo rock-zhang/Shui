@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { load } from "@tauri-apps/plugin-store";
 import { STORE_NAME } from "@/lib/constants";
 import {
@@ -19,6 +20,7 @@ import {
   readStoredPreference,
   resolveLocale,
   writeStoredPreference,
+  LANGUAGE_MIRROR_KEY,
   LANGUAGE_STORE_KEY,
   type LanguagePreference,
   type Locale,
@@ -65,24 +67,68 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     setSystemLocale(detectSystemLocale());
   }, []);
 
-  // 以 store 为准回填一次，覆盖镜像被清空但原生偏好还在的情况。
+  // 以 store 为准回填一次，并监听外部语言变化：
+  // - storage：浏览器多标签页 / 共享 localStorage 的窗口之间同步；
+  // - store://change：Tauri 多窗口（提醒窗口隐藏复用）之间同步；
+  // - languagechange：系统语言在运行中变化时，system 模式跟随。
+  // 监听在首次读取之前注册，避免挂载瞬间的写入被漏掉（缓解镜像丢失时的首帧滞后）。
   useEffect(() => {
+    if (typeof window === "undefined") return;
     let cancelled = false;
-    void (async () => {
+    let unlistenStore: (() => void) | undefined;
+
+    const readStore = async (): Promise<LanguagePreference | null> => {
       try {
         const store = await load(STORE_NAME.config, { autoSave: false });
         const stored = await store.get<unknown>(LANGUAGE_STORE_KEY);
-        if (cancelled || touched.current) return;
-        if (isLanguagePreference(stored)) {
-          setPreferenceState(stored);
-          writeStoredPreference(stored);
-        }
+        return isLanguagePreference(stored) ? stored : null;
       } catch {
         // 浏览器预览或首次启动没有 store。
+        return null;
       }
-    })();
+    };
+
+    const applyExternal = (next: LanguagePreference) => {
+      if (cancelled) return;
+      setPreferenceState(next);
+      writeStoredPreference(next);
+    };
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== LANGUAGE_MIRROR_KEY) return;
+      applyExternal(isLanguagePreference(event.newValue) ? event.newValue : "system");
+    };
+    window.addEventListener("storage", onStorage);
+
+    const onLanguageChange = () => setSystemLocale(detectSystemLocale());
+    window.addEventListener("languagechange", onLanguageChange);
+
+    void listen("store://change", (event) => {
+      const payload = event.payload as { key?: unknown } | null;
+      if (payload?.key !== LANGUAGE_STORE_KEY) return;
+      void readStore().then((stored) => {
+        if (stored) applyExternal(stored);
+      });
+    })
+      .then((unlisten) => {
+        if (cancelled) unlisten();
+        else unlistenStore = unlisten;
+      })
+      .catch(() => {
+        // 浏览器预览没有 Tauri 事件总线。
+      });
+
+    void readStore().then((stored) => {
+      if (cancelled || !stored || touched.current) return;
+      setPreferenceState(stored);
+      writeStoredPreference(stored);
+    });
+
     return () => {
       cancelled = true;
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("languagechange", onLanguageChange);
+      unlistenStore?.();
     };
   }, []);
 
@@ -107,7 +153,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const t = useCallback(
     (key: MessageKey, params?: Params) => {
       const dict = messages[locale];
-      const template = dict[key] ?? messages["zh-CN"][key];
+      const template = dict[key] ?? messages["zh-CN"][key] ?? key;
       return formatMessage(template, params);
     },
     [locale]

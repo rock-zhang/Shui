@@ -34,14 +34,20 @@ import {
   trackNow,
 } from "@/lib/analytics";
 import { emitRefresh } from "@/lib/mobile";
-import { useI18n, type LanguagePreference } from "@/lib/i18n";
+import {
+  useI18n,
+  type LanguagePreference,
+  type MessageKey,
+} from "@/lib/i18n";
 import { MobileRow, MobileSection, MobileSegmented } from "./ui";
 
 const GITHUB_URL = "https://github.com/rock-zhang/Shui";
 const STORE_URL = "https://play.google.com/store/apps/details?id=com.shui.app";
 
+type Notice = { key: MessageKey; params?: Record<string, string | number> };
+
 export function MeTab() {
-  const { t, preference, setPreference } = useI18n();
+  const { t, locale, preference, setPreference } = useI18n();
   const themeOptions = [
     { value: "system", label: t("common.system") },
     { value: "light", label: t("common.light") },
@@ -52,7 +58,7 @@ export function MeTab() {
   const [version, setVersion] = useState("");
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
-  const [message, setMessage] = useState("");
+  const [notice, setNotice] = useState<Notice | null>(null);
   const [error, setError] = useState("");
   const [analyticsOn, setAnalyticsOn] = useState(true);
   const locked = useRef(false);
@@ -77,11 +83,11 @@ export function MeTab() {
     locked.current = true;
     setBusy(true);
     setError("");
-    setMessage("");
+    setNotice(null);
     try {
       await operation();
     } catch (failure) {
-      setError(backupError(failure));
+      setError(backupError(failure, t("settings.data.error"), locale));
     } finally {
       locked.current = false;
       setBusy(false);
@@ -100,7 +106,7 @@ export function MeTab() {
           skipped_days: selected.skippedDays,
         });
       } else {
-        setMessage("已取消选择文件。");
+        setNotice({ key: "settings.data.import.canceled" });
       }
     });
 
@@ -115,9 +121,16 @@ export function MeTab() {
         already_imported: receipt.alreadyImported,
       });
       setPreview(null);
-      setMessage(
-        `${receipt.alreadyImported ? "本次导入已完成" : "导入完成"}：新增 ${receipt.importedDays} 天，共 ${receipt.importedAmount} ml；跳过 ${receipt.skippedDays} 个已有日期。`
-      );
+      setNotice({
+        key: receipt.alreadyImported
+          ? "settings.data.import.alreadyReceived"
+          : "settings.data.import.received",
+        params: {
+          days: receipt.importedDays,
+          amount: receipt.importedAmount,
+          skipped: receipt.skippedDays,
+        },
+      });
       // Tabs stay mounted; broadcast so Today / Data pick up the imported days.
       emitRefresh();
     });
@@ -127,7 +140,7 @@ export function MeTab() {
       await openUrl(url);
       track("external_link_open", { target });
     } catch {
-      toast.info("当前为桌面预览，链接将在原生环境打开");
+      toast.info(t("mobile.me.desktopPreview"));
     }
   };
 
@@ -136,22 +149,26 @@ export function MeTab() {
       const info = await invoke("get_app_runtime_info");
       await writeText(JSON.stringify(info));
       track("app_info_copy", { success: true });
-      toast.success("软件信息已复制");
+      toast.success(t("mobile.me.appInfoCopied"));
     } catch {
       track("app_info_copy", { success: false });
-      toast.error("复制失败，请稍后重试");
+      toast.error(t("mobile.me.copyFailedRetry"));
     }
   };
 
-  const copyContact = async (label: string, value: string) => {
+  const copyContact = async (
+    channel: "wechat" | "email",
+    labelKey: MessageKey,
+    value: string
+  ) => {
     try {
       await writeText(value);
-      track("contact_copy", {
-        channel: label === "微信号" ? "wechat" : "email",
-      });
-      toast.success(`${label}已复制`);
+      track("contact_copy", { channel });
+      toast.success(
+        t("mobile.me.copySuccess", { label: t(labelKey) })
+      );
     } catch {
-      toast.error("复制失败，请长按手动复制");
+      toast.error(t("mobile.me.copyFailed"));
     }
   };
 
@@ -194,12 +211,12 @@ export function MeTab() {
       </MobileSection>
 
       <MobileSection
-        title="备份与导入"
-        description="JSON 备份保留每日总量、逐笔明细与历史目标；不含主题和设置"
+        title={t("mobile.me.data.title")}
+        description={t("mobile.me.data.description")}
       >
         <MobileRow
-          title="导出备份"
-          description="生成 JSON 后通过系统分享保存到文件应用或发给自己"
+          title={t("mobile.me.export.title")}
+          description={t("mobile.me.export.description")}
           control={
             <Button
               variant="outline"
@@ -212,18 +229,22 @@ export function MeTab() {
                   track("backup_export", {
                     result: path ? "success" : "cancel",
                   });
-                  setMessage(path ? "饮水记录备份已保存。" : "已取消保存备份。");
+                  setNotice({
+                    key: path
+                      ? "settings.data.backup.saved"
+                      : "settings.data.backup.canceled",
+                  });
                 })
               }
             >
               <Download className="mr-1 h-3.5 w-3.5" />
-              导出
+              {t("mobile.me.export.action")}
             </Button>
           }
         />
         <MobileRow
-          title="导入备份"
-          description="仅补充缺失日期，已有日期整天跳过，不覆盖"
+          title={t("mobile.me.import.title")}
+          description={t("mobile.me.import.description")}
           control={
             <Button
               variant="outline"
@@ -233,7 +254,7 @@ export function MeTab() {
               onClick={chooseFile}
             >
               <Upload className="mr-1 h-3.5 w-3.5" />
-              选择文件
+              {t("mobile.me.import.choose")}
             </Button>
           }
         />
@@ -242,25 +263,43 @@ export function MeTab() {
           <div className="mt-3 rounded-xl bg-muted/50 p-3">
             <p className="break-all text-sm font-medium">{preview.fileName}</p>
             <p className="mb-3 mt-1 text-xs text-muted-foreground">
-              {formatBackupDate(preview.firstDate)} 至{" "}
-              {formatBackupDate(preview.lastDate)}
+              {t("settings.data.import.range", {
+                from: formatBackupDate(preview.firstDate),
+                to: formatBackupDate(preview.lastDate),
+              })}
             </p>
             <dl className="grid grid-cols-2 gap-2 text-sm">
               <div>
-                <dt className="text-[11px] text-muted-foreground">备份记录</dt>
+                <dt className="text-[11px] text-muted-foreground">
+                  {t("settings.data.import.backupRecords")}
+                </dt>
                 <dd>
-                  {preview.days} 天 / {preview.detailedEntries} 笔
+                  {t("mobile.me.import.count", {
+                    days: preview.days,
+                    entries: preview.detailedEntries,
+                  })}
                 </dd>
               </div>
               <div>
-                <dt className="text-[11px] text-muted-foreground">预计新增</dt>
+                <dt className="text-[11px] text-muted-foreground">
+                  {t("settings.data.import.expectedNew")}
+                </dt>
                 <dd>
-                  {preview.newDays} 天 / {preview.newAmount} ml
+                  {t("settings.data.import.expectedNewValue", {
+                    days: preview.newDays,
+                    amount: preview.newAmount,
+                  })}
                 </dd>
               </div>
               <div>
-                <dt className="text-[11px] text-muted-foreground">已有日期</dt>
-                <dd>{preview.skippedDays} 天将跳过</dd>
+                <dt className="text-[11px] text-muted-foreground">
+                  {t("settings.data.import.existingDates")}
+                </dt>
+                <dd>
+                  {t("settings.data.import.existingDatesValue", {
+                    days: preview.skippedDays,
+                  })}
+                </dd>
               </div>
             </dl>
             <div className="mt-3 flex gap-2">
@@ -269,7 +308,9 @@ export function MeTab() {
                 disabled={busy || preview.newDays === 0}
                 onClick={confirm}
               >
-                {busy ? "导入中…" : "确认导入"}
+                {busy
+                  ? t("mobile.me.import.importing")
+                  : t("mobile.me.import.confirm")}
               </Button>
               <Button
                 variant="ghost"
@@ -278,22 +319,22 @@ export function MeTab() {
                 onClick={() => {
                   track("backup_import_cancel");
                   setPreview(null);
-                  setMessage("已取消导入，本地记录未修改。");
+                  setNotice({ key: "settings.data.import.canceledNotice" });
                 }}
               >
-                取消
+                {t("common.cancel")}
               </Button>
             </div>
             {preview.newDays === 0 && (
               <p className="mt-2 text-xs text-muted-foreground">
-                所有日期均已存在，无需导入。
+                {t("settings.data.import.allExist")}
               </p>
             )}
           </div>
         )}
-        {message && (
+        {notice && (
           <p role="status" className="mt-3 text-xs leading-5">
-            {message}
+            {t(notice.key, notice.params)}
           </p>
         )}
         {error && (
@@ -302,41 +343,44 @@ export function MeTab() {
           </p>
         )}
         <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
-          导出文件先写入应用缓存再调用系统分享；导入使用系统文件选择器（SAF），已有日期整体跳过、绝不覆盖。
+          {t("mobile.me.import.note")}
         </p>
       </MobileSection>
 
       <MobileSection
-        title="隐私与统计"
-        description="只统计功能使用与崩溃，不包含饮水记录、时间或任何可识别身份的信息"
+        title={t("mobile.me.privacy.title")}
+        description={t("mobile.me.privacy.description")}
       >
         <MobileRow
-          title="匿名使用统计"
+          title={t("mobile.me.analytics.title")}
           description={
             analyticsOn
-              ? "已开启：帮助我们了解哪些功能真正有用，可随时关闭"
-              : "已关闭：应用不再上报任何使用数据或崩溃信息"
+              ? t("mobile.me.analytics.on")
+              : t("mobile.me.analytics.off")
           }
           control={
             <Switch
               checked={analyticsOn}
               onCheckedChange={(next) => void toggleAnalytics(next)}
-              aria-label="匿名使用统计"
+              aria-label={t("mobile.me.analytics.title")}
             />
           }
         />
       </MobileSection>
 
-      <MobileSection title="关于">
+      <MobileSection title={t("mobile.me.about.title")}>
         <div className="mb-3 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 p-4 dark:from-blue-950/40 dark:to-indigo-950/30">
           <p className="text-sm leading-6">
-            一个帮你养成健康饮水习惯的小工具。按你设定的目标，在合适的时间提醒你喝水，并记录每一次坚持。
+            {t("mobile.me.about.description")}
           </p>
         </div>
-        <MobileRow title="当前版本" description={version || "—"} />
         <MobileRow
-          title="检查更新"
-          description="前往应用商店查看最新版本"
+          title={t("mobile.me.about.version")}
+          description={version || "—"}
+        />
+        <MobileRow
+          title={t("mobile.me.about.updateTitle")}
+          description={t("mobile.me.about.updateDescription")}
           control={
             <Button
               variant="outline"
@@ -345,13 +389,13 @@ export function MeTab() {
               onClick={() => openExternal(STORE_URL, "store")}
             >
               <ExternalLink className="mr-1 h-3.5 w-3.5" />
-              前往商店
+              {t("mobile.me.about.store")}
             </Button>
           }
         />
         <MobileRow
-          title="软件信息"
-          description="复制运行环境信息用于反馈问题"
+          title={t("mobile.me.about.appInfoTitle")}
+          description={t("mobile.me.about.appInfoDescription")}
           control={
             <Button
               variant="outline"
@@ -360,7 +404,7 @@ export function MeTab() {
               onClick={copyAppInfo}
             >
               <Info className="mr-1 h-3.5 w-3.5" />
-              复制
+              {t("mobile.me.copy")}
             </Button>
           }
         />
@@ -375,13 +419,15 @@ export function MeTab() {
       </MobileSection>
 
       <MobileSection
-        title="反馈与联系"
-        description="遇到问题或有建议，欢迎通过以下任一方式联系我"
+        title={t("mobile.me.contact.title")}
+        description={t("mobile.me.contact.description")}
       >
         <div className="overflow-hidden rounded-xl border border-border/70">
           <button
             type="button"
-            onClick={() => copyContact("微信号", "slash__z")}
+            onClick={() =>
+              copyContact("wechat", "mobile.me.contact.wechat", "slash__z")
+            }
             className="flex min-h-14 w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/50 active:bg-muted"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -389,19 +435,23 @@ export function MeTab() {
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-[11px] leading-4 text-muted-foreground">
-                微信号
+                {t("mobile.me.contact.wechat")}
               </span>
               <span className="block select-text truncate text-sm font-medium">
                 slash__z
               </span>
             </span>
             <Copy className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <span className="shrink-0 text-[11px] text-muted-foreground">复制</span>
+            <span className="shrink-0 text-[11px] text-muted-foreground">
+              {t("mobile.me.copy")}
+            </span>
           </button>
           <div className="mx-3 h-px bg-border/70" />
           <button
             type="button"
-            onClick={() => copyContact("邮箱", "hey47_zhang@163.com")}
+            onClick={() =>
+              copyContact("email", "mobile.me.contact.email", "hey47_zhang@163.com")
+            }
             className="flex min-h-14 w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/50 active:bg-muted"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -409,14 +459,16 @@ export function MeTab() {
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-[11px] leading-4 text-muted-foreground">
-                邮箱
+                {t("mobile.me.contact.email")}
               </span>
               <span className="block select-text truncate text-sm font-medium">
                 hey47_zhang@163.com
               </span>
             </span>
             <Copy className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <span className="shrink-0 text-[11px] text-muted-foreground">复制</span>
+            <span className="shrink-0 text-[11px] text-muted-foreground">
+              {t("mobile.me.copy")}
+            </span>
           </button>
         </div>
       </MobileSection>

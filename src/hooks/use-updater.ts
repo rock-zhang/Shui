@@ -2,8 +2,10 @@ import { useState } from "react";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { toast } from "sonner";
+import { useI18n } from "@/lib/i18n";
 
 export function useUpdaterCheck() {
+  const { t } = useI18n();
   const [checking, setChecking] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<{
@@ -28,14 +30,14 @@ export function useUpdaterCheck() {
           version: update.version,
         });
       } else {
-        toast("当前已是最新版本");
+        toast(t("updater.upToDate"));
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("检查更新失败:", err);
       // 把 Tauri 的真实错误（例如 TargetNotFound: darwin-aarch64）露出来，
       // 否则只能看到一句「检查更新失败」，排查得开 DevTools。
-      toast.error("检查更新失败", { description: message });
+      toast.error(t("updater.checkFailed"), { description: message });
       setUpdateAvailable(false);
     } finally {
       setChecking(false);
@@ -51,6 +53,7 @@ export function useUpdaterCheck() {
 }
 
 export function useUpdaterDownload() {
+  const { t } = useI18n();
   const [installing, setInstalling] = useState(false);
   const [progress, setProgress] = useState(0);
 
@@ -61,7 +64,7 @@ export function useUpdaterDownload() {
 
       const update = await check();
       if (!update) {
-        throw new Error("没有可用的更新");
+        throw new Error(t("updater.noUpdate"));
       }
 
       let downloaded = 0;
@@ -90,7 +93,7 @@ export function useUpdaterDownload() {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("更新安装失败:", err);
-      toast.error("更新安装失败", { description: message });
+      toast.error(t("updater.installFailed"), { description: message });
       setProgress(0);
     } finally {
       setInstalling(false);

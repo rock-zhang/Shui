@@ -14,6 +14,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { isPermissionGranted } from "@tauri-apps/plugin-notification";
 import { toast } from "sonner";
 import { track } from "@/lib/analytics";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 
 /**
  * `unsupported` = 桌面浏览器预览，没有这套系统权限概念。
@@ -59,6 +60,7 @@ export function NotificationPermissionProvider({
 }: {
   children: ReactNode;
 }) {
+  const { t } = useI18n();
   const [permission, setPermission] = useState<NotificationPermission>("unknown");
   const [canRequest, setCanRequest] = useState(true);
   const alive = useRef(true);
@@ -106,7 +108,7 @@ export function NotificationPermissionProvider({
    * 停在旧状态；这里最多持续 WATCH_TOTAL_MS，状态变成已授权即停并提示。
    */
   const watch = useCallback(
-    (successText: string, source: string, reportResult: boolean) => {
+    (successKey: MessageKey, source: string, reportResult: boolean) => {
       stopWatching();
       const deadline = Date.now() + WATCH_TOTAL_MS;
       const tick = async () => {
@@ -118,7 +120,7 @@ export function NotificationPermissionProvider({
           if (reportResult) {
             track("permission_result", { source, result: "granted" });
           }
-          toast.success(successText);
+          toast.success(t(successKey));
           return;
         }
         if (!alive.current || Date.now() >= deadline) {
@@ -131,7 +133,7 @@ export function NotificationPermissionProvider({
       void tick();
       watchTimer.current = window.setInterval(() => void tick(), WATCH_INTERVAL_MS);
     },
-    [read, stopWatching]
+    [read, stopWatching, t]
   );
 
   /**
@@ -143,13 +145,13 @@ export function NotificationPermissionProvider({
       track("settings_opened", { target: "notification", source });
       try {
         await invoke("open_notification_settings");
-        toast.info("系统已不再弹授权窗，请在设置中允许通知");
-        watch("通知权限已开启", source, true);
+        toast.info(t("mobile.notif.noMorePrompt"));
+        watch("mobile.notif.enabled", source, true);
       } catch {
-        toast.error("无法打开通知设置，请到 应用信息 → 通知 手动开启");
+        toast.error(t("mobile.notif.openSettingsFailed"));
       }
     },
-    [watch]
+    [watch, t]
   );
 
   const request = useCallback(
@@ -162,7 +164,7 @@ export function NotificationPermissionProvider({
         if (state.granted) {
           setPermission("granted");
           track("permission_result", { source, result: "already_granted" });
-          toast.success("通知权限已开启");
+          toast.success(t("mobile.notif.enabled"));
           return;
         }
         track("permission_request", {
@@ -173,15 +175,15 @@ export function NotificationPermissionProvider({
           // 系统授权框本身就是反馈，这里不再叠一层 toast。
           // 授权结果由原生 onRequestPermissionsResult 上报，避免重复。
           await invoke("request_notification_permission", { source });
-          watch("通知权限已开启", source, false);
+          watch("mobile.notif.enabled", source, false);
           return;
         }
         await openSettings(source);
       } catch {
-        toast.info("当前为桌面预览，通知权限由系统管理");
+        toast.info(t("mobile.notif.desktopPreview"));
       }
     },
-    [openSettings, watch]
+    [openSettings, watch, t]
   );
 
   const refresh = useCallback(() => {

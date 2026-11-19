@@ -20,7 +20,7 @@ const base = (patch = {}) => ({
   ...patch,
 });
 
-test('Sunday is not selected: next reminder is Monday, not "预计下一杯"', () => {
+test('Sunday is not selected: next reminder is Monday, not today', () => {
   const result = findNextReminder(base({ weekdays: [1, 2, 3, 4, 5, 6] }), sunday);
   assert.equal(result.kind, 'time');
   assert.equal(result.date.getDay(), 1);
@@ -28,8 +28,11 @@ test('Sunday is not selected: next reminder is Monday, not "预计下一杯"', (
     `${String(result.date.getHours()).padStart(2, '0')}:${String(result.date.getMinutes()).padStart(2, '0')}`,
     '09:08'
   );
-  assert.match(describeNextReminder(result, sunday), /今天不提醒/);
-  assert.doesNotMatch(describeNextReminder(result, sunday), /预计下一杯约/);
+  assert.deepEqual(describeNextReminder(result, sunday), {
+    kind: 'later',
+    weekday: null,
+    time: '09:08',
+  });
 });
 
 test('selected weekday inside the time window estimates the next cup today', () => {
@@ -37,7 +40,11 @@ test('selected weekday inside the time window estimates the next cup today', () 
   const result = findNextReminder(base(), now);
   assert.equal(result.kind, 'time');
   assert.equal(result.date.getDay(), 0);
-  assert.match(describeNextReminder(result, now), /^预计下一杯约/);
+  assert.deepEqual(describeNextReminder(result, now), {
+    kind: 'today',
+    time: '10:20',
+    minutes: null,
+  });
 });
 
 test('time window already over: rolls to tomorrow', () => {
@@ -45,14 +52,18 @@ test('time window already over: rolls to tomorrow', () => {
   const result = findNextReminder(base(), now);
   assert.equal(result.kind, 'time');
   assert.equal(result.date.getDay(), 1);
-  assert.match(describeNextReminder(result, now), /今天不提醒 · 下次明天/);
+  assert.deepEqual(describeNextReminder(result, now), {
+    kind: 'later',
+    weekday: null,
+    time: '09:00',
+  });
 });
 
 test('paused and goal-reached never show a next-cup estimate', () => {
   assert.equal(findNextReminder(base({ isPaused: true }), sunday).kind, 'paused');
   const reached = findNextReminder(base({ todayTotal: 1500 }), sunday);
   assert.equal(reached.kind, 'goalReached');
-  assert.equal(describeNextReminder(reached, sunday), '今日目标已达成，暂停提醒');
+  assert.deepEqual(describeNextReminder(reached, sunday), { kind: 'goalReached' });
 });
 
 test('empty weekday list means every day (native behaviour)', () => {
@@ -82,7 +93,11 @@ test('end 00:00 is treated as a cross-midnight window', () => {
 test('native next time keeps the absolute clock and shows remaining minutes', () => {
   const now = new Date(2026, 10, 16, 10, 0).getTime();
   const at = new Date(2026, 10, 16, 10, 30).getTime();
-  assert.equal(describeNextAt(at, now), '预计下一杯约 10:30 · 还有 30 分钟');
+  assert.deepEqual(describeNextAt(at, now), {
+    kind: 'today',
+    time: '10:30',
+    minutes: 30,
+  });
 });
 
 test('1-minute test gap does not round up to 2 minutes when now lags a few seconds', () => {
@@ -90,17 +105,25 @@ test('1-minute test gap does not round up to 2 minutes when now lags a few secon
   // ceil 会把 75 秒报成 2 分钟，round 稳定报 1。
   const at = new Date(2026, 10, 16, 10, 1, 0).getTime();
   const laggedNow = new Date(2026, 10, 16, 9, 59, 45).getTime(); // 差 75 秒
-  assert.equal(describeNextAt(at, laggedNow), '预计下一杯约 10:01 · 还有 1 分钟');
+  assert.deepEqual(describeNextAt(at, laggedNow), {
+    kind: 'today',
+    time: '10:01',
+    minutes: 1,
+  });
 });
 
 test('native next time rolls to tomorrow wording', () => {
   const now = new Date(2026, 10, 16, 18, 48).getTime();
   const at = new Date(2026, 10, 17, 9, 0).getTime();
-  assert.equal(describeNextAt(at, now), '今天不提醒 · 下次明天 09:00');
+  assert.deepEqual(describeNextAt(at, now), {
+    kind: 'later',
+    weekday: null,
+    time: '09:00',
+  });
 });
 
 test('overdue native next time is reported as imminent', () => {
   const now = new Date(2026, 10, 16, 10, 0).getTime();
   const at = new Date(2026, 10, 16, 9, 30).getTime();
-  assert.equal(describeNextAt(at, now), '预计下一杯随时到达');
+  assert.deepEqual(describeNextAt(at, now), { kind: 'imminent' });
 });

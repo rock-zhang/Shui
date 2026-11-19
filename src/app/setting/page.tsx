@@ -374,7 +374,7 @@ export default function Home() {
             setPreference(next as LanguagePreference)
           }
         >
-          <SelectTrigger className="w-[120px]">
+          <SelectTrigger className="w-[150px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -401,7 +401,7 @@ export default function Home() {
           disabled={!themeMounted}
           onValueChange={setTheme}
         >
-          <SelectTrigger className="w-[120px]">
+          <SelectTrigger className="w-[150px]">
             <SelectValue
               placeholder={t("settings.general.appearance.placeholder")}
             />

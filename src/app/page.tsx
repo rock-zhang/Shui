@@ -24,5 +24,6 @@ export default function Home() {
     return <div className="h-dvh w-full bg-background" aria-hidden="true" />;
   }
   if (shell === "mobile") return <MobileApp />;
-  return <div>HOME</div>;
+  // 桌面窗口直接指向 /setting/，这里仅作为不应到达的中性兜底，不显示任何语言相关的占位文案。
+  return <div className="h-dvh w-full bg-background" aria-hidden="true" />;
 }

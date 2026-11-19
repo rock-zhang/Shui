@@ -39,3 +39,23 @@ test('native errors propagate to the view with readable messages', async () => {
   assert.equal(api.backupError(null), '操作失败，请重试');
   assert.equal(api.formatBackupDate('20261106'), '2026-11-06');
 });
+
+test('English UI replaces Chinese native errors with the generic fallback', () => {
+  const original = console.error;
+  const logs = [];
+  console.error = (...args) => logs.push(args);
+  try {
+    const api = client();
+    assert.equal(
+      api.backupError('备份超过 16 MB，暂不支持导出', 'Could not complete the operation', 'en-US'),
+      'Could not complete the operation'
+    );
+    // 英文原生错误保留具体原因，中文界面也照常显示中文原文。
+    assert.equal(api.backupError('disk full', 'Could not complete the operation', 'en-US'), 'disk full');
+    assert.equal(api.backupError('备份超过 16 MB', '操作失败，请重试', 'zh-CN'), '备份超过 16 MB');
+    assert.equal(logs.length, 1);
+    assert.match(logs[0][1], /备份超过 16 MB/);
+  } finally {
+    console.error = original;
+  }
+});

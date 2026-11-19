@@ -2,7 +2,8 @@
  * 首次启动个性化引导的状态与步骤定义。
  *
  * 引导不在弹窗里改配置，而是直接高亮「提醒」页的真实控件；这里的步骤只负责
- * 顺序、文案与目标锚点，配置保存仍走 reminder-tab 自己的 patchAlert。
+ * 顺序、文案 key 与目标锚点，配置保存仍走 reminder-tab 自己的 patchAlert。
+ * 文案 key 与渲染层的词典对齐，纯函数不持有具体语言文案。
  */
 
 export type OnboardingOutcome = "completed" | "dismissed" | "limit";
@@ -16,37 +17,17 @@ export type OnboardingStepKey =
 
 export interface OnboardingStep {
   key: OnboardingStepKey;
-  title: string;
-  body: string;
+  titleKey: string;
+  bodyKey: string;
 }
 
 /** 开始与结束时间分开两步：时间范围是两次独立选择，不能并成一个高亮框。 */
 export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
-  {
-    key: "goal",
-    title: "先定每日目标",
-    body: "点一个金额，确认每天想喝多少；默认 1000 ml。",
-  },
-  {
-    key: "gap",
-    title: "再选提醒间隔",
-    body: "点一个间隔确认；建议 20–30 分钟，太频繁容易烦。",
-  },
-  {
-    key: "weekdays",
-    title: "哪些天需要提醒",
-    body: "点任意一天确认。默认周一至周五，点亮的日期才会提醒。",
-  },
-  {
-    key: "timeStart",
-    title: "选择开始时间",
-    body: "点开始时间，选择每天从几点开始提醒；默认 09:00。",
-  },
-  {
-    key: "timeEnd",
-    title: "选择结束时间",
-    body: "再选结束时间；默认 18:00，下班后不再打扰。",
-  },
+  { key: "goal", titleKey: "mobile.onboarding.step.goal.title", bodyKey: "mobile.onboarding.step.goal.body" },
+  { key: "gap", titleKey: "mobile.onboarding.step.gap.title", bodyKey: "mobile.onboarding.step.gap.body" },
+  { key: "weekdays", titleKey: "mobile.onboarding.step.weekdays.title", bodyKey: "mobile.onboarding.step.weekdays.body" },
+  { key: "timeStart", titleKey: "mobile.onboarding.step.timeStart.title", bodyKey: "mobile.onboarding.step.timeStart.body" },
+  { key: "timeEnd", titleKey: "mobile.onboarding.step.timeEnd.title", bodyKey: "mobile.onboarding.step.timeEnd.body" },
 ];
 
 export const ONBOARDING_SEEN_KEY = "shui:onboarding-seen";

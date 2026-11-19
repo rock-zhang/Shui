@@ -92,7 +92,7 @@ export function useDrinkData(period: 7 | 30 = 7) {
   const [revision, setRevision] = useState(0);
   const [snapshot, setSnapshot] = useState<Snapshot>(EMPTY);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(false);
 
   const reload = useCallback(() => setRevision((value) => value + 1), []);
 
@@ -104,13 +104,13 @@ export function useDrinkData(period: 7 | 30 = 7) {
     if (isDemoPreview()) {
       setSnapshot(buildDemoSnapshot(period));
       setLoading(false);
-      setError("");
+      setError(false);
       return;
     }
 
     let cancelled = false;
     setLoading(true);
-    setError("");
+    setError(false);
 
     (async () => {
       const [configStore, historyStore] = await Promise.all([
@@ -160,7 +160,7 @@ export function useDrinkData(period: 7 | 30 = 7) {
         console.error("读取饮水数据失败", failure);
         if (!cancelled) {
           if (isMobilePreview()) setSnapshot(EMPTY);
-          else setError("暂时无法读取本地记录，请稍后重试");
+          else setError(true);
         }
       })
       .finally(() => {

@@ -121,8 +121,6 @@ const BASE_GAP_OPTIONS = ["10", "20", "30", "45", "60"];
 export const GAP_OPTIONS = isDebugBuild()
   ? ["1", ...BASE_GAP_OPTIONS]
   : BASE_GAP_OPTIONS;
-export const WEEKDAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
-
 export const TIME_LIST = [
   ...Array.from({ length: 24 }, (_, hour) => {
     const value = String(hour).padStart(2, "0");
@@ -292,16 +290,20 @@ export function formatDateKey(key: string) {
   return `${key.slice(0, 4)}-${key.slice(4, 6)}-${key.slice(6, 8)}`;
 }
 
-export function formatTimeLabel(value: string | null | undefined) {
-  if (!value) return "时间未知";
+export function formatTimeLabel(
+  value: string | null | undefined,
+  fallback = "时间未知",
+  locale = "zh-CN"
+) {
+  if (!value) return fallback;
   const date = new Date(value);
   return Number.isFinite(date.getTime())
-    ? date.toLocaleTimeString("zh-CN", {
+    ? date.toLocaleTimeString(locale, {
         hour: "2-digit",
         minute: "2-digit",
         hour12: false,
       })
-    : "时间未知";
+    : fallback;
 }
 
 /** Native notification actions write water without the WebView being alive. */

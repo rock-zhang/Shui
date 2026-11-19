@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BellOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { track } from "@/lib/analytics";
+import { useI18n } from "@/lib/i18n";
 import { useMobileConfig } from "./config-context";
 import { useNotificationPermission } from "./notification-permission-context";
 
@@ -35,6 +36,7 @@ function readSnoozeUntil(): number {
  * 后两者只是「可能延迟」，混在一起会稀释这句话的分量。
  */
 export function NotificationNudge() {
+  const { t } = useI18n();
   const { general, hydrated } = useMobileConfig();
   const { permission, canRequest, request } = useNotificationPermission();
   const [snoozeUntil, setSnoozeUntil] = useState<number | null>(null);
@@ -94,7 +96,7 @@ export function NotificationNudge() {
 
   return (
     <section
-      aria-label="通知权限未开启"
+      aria-label={t("mobile.nudge.aria")}
       className="mb-3 mt-1 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-3.5"
     >
       <div className="flex gap-2.5">
@@ -104,12 +106,12 @@ export function NotificationNudge() {
         />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium leading-5 text-amber-700 dark:text-amber-300">
-            提醒发不出去
+            {t("mobile.nudge.title")}
           </p>
           <p className="mt-0.5 text-xs leading-5 text-amber-700/80 dark:text-amber-300/70">
             {canRequest
-              ? "系统通知权限未开启，锁屏或退出 App 后收不到喝水提醒"
-              : "通知权限已被系统禁止，需要在系统设置中允许 Shui 发送通知"}
+              ? t("mobile.nudge.body.requestable")
+              : t("mobile.nudge.body.blocked")}
           </p>
         </div>
       </div>
@@ -120,7 +122,7 @@ export function NotificationNudge() {
           className="min-h-9 text-amber-700 hover:bg-amber-500/15 hover:text-amber-800 dark:text-amber-300 dark:hover:bg-amber-400/15 dark:hover:text-amber-200"
           onClick={snooze}
         >
-          稍后
+          {t("mobile.nudge.later")}
         </Button>
         <Button
           size="sm"
@@ -128,7 +130,7 @@ export function NotificationNudge() {
           className="min-h-9 bg-amber-600 text-white shadow-none hover:bg-amber-700 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
           onClick={() => void go()}
         >
-          去开启
+          {t("mobile.nudge.allow")}
         </Button>
       </div>
     </section>

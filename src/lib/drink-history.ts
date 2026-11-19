@@ -1,4 +1,5 @@
 import { normalizeDrinkDay, getLocalDateKey, type DrinkHistoryValue } from "./drink-day";
+import type { MessageKey } from "./i18n/messages";
 export { normalizeDrinkDay, getLocalDateKey, getRecentDates } from "./drink-day";
 export type { DrinkEntry, DrinkDayRecord, DrinkHistoryValue } from "./drink-day";
 
@@ -158,12 +159,49 @@ function formatDateKeyForExport(key: string) {
   return `${key.slice(0, 4)}-${key.slice(4, 6)}-${key.slice(6, 8)}`;
 }
 
+const CSV_TEXT_KEYS = {
+  date: "settings.statistics.csv.date",
+  total: "settings.statistics.csv.total",
+  goal: "settings.statistics.csv.goal",
+  reached: "settings.statistics.csv.reached",
+  amount: "settings.statistics.csv.amount",
+  time: "settings.statistics.csv.time",
+  yes: "settings.statistics.csv.yes",
+  no: "settings.statistics.csv.no",
+} as const satisfies Record<string, MessageKey>;
+
+type CsvTextKey = (typeof CSV_TEXT_KEYS)[keyof typeof CSV_TEXT_KEYS];
+
+/** 不传翻译函数时的中文默认值，兼容旧调用方与 Node 测试。 */
+const CSV_ZH: Record<string, string> = {
+  [CSV_TEXT_KEYS.date]: "日期",
+  [CSV_TEXT_KEYS.total]: "每日总量(ml)",
+  [CSV_TEXT_KEYS.goal]: "当日目标(ml)",
+  [CSV_TEXT_KEYS.reached]: "是否达标",
+  [CSV_TEXT_KEYS.amount]: "单次饮水量(ml)",
+  [CSV_TEXT_KEYS.time]: "记录时间(ISO)",
+  [CSV_TEXT_KEYS.yes]: "是",
+  [CSV_TEXT_KEYS.no]: "否",
+};
+
+/**
+ * 导出 CSV。表头与「是/否」通过 translate 注入，纯函数本身不持有具体语言文案。
+ */
 export function exportDrinkHistoryCsv(
   entries: Array<[string, DrinkHistoryValue]>,
-  fallbackGoal: number
+  fallbackGoal: number,
+  translate?: (key: CsvTextKey) => string
 ) {
+  const tr = (key: CsvTextKey) => (translate ? translate(key) : CSV_ZH[key] ?? key);
   const rows: Array<Array<string | number>> = [
-    ["日期", "每日总量(ml)", "当日目标(ml)", "是否达标", "单次饮水量(ml)", "记录时间(ISO)"],
+    [
+      tr(CSV_TEXT_KEYS.date),
+      tr(CSV_TEXT_KEYS.total),
+      tr(CSV_TEXT_KEYS.goal),
+      tr(CSV_TEXT_KEYS.reached),
+      tr(CSV_TEXT_KEYS.amount),
+      tr(CSV_TEXT_KEYS.time),
+    ],
   ];
 
   entries
@@ -175,7 +213,7 @@ export function exportDrinkHistoryCsv(
         formatDateKeyForExport(key),
         day.total,
         day.goal,
-        day.goal > 0 && day.total >= day.goal ? "是" : "否",
+        day.goal > 0 && day.total >= day.goal ? tr(CSV_TEXT_KEYS.yes) : tr(CSV_TEXT_KEYS.no),
       ];
 
       if (day.entries.length === 0) {

@@ -342,18 +342,14 @@ object ReminderScheduler {
     fun channelId(context: Context): String =
         if (isSoundEnabled(context)) CHANNEL_ID else CHANNEL_ID_SILENT
 
-    private fun buildChannel(channelId: String): NotificationChannel {
+    private fun buildChannel(channelId: String, context: Context): NotificationChannel {
         val soundEnabled = channelId == CHANNEL_ID
         return NotificationChannel(
             channelId,
-            if (soundEnabled) "喝水提醒" else "喝水提醒（静音）",
+            AppStrings.channelName(context, soundEnabled),
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = if (soundEnabled) {
-                "定时喝水提醒，可直接在通知里记一杯水"
-            } else {
-                "已关闭提醒音效：照常提醒，但不发出声音"
-            }
+            description = AppStrings.channelDescription(context, soundEnabled)
             // 横幅（Heads-up）的硬条件是渠道 importance >= HIGH；部分 ROM 还额外
             // 要求「有声音或震动」。静音渠道若两者皆无，提醒就只会静静躺在通知栏，
             // 所以这里必须给一段短震动兜底。
@@ -401,7 +397,7 @@ object ReminderScheduler {
         id: String = channelId(context)
     ) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        manager.createNotificationChannel(buildChannel(id))
+        manager.createNotificationChannel(buildChannel(id, context))
     }
 
     /**
@@ -424,6 +420,26 @@ object ReminderScheduler {
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         ensureChannel(context, manager, CHANNEL_ID)
         ensureChannel(context, manager, CHANNEL_ID_SILENT)
+    }
+
+    /** 渠道上次使用的语言（归一化后的 locale），用于判断是否需要刷新名称。 */
+    const val KEY_CHANNEL_LOCALE = "channel_locale"
+
+    /**
+     * 语言偏好变化时刷新渠道名与描述。
+     *
+     * Android 上 createNotificationChannel 对已存在的渠道只更新 name 与 description，
+     * **不会**覆盖用户在系统里调过的 importance / 横幅 / 锁屏 / 声音设置。因此切换
+     * 语言时只需再调一次 ensureChannels 用新文案覆盖名称，绝不能删除重建（那会丢失
+     * 用户的渠道自定义，也是高风险操作）。仅在检测到 locale 变化时触发，避免每次
+     * 启动都去写系统通知设置。
+     */
+    fun syncChannelLocale(context: Context) {
+        val locale = AppLocale.current(context)
+        val prefs = context.getSharedPreferences(ReminderPlugin.PREFS, Context.MODE_PRIVATE)
+        if (prefs.getString(KEY_CHANNEL_LOCALE, null) == locale) return
+        prefs.edit().putString(KEY_CHANNEL_LOCALE, locale).apply()
+        ensureChannels(context)
     }
 
     /**
@@ -853,100 +869,6 @@ object ReminderScheduler {
     }
 }
 
-/**
- * 提醒通知的文案池：按今日完成度分四档，每档十余条。
- *
- * 每次提醒随机取一条，并记住每档上一次用过的下标，保证连续两条不重复——
- * 固定文案用久了会被当成背景噪音直接划掉，进度不同给不同的鼓励也更贴合当下。
- */
-private object ReminderCopy {
-    private const val KEY_PREFIX = "reminder_copy_last_"
-
-    /** 完成度 < 25%：刚起步，重点是「开始喝」。 */
-    private val START = listOf(
-        "新的一天从一杯水开始，来一杯吧",
-        "刚起步，先喝口水润润嗓子",
-        "身体刚开始补水，别停下",
-        "现在喝一杯，今天会很轻松",
-        "第一杯水永远最值，先从这杯开始",
-        "还早，慢慢把节奏建立起来",
-        "起身走走，顺便接杯水",
-        "提醒一下：该补水了",
-        "别等到口渴才喝，现在正好",
-        "一小口水也是进步，来吧",
-        "给身体开个好头，干杯",
-        "先来一杯，给今天开个好头"
-    )
-
-    /** 完成度 25% ~ 50%：节奏建立起来了，强调「保持」。 */
-    private val HALF = listOf(
-        "已经四分之一了，继续保持",
-        "进度不错，再来一杯稳稳推进",
-        "节奏起来了，别断",
-        "喝一口，离目标更近一点",
-        "身体正在变好，别停下来",
-        "这一杯下去，状态会更清醒",
-        "补水进行中，保持这个势头",
-        "再补几杯，进度会更稳",
-        "现在的你比刚起床时更水润了",
-        "不必大口，小口多次最有效",
-        "继续按节奏来，稳稳的",
-        "记得喝水，也记得起身活动"
-    )
-
-    /** 完成度 50% ~ 75%：过半，强调「推进」。 */
-    private val NEAR = listOf(
-        "已经过半，胜利在望",
-        "再补几杯，今天就很稳了",
-        "势头很好，别松懈",
-        "今天的目标越来越近了",
-        "继续喝，身体会感谢你",
-        "过半的进度，值得再喝一杯",
-        "保持住，这个节奏刚刚好",
-        "再来一杯，向目标冲刺",
-        "你已经比大多数人喝得多了",
-        "喝口水，给自己一个小小的奖励",
-        "补水过半，状态在线",
-        "剩下的交给每一杯水"
-    )
-
-    /** 完成度 >= 75%：收尾，强调「就差一点」。 */
-    private val ALMOST = listOf(
-        "只差最后几杯，别放弃",
-        "快到目标了，一鼓作气",
-        "胜利就在眼前，再来一杯",
-        "最后冲刺，今天的目标马上达成",
-        "已经很接近了，坚持一下",
-        "再喝一杯就离目标更近了",
-        "收尾阶段，稳稳喝完",
-        "今天的你非常自律，继续",
-        "最后这一段，交给这杯水",
-        "差距不大了，喝完就达标",
-        "保持住，马上就能完成目标",
-        "再补一杯，今天就算圆满"
-    )
-
-    /** 按完成度取一条文案；ratio 是 0.0 ~ 1.0 的完成比例。 */
-    fun pick(context: Context, ratio: Double): String {
-        val (bucket, pool) = when {
-            ratio >= 0.75 -> "almost" to ALMOST
-            ratio >= 0.5 -> "near" to NEAR
-            ratio >= 0.25 -> "half" to HALF
-            else -> "start" to START
-        }
-        val prefs = context.getSharedPreferences(ReminderPlugin.PREFS, Context.MODE_PRIVATE)
-        val key = KEY_PREFIX + bucket
-        val last = prefs.getInt(key, -1)
-        var index = pool.indices.random()
-        if (pool.size > 1 && index == last) {
-            // 撞上上一条就顺移一格，既换了文案又不用重摇。
-            index = (index + 1) % pool.size
-        }
-        prefs.edit().putInt(key, index).apply()
-        return pool[index]
-    }
-}
-
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
@@ -1066,8 +988,8 @@ class ReminderReceiver : BroadcastReceiver() {
             .setSmallIcon(R.drawable.ic_stat_water)
             .setLargeIcon(BitmapFactory.decodeResource(context.resources, R.drawable.ic_notification_large))
             .setColor(0xFF10B981.toInt())
-            .setContentTitle("今日目标已完成")
-            .setContentText("已喝 ${total}ml / 目标 ${goal}ml，今天的提醒就到这里")
+            .setContentTitle(AppStrings.goalTitle(context))
+            .setContentText(AppStrings.goalText(context, total, goal))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             // 状态类而不是提醒类：它不需要用户处理，只是告知。
@@ -1131,7 +1053,7 @@ class ReminderReceiver : BroadcastReceiver() {
             // 下拉大图标用桌面版「水」字 logo；状态栏小图标受系统限制只能单色剪影。
             .setLargeIcon(BitmapFactory.decodeResource(context.resources, R.drawable.ic_notification_large))
             .setColor(0xFF3B82F6.toInt())
-            .setContentTitle("该喝水啦")
+            .setContentTitle(AppStrings.reminderTitle(context))
             // 正文按今日完成度从文案池随机取，连续两条不重复。
             .setContentText(ReminderCopy.pick(context, ratio))
             .setPriority(NotificationCompat.PRIORITY_HIGH)

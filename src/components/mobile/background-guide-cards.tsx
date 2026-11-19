@@ -6,6 +6,7 @@ import { ChevronRight, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { track } from "@/lib/analytics";
 import type { RomProfile } from "@/lib/rom";
+import { useI18n } from "@/lib/i18n";
 
 type Command = "open_autostart_settings" | "open_app_settings";
 
@@ -24,6 +25,7 @@ export function BackgroundGuideCards({
   /** 埋点来源：三步引导 guide_step3 / 漏提醒弹窗 missed_dialog。 */
   source?: string;
 }) {
+  const { t } = useI18n();
   const [pending, setPending] = useState<Command | null>(null);
 
   async function open(command: Command) {
@@ -43,7 +45,7 @@ export function BackgroundGuideCards({
     try {
       await invoke(command);
     } catch {
-      toast.error("打不开设置页，请按上面的路径手动开启");
+      toast.error(t("mobile.guide.background.openFailed"));
     } finally {
       setPending(null);
     }
@@ -72,7 +74,7 @@ export function BackgroundGuideCards({
         />
       </div>
       <p className="mt-1.5 px-1 text-[11px] leading-4 text-muted-foreground">
-        路径可能因系统版本略有差异；两项都打开后回到 App 即可。
+        {t("mobile.guide.background.footnote")}
       </p>
     </div>
   );
@@ -95,6 +97,7 @@ function SettingCard({
   disabled: boolean;
   onOpen: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.06] p-3">
       <div className="flex items-start gap-2.5">
@@ -103,7 +106,7 @@ function SettingCard({
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-semibold leading-5 text-foreground">
-            检查「{label}」是否已开启
+            {t("mobile.guide.background.check", { label })}
           </p>
 
           {/* 面包屑按真实设置层级排列，相当于给用户一张可照抄的路径截图。 */}
@@ -148,7 +151,7 @@ function SettingCard({
         className="mt-2.5 flex min-h-8 w-full items-center justify-center gap-1 rounded-xl border border-amber-500/40 bg-amber-500/10 py-1.5 text-xs font-medium text-amber-700 transition-colors active:bg-amber-500/15 disabled:opacity-60 dark:text-amber-300"
       >
         <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-        去设置
+        {t("mobile.guide.background.openSettings")}
       </button>
     </div>
   );

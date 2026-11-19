@@ -8,7 +8,6 @@ import { Switch } from "@/components/ui/switch";
 import {
   GAP_OPTIONS,
   GOLD_OPTIONS,
-  WEEKDAY_LABELS,
   emitShowReminder,
 } from "@/lib/mobile";
 import { cn } from "@/lib/utils";
@@ -18,6 +17,7 @@ import { useMobileConfig } from "./config-context";
 import { useNotificationPermission } from "./notification-permission-context";
 import { NotificationHealthCard } from "./notification-health-card";
 import { MobileRow, MobileSection, MobileTimeInput } from "./ui";
+import { useI18n, WEEKDAY_SHORT_KEYS } from "@/lib/i18n";
 
 function Chip({
   selected,
@@ -59,9 +59,9 @@ function Chip({
 }
 
 /** Stable placeholder: never paints DEFAULT_ALERT before the stored config arrives. */
-function ReminderSkeleton() {
+function ReminderSkeleton({ label }: { label: string }) {
   return (
-    <div className="space-y-3" aria-busy="true" aria-label="正在读取提醒设置">
+    <div className="space-y-3" aria-busy="true" aria-label={label}>
       {[96, 96, 96, 96, 224, 168, 180].map((height, index) => (
         <Skeleton key={index} className="rounded-2xl" style={{ height }} />
       ))}
@@ -70,6 +70,7 @@ function ReminderSkeleton() {
 }
 
 export function ReminderTab() {
+  const { t } = useI18n();
   const { alert, general, hydrated, patchAlert, patchGeneral } =
     useMobileConfig();
   // 通知权限由 NotificationPermissionProvider 统一持有：今日 tab 的提示卡和
@@ -93,14 +94,14 @@ export function ReminderTab() {
     try {
       await sendReminderNotification();
       track("test_notification_click", { success: true });
-      toast.success("测试通知已发送");
+      toast.success(t("mobile.reminder.testSent"));
     } catch {
       track("test_notification_click", { success: false });
-      toast.info("当前为桌面预览，通知由 Android 原生通道发送");
+      toast.info(t("mobile.reminder.desktopPreview"));
     }
   }
 
-  if (!hydrated) return <ReminderSkeleton />;
+  if (!hydrated) return <ReminderSkeleton label={t("mobile.reminder.loading")} />;
 
   // 「想收通知」与「系统允许通知」是两件事：前者是 App 偏好，后者是系统权限。
   // 两者同时成立才会真正到达，所以只在这一行做联动提示，不再单列一个开关。
@@ -109,8 +110,8 @@ export function ReminderTab() {
   return (
     <>
       <MobileSection
-        title="每日目标"
-        description="达成目标后不再重复提醒，建议不低于 1500ml"
+        title={t("mobile.reminder.goal.title")}
+        description={t("mobile.reminder.goal.description")}
         tourId="goal"
       >
         <div className="mobile-scroll-x flex gap-2 overflow-x-auto overflow-y-hidden pb-1">
@@ -119,7 +120,7 @@ export function ReminderTab() {
               key={value}
               selected={alert.gold === value}
               onClick={() => patchAlert({ gold: value })}
-              label={`每日目标 ${value} 毫升`}
+              label={t("mobile.reminder.goal.aria", { amount: value })}
             >
               {value} ml
             </Chip>
@@ -128,8 +129,8 @@ export function ReminderTab() {
       </MobileSection>
 
       <MobileSection
-        title="提醒间隔"
-        description="每隔设定时间提醒一次，单位为分钟"
+        title={t("mobile.reminder.gap.title")}
+        description={t("mobile.reminder.gap.description")}
         tourId="gap"
       >
         <div className="grid grid-cols-5 gap-1.5">
@@ -138,8 +139,8 @@ export function ReminderTab() {
               key={value}
               selected={alert.gap === value}
               onClick={() => patchAlert({ gap: value })}
-              sublabel="分钟"
-              label={`每 ${value} 分钟提醒一次`}
+              sublabel={t("mobile.reminder.gap.unit")}
+              label={t("mobile.reminder.gap.aria", { minutes: value })}
               className="w-full shrink px-0"
             >
               {value}
@@ -149,12 +150,12 @@ export function ReminderTab() {
       </MobileSection>
 
       <MobileSection
-        title="重复"
-        description="不选择任何一天则每天提醒"
+        title={t("mobile.reminder.weekdays.title")}
+        description={t("mobile.reminder.weekdays.description")}
         tourId="weekdays"
       >
         <div className="grid grid-cols-7 gap-1.5">
-          {WEEKDAY_LABELS.map((label, day) => {
+          {Array.from({ length: 7 }, (_, day) => {
             const selected = (alert.weekdays ?? []).includes(day);
             return (
               <button
@@ -169,24 +170,29 @@ export function ReminderTab() {
                     : "bg-muted text-muted-foreground"
                 )}
               >
-                {label}
+                {t(WEEKDAY_SHORT_KEYS[day])}
               </button>
             );
           })}
         </div>
       </MobileSection>
 
-      <MobileSection title="时间范围" description="00:00 作为结束时间表示次日零点">
+      <MobileSection
+        title={t("mobile.reminder.time.title")}
+        description={t("mobile.reminder.time.description")}
+      >
         <div className="flex items-center gap-2">
           <MobileTimeInput
-            label="开始时间"
+            label={t("settings.reminder.time.start")}
             value={alert.timeStart}
             onChange={(value) => patchAlert({ timeStart: value })}
             tourId="timeStart"
           />
-          <span className="shrink-0 text-xs text-muted-foreground">至</span>
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {t("settings.reminder.time.separator")}
+          </span>
           <MobileTimeInput
-            label="结束时间"
+            label={t("settings.reminder.time.end")}
             value={alert.timeEnd}
             onChange={(value) => patchAlert({ timeEnd: value })}
             tourId="timeEnd"
@@ -195,26 +201,26 @@ export function ReminderTab() {
       </MobileSection>
 
       <MobileSection
-        title="提醒方式"
-        description="两种通道可同时开启：后台靠系统通知保底到达，App 在前台时展示全屏提醒"
+        title={t("mobile.reminder.methods.title")}
+        description={t("mobile.reminder.methods.description")}
       >
         <MobileRow
-          title="系统通知"
+          title={t("mobile.reminder.notification.title")}
           description={
             notifBlocked
               ? notifCanRequest
-                ? "通知权限未开启，锁屏与后台的提醒收不到"
-                : "通知权限已被系统拒绝，需到系统设置里手动开启"
+                ? t("mobile.reminder.notification.deniedRequestable")
+                : t("mobile.reminder.notification.deniedBlocked")
               : general.isNotification
-                ? "锁屏或退到后台也能到达，通知里可直接记一杯水"
-                : "已关闭，锁屏与后台不再提醒"
+                ? t("mobile.reminder.notification.on")
+                : t("mobile.reminder.notification.off")
           }
           descriptionClassName={notifBlocked ? "text-destructive" : undefined}
           control={
             <Switch
               checked={general.isNotification}
               onCheckedChange={(value) => patchGeneral({ isNotification: value })}
-              aria-label="系统通知"
+              aria-label={t("mobile.reminder.notification.title")}
             />
           }
           // 行内文字链接的点击区只有十来个像素高，在开关旁边根本不像能点。
@@ -229,12 +235,12 @@ export function ReminderTab() {
                 {notifCanRequest ? (
                   <>
                     <BellRing className="mr-1.5 h-4 w-4" />
-                    允许通知
+                    {t("mobile.reminder.notification.allow")}
                   </>
                 ) : (
                   <>
                     <Settings className="mr-1.5 h-4 w-4" />
-                    去系统设置开启
+                    {t("mobile.reminder.notification.openSettings")}
                   </>
                 )}
               </Button>
@@ -242,65 +248,67 @@ export function ReminderTab() {
           }
         />
         <MobileRow
-          title="全屏提醒"
-          description="打开 App 时显示彩虹渐变提醒页，30 秒倒计时"
+          title={t("mobile.reminder.fullscreen.title")}
+          description={t("mobile.reminder.fullscreen.description")}
           control={
             <Switch
               checked={general.isFullScreen}
               onCheckedChange={(value) => patchGeneral({ isFullScreen: value })}
-              aria-label="全屏提醒"
+              aria-label={t("mobile.reminder.fullscreen.title")}
             />
           }
         />
         <MobileRow
-          title="提醒音效"
-          description="提醒到达时播放水滴声"
+          title={t("mobile.reminder.sound.title")}
+          description={t("mobile.reminder.sound.description")}
           control={
             <Switch
               checked={general.isSound}
               onCheckedChange={(value) => patchGeneral({ isSound: value })}
-              aria-label="提醒音效"
+              aria-label={t("mobile.reminder.sound.title")}
             />
           }
         />
         <MobileRow
-          title="暂停提醒"
-          description="临时关闭全部提醒，饮水记录仍可手动添加"
+          title={t("mobile.reminder.pause.title")}
+          description={t("mobile.reminder.pause.description")}
           control={
             <Switch
               checked={general.isPaused}
               onCheckedChange={(value) => patchGeneral({ isPaused: value })}
-              aria-label="暂停提醒"
+              aria-label={t("mobile.reminder.pause.title")}
             />
           }
         />
       </MobileSection>
 
       <MobileSection
-        title="勿扰时段"
-        description="在该时段内不发送提醒，适合午休或夜间"
+        title={t("mobile.reminder.quiet.title")}
+        description={t("mobile.reminder.quiet.description")}
       >
         <MobileRow
-          title="启用勿扰"
-          description="适合午休、会议或夜间"
+          title={t("mobile.reminder.quiet.toggle")}
+          description={t("mobile.reminder.quiet.toggleDescription")}
           control={
             <Switch
               checked={general.quietEnabled}
               onCheckedChange={(value) => patchGeneral({ quietEnabled: value })}
-              aria-label="启用勿扰时段"
+              aria-label={t("mobile.reminder.quiet.toggle")}
             />
           }
         />
         {general.quietEnabled && (
           <div className="flex items-center gap-2 pb-1 pt-2">
             <MobileTimeInput
-              label="勿扰开始时间"
+              label={t("mobile.reminder.quiet.start")}
               value={general.quietStart}
               onChange={(value) => patchGeneral({ quietStart: value })}
             />
-            <span className="shrink-0 text-xs text-muted-foreground">至</span>
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {t("settings.reminder.time.separator")}
+            </span>
             <MobileTimeInput
-              label="勿扰结束时间"
+              label={t("mobile.reminder.quiet.end")}
               value={general.quietEnd}
               onChange={(value) => patchGeneral({ quietEnd: value })}
             />
@@ -319,14 +327,14 @@ export function ReminderTab() {
           }}
         >
           <BellRing className="mr-1.5 h-4 w-4" />
-          预览全屏提醒
+          {t("mobile.reminder.preview")}
         </Button>
         <Button
           variant="outline"
           className="min-h-12 flex-1"
           onClick={sendTestNotification}
         >
-          发送测试通知
+          {t("mobile.reminder.testNotification")}
         </Button>
       </div>
     </>

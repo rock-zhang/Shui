@@ -31,6 +31,8 @@ tauri = { version = "2", features = [ "tray-icon", "macos-private-api", "image-i
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 chrono = { version = "0.4", features = ["serde"] }
+# 原生侧本地化：system 语言偏好从系统读取（已在 Cargo.lock 中，0.3.x）。
+sys-locale = "0.3"
 scopeguard = "1.2"
 tauri-plugin-os = "2"
 tauri-plugin-store = "2"

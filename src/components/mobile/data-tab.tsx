@@ -5,25 +5,37 @@ import { useDrinkData } from "@/hooks/use-drink-data";
 import {
   type DrinkDaySummary,
   type DrinkPatternAnalysis,
+  type DrinkTimeBucket,
 } from "@/lib/drink-history";
 import type { ReminderSummary } from "@/lib/reminder-history";
 import { MobileEmpty, MobileSection, MobileSegmented, MobileStat } from "./ui";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/analytics";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 
-const PERIOD_OPTIONS = [
-  { value: "7", label: "近 7 天" },
-  { value: "30", label: "近 30 天" },
-] as const;
+const BUCKET_LABEL_KEYS: Record<DrinkTimeBucket["key"], MessageKey> = {
+  overnight: "settings.statistics.bucket.overnight",
+  morning: "settings.statistics.bucket.morning",
+  afternoon: "settings.statistics.bucket.afternoon",
+  evening: "settings.statistics.bucket.evening",
+};
 
-function formatInterval(minutes: number | null) {
+type Translate = ReturnType<typeof useI18n>["t"];
+
+function formatInterval(minutes: number | null, t: Translate) {
   if (minutes === null) return "--";
-  if (minutes < 1) return "不足 1 分钟";
+  if (minutes < 1) return t("settings.statistics.interval.lessThanMinute");
   const rounded = Math.round(minutes);
-  if (rounded < 60) return `${rounded} 分钟`;
+  if (rounded < 60)
+    return t("settings.statistics.interval.minutes", { minutes: rounded });
   const hours = Math.floor(rounded / 60);
   const remaining = rounded % 60;
-  return remaining ? `${hours} 小时 ${remaining} 分` : `${hours} 小时`;
+  return remaining
+    ? t("settings.statistics.interval.hoursMinutes", {
+        hours,
+        minutes: remaining,
+      })
+    : t("settings.statistics.interval.hours", { hours });
 }
 
 /** Horizontally scrollable bars: 30 days no longer compress into 6px columns. */
@@ -34,6 +46,7 @@ function TrendChart({
   days: DrinkDaySummary[];
   goal: number;
 }) {
+  const { t } = useI18n();
   const chartMax = Math.max(
     Math.ceil(Math.max(goal, ...days.map((day) => day.total), 1) / 500) * 500,
     500
@@ -61,7 +74,10 @@ function TrendChart({
               <div
                 key={day.key}
                 className="relative flex h-full min-w-[14px] flex-1 items-end"
-                title={`${day.date.getMonth() + 1}/${day.date.getDate()}：${day.total}ml`}
+                title={t("mobile.data.trend.tooltip", {
+                  date: `${day.date.getMonth() + 1}/${day.date.getDate()}`,
+                  total: day.total,
+                })}
               >
                 <div
                   className={cn(
@@ -81,33 +97,40 @@ function TrendChart({
         </div>
       </div>
       <p className="mt-1 text-[11px] text-muted-foreground">
-        纵轴上限 {chartMax} ml · 绿色为达标日 · 虚线为当前目标 · 左右滑动查看
+        {t("mobile.data.trend.note", { max: chartMax })}
       </p>
     </div>
   );
 }
 
 function PatternCards({ analysis }: { analysis: DrinkPatternAnalysis }) {
+  const { t } = useI18n();
   return (
-    <MobileSection title="饮水习惯">
+    <MobileSection title={t("mobile.data.habit.title")}>
       <p className="mb-3 text-xs text-muted-foreground">
-        时间分布 · 基于 {analysis.totalEntries} 次有效记录
+        {t("mobile.data.habit.description", { count: analysis.totalEntries })}
       </p>
       {analysis.totalEntries === 0 ? (
-        <MobileEmpty title="还没有足够数据" description="记录几次饮水后，这里会显示时段偏好" />
+        <MobileEmpty
+          title={t("mobile.data.habit.emptyTitle")}
+          description={t("mobile.data.habit.emptyDescription")}
+        />
       ) : (
         <div className="space-y-3">
           {analysis.timeBuckets.map((bucket) => (
             <div key={bucket.key}>
               <div className="mb-1 flex items-baseline justify-between gap-2">
                 <span className="text-xs font-medium">
-                  {bucket.label}
+                  {t(BUCKET_LABEL_KEYS[bucket.key])}
                   <span className="ml-1 text-[10px] font-normal text-muted-foreground">
                     {bucket.range}
                   </span>
                 </span>
                 <span className="whitespace-nowrap text-[11px] text-muted-foreground">
-                  {bucket.amount}ml · {bucket.count}次
+                  {t("mobile.data.habit.entry", {
+                    amount: bucket.amount,
+                    count: bucket.count,
+                  })}
                 </span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-muted">
@@ -122,28 +145,32 @@ function PatternCards({ analysis }: { analysis: DrinkPatternAnalysis }) {
       )}
 
       <div className="mt-4 border-t border-border/60 pt-3">
-        <p className="text-xs text-muted-foreground">平均饮水间隔</p>
+        <p className="text-xs text-muted-foreground">
+          {t("mobile.data.interval.average")}
+        </p>
         <p className="mt-1 text-xl font-semibold">
-          {formatInterval(analysis.averageIntervalMinutes)}
+          {formatInterval(analysis.averageIntervalMinutes, t)}
         </p>
         {analysis.intervalCount > 0 && (
           <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-            {[
-              ["最短", analysis.shortestIntervalMinutes],
-              ["中位", analysis.medianIntervalMinutes],
-              ["最长", analysis.longestIntervalMinutes],
-            ].map(([label, value]) => (
-              <div key={label as string} className="rounded-lg bg-muted/60 py-2">
-                <p className="text-[10px] text-muted-foreground">{label}</p>
+            {([
+              ["settings.statistics.pattern.interval.shortest", analysis.shortestIntervalMinutes],
+              ["settings.statistics.pattern.interval.median", analysis.medianIntervalMinutes],
+              ["settings.statistics.pattern.interval.longest", analysis.longestIntervalMinutes],
+            ] satisfies Array<readonly [MessageKey, number | null]>).map(([labelKey, value]) => (
+              <div key={labelKey} className="rounded-lg bg-muted/60 py-2">
+                <p className="text-[10px] text-muted-foreground">
+                  {t(labelKey)}
+                </p>
                 <p className="mt-0.5 text-xs font-medium">
-                  {formatInterval(value as number | null)}
+                  {formatInterval(value, t)}
                 </p>
               </div>
             ))}
           </div>
         )}
         <p className="mt-2 text-[11px] text-muted-foreground">
-          仅计算同一天内的相邻记录，基于 {analysis.intervalCount} 个有效间隔
+          {t("mobile.data.interval.note", { count: analysis.intervalCount })}
         </p>
       </div>
     </MobileSection>
@@ -157,25 +184,41 @@ function ReminderStats({
   reminders: ReminderSummary;
   error: boolean;
 }) {
+  const { t } = useI18n();
   const rows: Array<[string, string]> = [
-    ["已结束提醒", `${reminders.completed} 次`],
-    ["确认饮水", `${reminders.confirmed} 次`],
-    ["跳过 / 关闭", `${reminders.skipped} 次`],
-    ["自动超时", `${reminders.timedOut} 次`],
     [
-      "累计展示时长",
-      `${Math.floor(reminders.displaySeconds / 60)} 分 ${reminders.displaySeconds % 60} 秒`,
+      t("settings.statistics.reminder.completed"),
+      t("settings.statistics.reminder.count", { count: reminders.completed }),
+    ],
+    [
+      t("settings.statistics.reminder.confirmed"),
+      t("settings.statistics.reminder.count", { count: reminders.confirmed }),
+    ],
+    [
+      t("mobile.data.reminder.skipped"),
+      t("settings.statistics.reminder.count", { count: reminders.skipped }),
+    ],
+    [
+      t("mobile.data.reminder.timedOut"),
+      t("settings.statistics.reminder.count", { count: reminders.timedOut }),
+    ],
+    [
+      t("settings.statistics.reminder.duration"),
+      t("settings.statistics.reminder.durationValue", {
+        minutes: Math.floor(reminders.displaySeconds / 60),
+        seconds: reminders.displaySeconds % 60,
+      }),
     ],
   ];
 
   return (
     <MobileSection
-      title="提醒结果统计"
-      description="全屏提醒与通知操作都会计入，按开始日期归档"
+      title={t("mobile.data.reminder.title")}
+      description={t("mobile.data.reminder.description")}
     >
       {error ? (
         <p role="alert" className="text-sm text-destructive">
-          提醒统计暂时无法读取
+          {t("mobile.data.reminder.error")}
         </p>
       ) : (
         <dl className="grid grid-cols-2 gap-3">
@@ -189,7 +232,7 @@ function ReminderStats({
       )}
       {reminders.completed === 0 && !error && (
         <p className="mt-3 text-xs leading-5 text-muted-foreground">
-          此时间范围内暂无已结束提醒。全屏提醒和通知里的快捷操作都会计入统计。
+          {t("mobile.data.reminder.empty")}
         </p>
       )}
     </MobileSection>
@@ -197,6 +240,7 @@ function ReminderStats({
 }
 
 export function DataTab() {
+  const { t } = useI18n();
   const [periodValue, setPeriodValue] = useState<"7" | "30">("7");
   const period = periodValue === "7" ? 7 : 30;
   const {
@@ -219,22 +263,25 @@ export function DataTab() {
       <MobileSection>
         <MobileSegmented
           value={periodValue}
-          options={PERIOD_OPTIONS}
+          options={[
+            { value: "7", label: t("mobile.data.period.7") },
+            { value: "30", label: t("mobile.data.period.30") },
+          ]}
           onChange={(next) => {
             if (next !== periodValue) {
               track("data_period_changed", { from: periodValue, to: next });
             }
             setPeriodValue(next);
           }}
-          label="统计周期"
+          label={t("mobile.data.period.label")}
         />
         <div className="mt-3 grid grid-cols-3 gap-2">
-          <MobileStat label="今日" value={loading ? "--" : summary.today} unit="ml" />
-          <MobileStat label="日均" value={loading ? "--" : summary.average} unit="ml" />
+          <MobileStat label={t("mobile.data.today")} value={loading ? "--" : summary.today} unit="ml" />
+          <MobileStat label={t("mobile.data.average")} value={loading ? "--" : summary.average} unit="ml" />
           <MobileStat
-            label="达标"
+            label={t("mobile.data.completed")}
             value={loading ? "--" : summary.completedDays}
-            unit="天"
+            unit={t("mobile.data.daysUnit")}
           />
         </div>
       </MobileSection>
@@ -242,14 +289,14 @@ export function DataTab() {
       {error ? (
         <MobileSection>
           <p role="alert" className="text-sm text-destructive">
-            {error}
+            {t("mobile.data.error")}
           </p>
         </MobileSection>
       ) : (
         <>
           <MobileSection
-            title="饮水量趋势"
-            description={`每日累计饮水量 · 目标 ${goal || "--"} ml`}
+            title={t("mobile.data.trend.title")}
+            description={t("mobile.data.trend.description", { goal: goal || "--" })}
           >
             <TrendChart days={days} goal={goal} />
           </MobileSection>
@@ -257,11 +304,11 @@ export function DataTab() {
           <ReminderStats reminders={reminders} error={reminderError} />
           {hasLegacyData && (
             <p className="px-1 text-[11px] leading-5 text-muted-foreground">
-              部分导入记录未保存当天目标，达标结果按当前目标 {goal || "--"}ml 估算。
+              {t("mobile.data.legacy", { goal: goal || "--" })}
             </p>
           )}
           <p className="px-1 pb-2 text-[11px] leading-5 text-muted-foreground">
-            时间分析仅包含有时间信息的记录；间隔不跨日，相同时间的记录不产生间隔。
+            {t("mobile.data.note")}
           </p>
         </>
       )}

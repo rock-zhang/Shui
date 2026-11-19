@@ -13,7 +13,9 @@ import {
   markOnboardingSeen,
   nextOnboardingIndex,
   type OnboardingOutcome,
+  type OnboardingStepKey,
 } from "@/lib/onboarding";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 import { useMobileConfig } from "./config-context";
 
 /**
@@ -30,6 +32,33 @@ type Layout = {
   hint: { top: number; left: number };
 };
 
+/** 步骤文案按 key 存，渲染时再取当前语言，避免模块常量锁死中文。 */
+const STEP_TEXT: Record<
+  OnboardingStepKey,
+  { title: MessageKey; body: MessageKey }
+> = {
+  goal: {
+    title: "mobile.onboarding.step.goal.title",
+    body: "mobile.onboarding.step.goal.body",
+  },
+  gap: {
+    title: "mobile.onboarding.step.gap.title",
+    body: "mobile.onboarding.step.gap.body",
+  },
+  weekdays: {
+    title: "mobile.onboarding.step.weekdays.title",
+    body: "mobile.onboarding.step.weekdays.body",
+  },
+  timeStart: {
+    title: "mobile.onboarding.step.timeStart.title",
+    body: "mobile.onboarding.step.timeStart.body",
+  },
+  timeEnd: {
+    title: "mobile.onboarding.step.timeEnd.title",
+    body: "mobile.onboarding.step.timeEnd.body",
+  },
+};
+
 export function OnboardingTour({
   open,
   onDone,
@@ -37,6 +66,7 @@ export function OnboardingTour({
   open: boolean;
   onDone: (outcome: OnboardingOutcome) => void;
 }) {
+  const { t } = useI18n();
   const { hydrated, alert } = useMobileConfig();
   const [index, setIndex] = useState(0);
   const [layout, setLayout] = useState<Layout | null>(null);
@@ -53,6 +83,7 @@ export function OnboardingTour({
   alertRef.current = alert;
 
   const step = ONBOARDING_STEPS[index];
+  const stepText = STEP_TEXT[step.key];
   const last = index === ONBOARDING_STEPS.length - 1;
 
   const place = useCallback(() => {
@@ -108,11 +139,11 @@ export function OnboardingTour({
           time_start: config.timeStart,
           time_end: config.timeEnd,
         });
-        toast.success("设置完成，之后可在提醒页随时修改");
+        toast.success(t("mobile.onboarding.completedToast"));
       }
       onDone(outcome);
     },
-    [onDone]
+    [onDone, t]
   );
 
   const advance = useCallback(
@@ -308,7 +339,7 @@ export function OnboardingTour({
         className="pointer-events-none fixed flex h-7 items-center rounded-full bg-sky-500 px-2.5 text-[11px] font-semibold text-white shadow-lg shadow-sky-500/30"
         style={hint}
       >
-        点这里修改
+        {t("mobile.onboarding.hint")}
       </div>
 
       <div
@@ -322,11 +353,14 @@ export function OnboardingTour({
       >
         <div className="flex items-start justify-between gap-2">
           <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold leading-4 text-sky-700 dark:text-sky-300">
-            第 {index + 1} 步 · 共 {ONBOARDING_STEPS.length} 步
+            {t("mobile.onboarding.stepProgress", {
+              index: index + 1,
+              total: ONBOARDING_STEPS.length,
+            })}
           </span>
           <button
             type="button"
-            aria-label="跳过引导"
+            aria-label={t("mobile.onboarding.skip")}
             onClick={dismiss}
             className="-mr-1.5 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
           >
@@ -338,10 +372,10 @@ export function OnboardingTour({
           id="onboarding-title"
           className="mt-2 text-[17px] font-semibold leading-6 tracking-tight"
         >
-          {step.title}
+          {t(stepText.title)}
         </h2>
         <p className="mt-1 text-[13px] leading-5 text-muted-foreground">
-          {step.body}
+          {t(stepText.body)}
         </p>
 
         {last ? (
@@ -350,7 +384,7 @@ export function OnboardingTour({
             onClick={() => finish("completed")}
             className="mt-3 flex h-11 w-full items-center justify-center gap-1 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-500 text-[15px] font-semibold text-white shadow-lg shadow-sky-500/20 transition-transform duration-150 active:scale-[0.985]"
           >
-            完成设置
+            {t("mobile.onboarding.finish")}
             <ChevronRight className="h-4 w-4" />
           </button>
         ) : (
@@ -359,7 +393,7 @@ export function OnboardingTour({
             onClick={() => advance(0)}
             className="mt-3 flex h-10 w-full items-center justify-center rounded-xl border border-border/70 bg-background/60 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
           >
-            保持当前，下一步
+            {t("mobile.onboarding.next")}
           </button>
         )}
       </div>

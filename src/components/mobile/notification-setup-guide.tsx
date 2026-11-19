@@ -14,8 +14,9 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/analytics";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 import { emitRefresh, readNotificationHealth, type NotificationHealth } from "@/lib/mobile";
-import { romFromHealth, romProfile, type RomProfile } from "@/lib/rom";
+import { localizeRomProfile, romFromHealth, romProfile, type RomProfile } from "@/lib/rom";
 import { useNotificationPermission } from "./notification-permission-context";
 import { BackgroundGuideCards } from "./background-guide-cards";
 
@@ -72,10 +73,14 @@ function bumpDismissCount(): number {
 
 type Step = 0 | 1 | 2;
 
-const STEP_LABELS = ["允许通知", "打开开关", "后台运行"] as const;
+const STEP_LABEL_KEYS: MessageKey[] = [
+  "mobile.guide.step.permission",
+  "mobile.guide.step.switches",
+  "mobile.guide.step.background",
+];
 /** 埋点用英文步骤名，避免中文参数在分析平台里出现编码问题。 */
 const STEP_NAMES = ["permission", "switches", "background"] as const;
-const STEP_COUNT = STEP_LABELS.length;
+const STEP_COUNT = STEP_LABEL_KEYS.length;
 
 function readSeen(): boolean {
   try {
@@ -132,13 +137,13 @@ function DiagramFrame({
 }
 
 /** 第一步：系统授权弹窗——高亮「允许」，其余元素压暗。 */
-function PermissionDiagram() {
+function PermissionDiagram({ t }: { t: ReturnType<typeof useI18n>["t"] }) {
   return (
     <svg
       viewBox="0 0 220 116"
       className="h-[116px] w-auto"
       role="img"
-      aria-label="系统授权弹窗示意图：弹窗出现时点右侧的「允许」"
+      aria-label={t("mobile.guide.diagram.permissionAria")}
     >
       <defs>
         <linearGradient id="guide-allow" x1="0" y1="0" x2="1" y2="0">
@@ -152,18 +157,18 @@ function PermissionDiagram() {
       <circle cx="110" cy="35" r="12" className="fill-sky-500/12" />
       <path d="M105.5 35a4.5 4.5 0 0 1 9 0v3.5h-9z" className="fill-sky-500/70" />
       <text x="110" y="67" textAnchor="middle" fontSize="12.5" fontWeight="600" className="fill-foreground">
-        允许通知？
+        {t("mobile.guide.diagram.allowTitle")}
       </text>
       <text x="110" y="84" textAnchor="middle" fontSize="9" className="fill-muted-foreground">
-        「Shui」想向你发送通知
+        {t("mobile.guide.diagram.allowBody")}
       </text>
       <rect x="28" y="93" width="76" height="18" rx="9" className="fill-muted" />
       <text x="66" y="105.5" textAnchor="middle" fontSize="9.5" className="fill-muted-foreground">
-        不允许
+        {t("mobile.guide.diagram.deny")}
       </text>
       <rect x="116" y="93" width="76" height="18" rx="9" fill="url(#guide-allow)" />
       <text x="154" y="105.5" textAnchor="middle" fontSize="9.5" fontWeight="600" fill="#ffffff">
-        允许
+        {t("mobile.guide.diagram.allow")}
       </text>
     </svg>
   );
@@ -175,14 +180,19 @@ function PermissionDiagram() {
  * 开关一律画成**已打开**状态（滑块在右、品牌渐变底）：这是目标状态，
  * 画成关闭状态会让人以为「现在这样就行」。
  */
-function SwitchDiagram() {
-  const rows = ["横幅", "锁屏", "铃声", "振动"];
+function SwitchDiagram({ t }: { t: ReturnType<typeof useI18n>["t"] }) {
+  const rows = [
+    t("mobile.guide.diagram.banner"),
+    t("mobile.guide.diagram.lockscreen"),
+    t("mobile.guide.diagram.ringtone"),
+    t("mobile.guide.diagram.vibration"),
+  ];
   return (
     <svg
       viewBox="0 0 220 164"
       className="h-[158px] w-auto"
       role="img"
-      aria-label="通知管理页示意图：示例中横幅、锁屏、铃声、振动四个开关都已打开"
+      aria-label={t("mobile.guide.diagram.switchesAria")}
     >
       <defs>
         <linearGradient id="guide-switch" x1="0" y1="0" x2="1" y2="0">
@@ -192,7 +202,7 @@ function SwitchDiagram() {
       </defs>
       <rect x="8" y="4" width="204" height="156" rx="18" className="fill-card stroke-border" strokeWidth="1.2" />
       <text x="22" y="27" fontSize="11" fontWeight="600" className="fill-foreground">
-        通知管理
+        {t("mobile.guide.diagram.manageTitle")}
       </text>
       <text x="22" y="41" fontSize="8.5" className="fill-muted-foreground">
         Shui
@@ -228,17 +238,18 @@ function SwitchDiagram() {
 }
 
 /** 顶部步骤条：已完成打勾、当前步带光环、未到灰显，均带文字标签。 */
-function StepRail({ step }: { step: Step }) {
+function StepRail({ step, t }: { step: Step; t: ReturnType<typeof useI18n>["t"] }) {
   return (
     <div
       className="mt-4 flex items-start"
-      aria-label={`第 ${step + 1} 步，共 ${STEP_COUNT} 步`}
+      aria-label={t("mobile.guide.stepAria", { current: step + 1, total: STEP_COUNT })}
     >
-      {STEP_LABELS.map((label, index) => {
+      {STEP_LABEL_KEYS.map((labelKey, index) => {
+        const label = t(labelKey);
         const done = index < step;
         const active = index === step;
         return (
-          <Fragment key={label}>
+          <Fragment key={labelKey}>
             {index > 0 && (
               <span
                 aria-hidden="true"
@@ -248,7 +259,7 @@ function StepRail({ step }: { step: Step }) {
                 )}
               />
             )}
-            <span className="flex w-[68px] shrink-0 flex-col items-center gap-1.5">
+            <span className="flex w-auto min-w-[68px] max-w-[96px] shrink-0 flex-col items-center gap-1.5">
               <span
                 className={cn(
                   "flex h-[26px] w-[26px] items-center justify-center rounded-full text-[11px] font-semibold transition-all duration-300",
@@ -262,7 +273,7 @@ function StepRail({ step }: { step: Step }) {
               </span>
               <span
                 className={cn(
-                  "text-[10px] leading-none transition-colors",
+                  "text-center text-[10px] leading-tight transition-colors",
                   active
                     ? "font-semibold text-foreground"
                     : done
@@ -346,12 +357,16 @@ function StepHeading({ title, children }: { title: string; children: ReactNode }
 /* ──────────────────────────── 主组件 ──────────────────────────── */
 
 export function NotificationSetupGuide() {
+  const { t, locale } = useI18n();
   const { permission, canRequest, request, refresh } = useNotificationPermission();
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState<Step>(0);
   const [pending, setPending] = useState(false);
   // 系统名与私有开关叫法随 ROM 变，文案不能写死某一个品牌。
-  const [rom, setRom] = useState<RomProfile>(() => romProfile());
+  // state 只存识别结果（key/domestic），渲染时再按当前语言取文案：
+  // 异步读 health 后 setRom 也不会把已切换的英文覆盖回中文。
+  const [romProfileState, setRom] = useState<RomProfile>(() => romProfile());
+  const rom = localizeRomProfile(romProfileState, locale);
   // 检测守卫或用户手动唤起过：本次挂载内不要再让首启逻辑改 step。
   const manualOpenRef = useRef(false);
   const showStartedAt = useRef(Date.now());
@@ -488,8 +503,8 @@ export function NotificationSetupGuide() {
     // 引导里可能改了通知/精确闹钟/渠道，完成后主动通知体检卡重读，
     // 否则它的「打开引导」主按钮和检查项会停留在改之前的状态。
     emitRefresh();
-    toast.success("设置完成，到点会有横幅、声音和震动");
-  }, []);
+    toast.success(t("mobile.guide.doneToast"));
+  }, [t]);
 
   const goTo = useCallback(
     (next: Step) => {
@@ -525,7 +540,7 @@ export function NotificationSetupGuide() {
     try {
       await invoke(command);
     } catch {
-      toast.error("无法打开该设置页，请到系统设置中手动完成");
+      toast.error(t("mobile.notif.openSettingsFailed"));
     } finally {
       setPending(false);
     }
@@ -585,19 +600,19 @@ export function NotificationSetupGuide() {
                     id="notif-guide-title"
                     className="text-[15px] font-semibold leading-5 tracking-tight"
                   >
-                    让提醒真正弹出来
+                    {t("mobile.guide.title")}
                   </h2>
                   <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold leading-4 text-sky-700 dark:text-sky-300">
-                    3 步
+                    {t("mobile.guide.stepsBadge", { count: STEP_COUNT })}
                   </span>
                 </div>
                 <p className="mt-1 text-[12px] leading-[18px] text-muted-foreground">
-                  只做一次，长期有效 · 大约 1 分钟
+                  {t("mobile.guide.subtitle")}
                 </p>
               </div>
               <button
                 type="button"
-                aria-label="稍后设置"
+                aria-label={t("mobile.guide.later")}
                 onClick={dismiss}
                 className="-mr-1.5 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
               >
@@ -605,7 +620,7 @@ export function NotificationSetupGuide() {
               </button>
             </div>
 
-            <StepRail step={step} />
+            <StepRail step={step} t={t} />
           </div>
         </header>
 
@@ -617,47 +632,46 @@ export function NotificationSetupGuide() {
           >
             {step === 0 && (
               <>
-                <StepHeading title="允许通知">
-                  系统要允许 Shui 发送通知，否则所有提醒都会被直接丢弃——
+                <StepHeading title={t("mobile.guide.step0.title")}>
+                  {t("mobile.guide.step0.bodyStart")}
                   <span className="font-medium text-foreground">
-                    界面里显示「已开启」也没用
+                    {t("mobile.guide.step0.bodyEmphasis")}
                   </span>
-                  。
+                  {t("mobile.guide.step0.bodyEnd")}
                 </StepHeading>
-                <DiagramFrame caption="示意图 · 弹窗出现时点「允许」">
-                  <PermissionDiagram />
+                <DiagramFrame caption={t("mobile.guide.step0.caption")}>
+                  <PermissionDiagram t={t} />
                 </DiagramFrame>
               </>
             )}
 
             {step === 1 && (
               <>
-                <StepHeading title="打开 4 个开关">
-                  国产系统（OPPO / 小米 / vivo / 华为等）多数默认关闭。不打开的话，
-                  到点只会静静躺在通知栏里——
+                <StepHeading title={t("mobile.guide.step1.title")}>
+                  {t("mobile.guide.step1.bodyStart")}
                   <span className="font-medium text-foreground">
-                    不弹窗、不响、不震
+                    {t("mobile.guide.step1.bodyEmphasis")}
                   </span>
-                  。
+                  {t("mobile.guide.step1.bodyEnd")}
                 </StepHeading>
-                <DiagramFrame caption="示意图 · 横幅、锁屏、铃声、振动逐个打开">
-                  <SwitchDiagram />
+                <DiagramFrame caption={t("mobile.guide.step1.caption")}>
+                  <SwitchDiagram t={t} />
                 </DiagramFrame>
                 <p className="mt-2.5 flex items-start gap-1.5 text-[11px] leading-4 text-muted-foreground">
                   <span aria-hidden="true" className="mt-[3px] h-1 w-1 shrink-0 rounded-full bg-amber-500" />
-                  顺带确认「静默通知 / 设为不重要通知」是关闭的。
+                  {t("mobile.guide.step1.silentHint")}
                 </p>
               </>
             )}
 
             {step === 2 && (
               <>
-                <StepHeading title="让后台也能准时提醒">
-                  两项都要开：只开自启动，锁屏后仍会被系统冻结。
+                <StepHeading title={t("mobile.guide.step2.title")}>
+                  {t("mobile.guide.step2.bodyStart")}
                   <span className="font-medium text-foreground">
-                    两项都关时，基本收不到任何提醒
+                    {t("mobile.guide.step2.bodyEmphasis")}
                   </span>
-                  。
+                  {t("mobile.guide.step2.bodyEnd")}
                 </StepHeading>
 
                 {/* 与漏提醒弹窗共用同一套分步引导：同样的路径、同样的跳转。
@@ -679,10 +693,10 @@ export function NotificationSetupGuide() {
                     <Timer className="h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400" />
                     <span className="min-w-0 flex-1">
                       <span className="block text-[13px] font-medium leading-5">
-                        精确闹钟
+                        {t("mobile.guide.step2.exactTitle")}
                       </span>
                       <span className="block text-[11px] leading-4 text-muted-foreground">
-                        允许「闹钟和提醒」，到点才准，否则可能晚十几分钟
+                        {t("mobile.guide.step2.exactHint")}
                       </span>
                     </span>
                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/60" />
@@ -698,7 +712,7 @@ export function NotificationSetupGuide() {
                   >
                     <Settings className="h-3.5 w-3.5 shrink-0" />
                     <span className="min-w-0 flex-1">
-                      顺带把电池设为「不限制」，并关掉{rom.batteryLabel}
+                      {t("mobile.guide.step2.battery", { label: rom.batteryLabel })}
                     </span>
                     <ChevronRight className="h-3.5 w-3.5 shrink-0" />
                   </button>
@@ -710,8 +724,7 @@ export function NotificationSetupGuide() {
                     className="mt-[5px] h-1 w-1 shrink-0 rounded-full bg-muted-foreground/50"
                   />
                   <p className="text-[11px] leading-[18px] text-muted-foreground">
-                    再回最近任务里长按 Shui 选「加锁 / 锁定」（多数国产系统支持），
-                    可以避免被一键清理。
+                    {t("mobile.guide.step2.lockHint")}
                   </p>
                 </div>
               </>
@@ -726,16 +739,16 @@ export function NotificationSetupGuide() {
               <>
                 <p className="mb-2.5 flex items-center justify-center gap-1.5 text-[12px] font-medium text-emerald-600 dark:text-emerald-400">
                   <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                  通知权限已开启
+                  {t("mobile.notif.enabled")}
                 </p>
                 <PrimaryAction onClick={() => goTo(1)}>
-                  下一步
+                  {t("mobile.guide.next")}
                   <ChevronRight className="h-4 w-4" />
                 </PrimaryAction>
               </>
             ) : (
               <PrimaryAction disabled={pending} onClick={() => void allowNotifications()}>
-                {canRequest ? "允许通知" : "去设置开启"}
+                {canRequest ? t("mobile.guide.allow") : t("mobile.guide.goEnable")}
               </PrimaryAction>
             ))}
 
@@ -746,12 +759,12 @@ export function NotificationSetupGuide() {
                 onClick={() => void openSetting("open_notification_settings")}
               >
                 <Settings className="h-4 w-4" />
-                去通知设置
+                {t("mobile.guide.goNotificationSettings")}
               </PrimaryAction>
               <div className="mt-1 flex items-center justify-between">
-                <GhostAction onClick={() => goTo(0)}>上一步</GhostAction>
+                <GhostAction onClick={() => goTo(0)}>{t("mobile.guide.prev")}</GhostAction>
                 <GhostAction disabled={pending} onClick={() => goTo(2)}>
-                  已打开，下一步
+                  {t("mobile.guide.openedNext")}
                   <ChevronRight className="h-3.5 w-3.5" />
                 </GhostAction>
               </div>
@@ -762,10 +775,10 @@ export function NotificationSetupGuide() {
             <>
               <PrimaryAction onClick={finish}>
                 <Check className="h-4 w-4" />
-                完成设置
+                {t("mobile.guide.finish")}
               </PrimaryAction>
               <div className="mt-1 flex items-center justify-start">
-                <GhostAction onClick={() => goTo(1)}>上一步</GhostAction>
+                <GhostAction onClick={() => goTo(1)}>{t("mobile.guide.prev")}</GhostAction>
               </div>
             </>
           )}
