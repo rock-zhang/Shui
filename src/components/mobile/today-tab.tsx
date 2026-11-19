@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDrinkData } from "@/hooks/use-drink-data";
 import { usePlatform } from "@/hooks/use-platform";
+import { track, trackDrinkRecorded } from "@/lib/analytics";
 import { getLocalDateKey } from "@/lib/drink-history";
 import type { DrinkReceipt } from "@/lib/drink-day";
 import {
@@ -260,6 +261,7 @@ export function TodayTab() {
         // 不等 emitRefresh 触发的那次往返读取。
         if (receipt.nextAt) emitNextReminder(receipt.nextAt);
       }
+      trackDrinkRecorded(receipt, draft.amount, "manual_today");
       if (receipt.goalReached) {
         toast.success("🎉 今日目标已完成");
         // 只在真正达标的那一笔发系统通知；幂等重复点击 receipt.added 为 false，
@@ -285,6 +287,7 @@ export function TodayTab() {
         date: getLocalDateKey(new Date()),
         requestId,
       });
+      track("drink_undo", { result: "success" });
       setConfirmUndo(null);
       setCelebration(null);
       toast.success("已撤销这笔记录");

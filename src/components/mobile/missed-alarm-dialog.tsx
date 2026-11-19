@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { AlarmClockOff, CheckCircle2, Power, Settings, X } from "lucide-react";
-import { toast } from "sonner";
+import { AlarmClockOff, CheckCircle2, Settings, X } from "lucide-react";
 import { readDiagnostics } from "@/lib/mobile";
+import { minutesBucket, track } from "@/lib/analytics";
 import { romProfile, type RomProfile } from "@/lib/rom";
 import { useMobileConfig } from "./config-context";
 import { OPEN_GUIDE_EVENT } from "./notification-setup-guide";
+import { BackgroundGuideCards } from "./background-guide-cards";
 
 /**
  * 超过这个时长的旧记录不再弹窗——只在体检卡的「最近漏提醒」里留痕。
@@ -23,18 +24,6 @@ function clockLabel(ms: number): string {
   });
 }
 
-function Advice({ children }: { children: React.ReactNode }) {
-  return (
-    <li className="flex items-start gap-2">
-      <span
-        aria-hidden="true"
-        className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-amber-500"
-      />
-      <span className="min-w-0 flex-1">{children}</span>
-    </li>
-  );
-}
-
 /**
  * 「上次提醒没送到」弹窗。
  *
@@ -47,7 +36,7 @@ function Advice({ children }: { children: React.ReactNode }) {
  * 一起清掉，此后一条都收不到；这个弹窗就是那次失败的唯一可见证据。
  */
 export function MissedAlarmDialog() {
-  const { general, hydrated } = useMobileConfig();
+  const { general, alert, hydrated } = useMobileConfig();
   const [open, setOpen] = useState(false);
   const [missedAt, setMissedAt] = useState(0);
   // 当前弹窗对应的漏报时刻，供 close() 记确认用；不进 state，避免 close 依赖它重建。
@@ -56,10 +45,9 @@ export function MissedAlarmDialog() {
   // 那样把之后所有真漏都吞掉。
   const ackAtRef = useRef(0);
   const [cleared, setCleared] = useState(false);
-  // 认不出系统时用中性档案：文案写「系统」「电池设置里的后台限制」，
+  // 认不出系统时用中性档案：文案写通用的两项叫法，
   // 绝不把 ColorOS 的叫法写给小米用户看。
   const [rom, setRom] = useState<RomProfile>(() => romProfile());
-  const [pending, setPending] = useState(false);
 
   const read = useCallback(async () => {
     const diag = await readDiagnostics();
@@ -110,39 +98,46 @@ export function MissedAlarmDialog() {
    * 否则下次冷启动还会读到同一条。本会话内另用 ackAtRef 挡住竞态复读，
    * 两层加起来的目的：既不让刚关的弹窗复活，也不把之后真新增的漏报吞掉。
    */
-  const close = useCallback(() => {
+  const close = useCallback((via: "close" | "acknowledge" = "close") => {
+    const at = currentAtRef.current;
+    const delayMinutes =
+      at > 0 ? Math.max(0, Math.round((Date.now() - at) / 60_000)) : 0;
+    track("missed_dialog_action", {
+      action: via === "acknowledge" ? "acknowledge" : "close",
+      delay_minutes: minutesBucket(delayMinutes),
+      alarm_cleared: cleared,
+    });
     setOpen(false);
     // 先在本会话确认掉这一条，再发异步清账。顺序反过来会留下竞态窗口：
     // clear 还在途时任意一次 read() 读到旧记录，就把刚关的弹窗又打开。
     // 只在内存里记，清账失败也只是本次会话不弹；下次冷启动仍会读原生记录，
     // 不会把真漏永久吞掉。
-    const at = currentAtRef.current;
-    if (at > 0) ackAtRef.current = Math.max(ackAtRef.current, at);
-    void invoke("clear_missed_alarm").catch(() => {
-      // 清账失败不会让本次会话复读；下次冷启动会再读一次记录。
-    });
-  }, []);
+    ackAtRef.current = Math.max(ackAtRef.current, at);
+    void invoke("clear_missed_alarm")
+      .then(() => {
+        track("missed_acknowledged", {
+          delay_minutes: minutesBucket(delayMinutes),
+          via,
+        });
+      })
+      .catch(() => {
+        // 清账失败不会让本次会话复读；下次冷启动会再读一次记录。
+      });
+  }, [cleared]);
 
   const acknowledge = useCallback(() => {
-    close();
+    close("acknowledge");
   }, [close]);
 
-  async function openAutostart() {
-    close();
-    setPending(true);
-    try {
-      await invoke("open_autostart_settings");
-      toast.info("找到 Shui，把「允许自启动 / 后台运行」打开");
-    } catch {
-      toast.error("无法打开该设置页，请到系统设置中手动完成");
-    } finally {
-      setPending(false);
-    }
-  }
-
   function openGuide() {
-    close();
-    window.dispatchEvent(new CustomEvent(OPEN_GUIDE_EVENT, { detail: { step: 2 } }));
+    track("missed_dialog_action", { action: "open_guide" });
+    // 只收起弹窗，不清账：用户可能只是去看看步骤，证据要留到明确「知道了」。
+    setOpen(false);
+    window.dispatchEvent(
+      new CustomEvent(OPEN_GUIDE_EVENT, {
+        detail: { step: 2, source: "missed_dialog" },
+      })
+    );
   }
 
   // 用户自己暂停了提醒、或关掉了系统通知，就是明确表示不想被打断，
@@ -152,11 +147,25 @@ export function MissedAlarmDialog() {
   useEffect(() => {
     if (!open || !enabled) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
+      if (event.key === "Escape") close("close");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [close, enabled, open]);
+
+  const shownAtRef = useRef(0);
+  useEffect(() => {
+    if (!open || !enabled) return;
+    if (shownAtRef.current === missedAt) return;
+    shownAtRef.current = missedAt;
+    const delayMinutes = Math.max(0, Math.round((Date.now() - missedAt) / 60_000));
+    track("missed_dialog_shown", {
+      delay_minutes: minutesBucket(delayMinutes),
+      alarm_cleared: cleared,
+      missed_hour: new Date(missedAt).getHours(),
+      gap_min: Number(alert.gap) || 0,
+    });
+  }, [open, enabled, missedAt, cleared, alert.gap]);
 
   if (!open || !enabled) return null;
 
@@ -165,7 +174,6 @@ export function MissedAlarmDialog() {
       role="dialog"
       aria-modal="true"
       aria-labelledby="missed-alarm-title"
-      onClick={close}
       className="fixed inset-0 z-[55] flex items-end justify-center bg-slate-950/55 px-3 pb-[max(1.25rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200"
     >
       <section
@@ -191,18 +199,16 @@ export function MissedAlarmDialog() {
                 id="missed-alarm-title"
                 className="text-[15px] font-semibold leading-5 tracking-tight"
               >
-                {clockLabel(missedAt)} 那次提醒没送到
+                {clockLabel(missedAt)} 的提醒没送到
               </h2>
               <p className="mt-1 text-[12px] leading-[18px] text-muted-foreground">
-                {cleared
-                  ? "系统把它排好的闹钟一起删了"
-                  : "闹钟排上了，但到点没有弹出通知"}
+                {cleared ? "系统把排好的闹钟清掉了" : "闹钟排上了，但通知没弹出来"}
               </p>
             </div>
             <button
               type="button"
               aria-label="关闭"
-              onClick={close}
+              onClick={() => close("close")}
               className="-mr-1.5 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
             >
               <X className="h-4 w-4" />
@@ -211,68 +217,24 @@ export function MissedAlarmDialog() {
         </header>
 
         <div className="px-5 pb-1">
-          <p className="text-[12.5px] leading-[19px] text-foreground/85">
-            {cleared ? (
-              <>
-                从最近任务划掉 Shui 时，
-                {rom.name ?? "系统"}会把它当成「强制停止」——不但结束进程，还会
-                <span className="font-medium text-foreground">删掉它排好的所有闹钟</span>
-                ，并把 App 标记为已停止。之后一条提醒都收不到，直到你再手动打开它。
-                「允许后台运行」那类开关防的是系统主动回收，防不住你手动划掉。
-              </>
-            ) : (
-              <>
-                闹钟确实排上了，但到点没能产生通知。多数是后台被系统限制，
-                或者精确闹钟被关掉——这两项一断，界面里看着一切正常，实际一条都不会响。
-              </>
-            )}
+          <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground">
+            检查这两项是否已开启
           </p>
+          <BackgroundGuideCards rom={rom} source="missed_dialog" />
 
-          <div className="mt-3.5 rounded-2xl border border-border/60 bg-muted/30 px-3.5 py-3">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              {cleared ? "这样就不会再被清掉" : "按顺序检查这几项"}
-            </p>
-            <ul className="mt-2 space-y-1.5 text-[12px] leading-[18px] text-foreground/80">
-              {cleared ? (
-                <>
-                  <Advice>
-                    用返回键或 Home 退出，
-                    <span className="font-medium text-foreground">别从多任务划掉</span>
-                  </Advice>
-                  <Advice>
-                    在最近任务里长按 Shui 卡片 → 加锁（多数国产系统支持），
-                    一键清理就扫不走
-                  </Advice>
-                  <Advice>关闭{rom.batteryLabel}</Advice>
-                </>
-              ) : (
-                <>
-                  <Advice>
-                    打开「后台运行 / 自启动」——这是收不到的头号原因
-                  </Advice>
-                  <Advice>确认精确闹钟已允许，{rom.batteryLabel}也关掉</Advice>
-                  <Advice>手机重启后需要打开一次 App，闹钟才会重新排上</Advice>
-                </>
-              )}
-            </ul>
-          </div>
+          <p className="mt-2.5 text-xs leading-[18px] text-muted-foreground">
+            {cleared
+              ? "另外：用返回键或 Home 退出，别从多任务划掉。"
+              : "另外：确认精确闹钟已允许。"}
+          </p>
         </div>
 
-        <footer className="px-5 pb-4 pt-3.5">
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => void openAutostart()}
-            className="flex w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-[14px] font-semibold text-white shadow-lg shadow-amber-500/25 transition-all active:scale-[0.99] disabled:opacity-60"
-          >
-            <Power className="h-4 w-4" aria-hidden="true" />
-            允许后台运行
-          </button>
-          <div className="mt-1 flex items-center justify-between">
+        <footer className="px-5 pb-4 pt-2">
+          <div className="flex items-center justify-between">
             <button
               type="button"
               onClick={openGuide}
-              className="flex items-center gap-1 rounded-lg px-1.5 py-2 text-[12.5px] text-muted-foreground transition-colors hover:text-foreground"
+              className="flex items-center gap-1 rounded-lg px-1.5 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
             >
               <Settings className="h-3.5 w-3.5" aria-hidden="true" />
               看设置步骤
@@ -280,7 +242,7 @@ export function MissedAlarmDialog() {
             <button
               type="button"
               onClick={() => void acknowledge()}
-              className="flex items-center gap-1 rounded-lg px-1.5 py-2 text-[12.5px] text-muted-foreground transition-colors hover:text-foreground"
+              className="flex items-center gap-1 rounded-lg px-1.5 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
             >
               <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
               知道了

@@ -29,7 +29,7 @@ import java.util.Locale
 import java.util.UUID
 
 
-/** 后台保底通道：精确闹钟 + 带「喝了 Xml」快捷操作的系统通知。 */
+/** 后台保底通道：精确闹钟 + 带「+Xml」快捷操作的系统通知。 */
 object ReminderScheduler {
     /**
      * 通知全链路的诊断日志统一走这个 TAG：
@@ -190,7 +190,7 @@ object ReminderScheduler {
         (config(context)?.optJSONObject("alert")?.optString("gap", "20")?.toLongOrNull() ?: 20L)
             .coerceIn(1, 720)
 
-    private fun todayAmount(context: Context): Long {
+    fun todayAmount(context: Context): Long {
         return try {
             val file = File(appDataDir(context), "drink_history_store.json")
             if (!file.exists()) return 0
@@ -254,10 +254,12 @@ object ReminderScheduler {
         config(context)?.optJSONObject("general")?.optBoolean("isSound", true) ?: true
 
     /**
-     * 通知栏记水后的「叮」。
+     * 通知栏记水后的气泡确认音。
      *
      * 在通知里点按钮时 App 处于后台，屏幕上唯一的变化是通知被撤掉；没有声音
      * 就完全没有「记上了」的确认感，容易让人怀疑没点中而再点一次。
+     *
+     * 音效是 Mixkit 的真实录音（Free License），已裁到约 0.9 秒并统一响度。
      *
      * 三条约束：
      * - 跟随「提醒音效」开关：用户明确关掉声音时不该被这一声回马枪打扰；
@@ -279,7 +281,7 @@ object ReminderScheduler {
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION_EVENT)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build()
-            val afd = context.resources.openRawResourceFd(R.raw.confirm_ding) ?: return
+            val afd = context.resources.openRawResourceFd(R.raw.confirm_bubble) ?: return
             val player = MediaPlayer()
             player.setAudioAttributes(attrs)
             player.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
@@ -485,33 +487,59 @@ object ReminderScheduler {
      *          交给 AlarmManager 独占后台通知（暂停/关通知/无权限都归这里）
      */
     fun deliverForeground(context: Context): String {
-        if (canUseOverlay(context)) return "overlay"
+        if (canUseOverlay(context)) {
+            AnalyticsTracker.logReminderDelivered(context, "overlay")
+            return "overlay"
+        }
         val general = config(context)?.optJSONObject("general")
         // 刚点暂停、用户关掉系统通知、或无通知权限时不能把这次提醒静默吞掉：
         // 返回 defer 让 Rust 不盖账本，AlarmManager 那一路保留补偿机会。
         if (general?.optBoolean("isPaused", false) == true) {
             Log.i(TAG, "deliverForeground=defer：已暂停，交给 AlarmManager")
+            AnalyticsTracker.logReminderDelivered(context, "defer_paused")
             return "defer"
         }
         if (general?.optBoolean("isNotification", true) == false) {
             Log.i(TAG, "deliverForeground=defer：系统通知已关闭")
+            AnalyticsTracker.logReminderDelivered(context, "defer_notification_off")
             return "defer"
         }
         if (!canPostNotifications(context)) {
             Log.i(TAG, "deliverForeground=defer：无通知权限，不盖账本")
+            AnalyticsTracker.logNotificationBlocked(
+                context,
+                "foreground",
+                blockReason(context)
+            )
+            AnalyticsTracker.logReminderDelivered(context, "defer_no_permission")
             return "defer"
         }
         // 只在通知真正投递成功后才盖账本，杜绝「账本写了但通知没发出去」
         // 导致 AlarmManager 与前台全屏两路都被抑制的静默失败。
-        val delivered = shouldNotify(context) && ReminderReceiver().showNotification(context)
+        val delivered = shouldNotify(context) && ReminderReceiver().showNotification(context, "foreground")
         if (delivered) {
             markReminder(context)
             Log.i(TAG, "deliverForeground=notification：通知已投递并写账本")
+            AnalyticsTracker.logReminderDelivered(context, "notification")
         } else {
             // 已达标或投递失败：不盖账本，让 AlarmManager 按自己的判断处理。
             Log.i(TAG, "deliverForeground=defer：已达标或通知投递失败")
+            AnalyticsTracker.logReminderDelivered(context, "defer_goal_or_failed")
         }
         return if (delivered) "notification" else "defer"
+    }
+
+    /** 通知发不出去的具体原因，供埋点区分「应用级关闭」与「渠道被关」。 */
+    fun blockReason(context: Context): String {
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+            return "app_disabled"
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val importance = manager.getNotificationChannel(channelId(context))?.importance
+            if (importance == NotificationManager.IMPORTANCE_NONE) return "channel_disabled"
+        }
+        return "no_permission"
     }
 
     /** 原生当前排定的下一次提醒；没有有效闹钟时为 0。 */
@@ -730,6 +758,7 @@ object ReminderScheduler {
         if (!found) {
             // 当前配置下没有任何可提醒的时间：撤掉旧闹钟，也让今日页如实显示。
             Log.w(TAG, "scheduleNext 跳过：未来 8 天内没有落在提醒时段/工作日且避开勿扰的时刻")
+            AnalyticsTracker.logScheduleFailed(context, "no_slot")
             cancel(context)
             return
         }
@@ -772,6 +801,9 @@ object ReminderScheduler {
                 array.put(
                     JSONObject()
                         .put("amount", amount)
+                        // 点击时刻：进程被杀时这批记录要等 App 重新启动才回灌，
+                        // 不带时间就会被记成「打开 App 的那一刻」，明细时间全一样。
+                        .put("timestamp", System.currentTimeMillis())
                         .put("requestId", "notification:${UUID.randomUUID()}")
                 )
                 file.writeText(array.toString())
@@ -782,17 +814,114 @@ object ReminderScheduler {
     }
 }
 
+/**
+ * 提醒通知的文案池：按今日完成度分四档，每档十余条。
+ *
+ * 每次提醒随机取一条，并记住每档上一次用过的下标，保证连续两条不重复——
+ * 固定文案用久了会被当成背景噪音直接划掉，进度不同给不同的鼓励也更贴合当下。
+ */
+private object ReminderCopy {
+    private const val KEY_PREFIX = "reminder_copy_last_"
+
+    /** 完成度 < 25%：刚起步，重点是「开始喝」。 */
+    private val START = listOf(
+        "新的一天从一杯水开始，来一杯吧",
+        "刚起步，先喝口水润润嗓子",
+        "身体刚开始补水，别停下",
+        "现在喝一杯，今天会很轻松",
+        "第一杯水永远最值，先从这杯开始",
+        "还早，慢慢把节奏建立起来",
+        "起身走走，顺便接杯水",
+        "提醒一下：该补水了",
+        "别等到口渴才喝，现在正好",
+        "一小口水也是进步，来吧",
+        "给身体开个好头，干杯",
+        "先来一杯，给今天开个好头"
+    )
+
+    /** 完成度 25% ~ 50%：节奏建立起来了，强调「保持」。 */
+    private val HALF = listOf(
+        "已经四分之一了，继续保持",
+        "进度不错，再来一杯稳稳推进",
+        "节奏起来了，别断",
+        "喝一口，离目标更近一点",
+        "身体正在变好，别停下来",
+        "这一杯下去，状态会更清醒",
+        "补水进行中，保持这个势头",
+        "再补几杯，进度会更稳",
+        "现在的你比刚起床时更水润了",
+        "不必大口，小口多次最有效",
+        "继续按节奏来，稳稳的",
+        "记得喝水，也记得起身活动"
+    )
+
+    /** 完成度 50% ~ 75%：过半，强调「推进」。 */
+    private val NEAR = listOf(
+        "已经过半，胜利在望",
+        "再补几杯，今天就很稳了",
+        "势头很好，别松懈",
+        "今天的目标越来越近了",
+        "继续喝，身体会感谢你",
+        "过半的进度，值得再喝一杯",
+        "保持住，这个节奏刚刚好",
+        "再来一杯，向目标冲刺",
+        "你已经比大多数人喝得多了",
+        "喝口水，给自己一个小小的奖励",
+        "补水过半，状态在线",
+        "剩下的交给每一杯水"
+    )
+
+    /** 完成度 >= 75%：收尾，强调「就差一点」。 */
+    private val ALMOST = listOf(
+        "只差最后几杯，别放弃",
+        "快到目标了，一鼓作气",
+        "胜利就在眼前，再来一杯",
+        "最后冲刺，今天的目标马上达成",
+        "已经很接近了，坚持一下",
+        "再喝一杯就离目标更近了",
+        "收尾阶段，稳稳喝完",
+        "今天的你非常自律，继续",
+        "最后这一段，交给这杯水",
+        "差距不大了，喝完就达标",
+        "保持住，马上就能完成目标",
+        "再补一杯，今天就算圆满"
+    )
+
+    /** 按完成度取一条文案；ratio 是 0.0 ~ 1.0 的完成比例。 */
+    fun pick(context: Context, ratio: Double): String {
+        val (bucket, pool) = when {
+            ratio >= 0.75 -> "almost" to ALMOST
+            ratio >= 0.5 -> "near" to NEAR
+            ratio >= 0.25 -> "half" to HALF
+            else -> "start" to START
+        }
+        val prefs = context.getSharedPreferences(ReminderPlugin.PREFS, Context.MODE_PRIVATE)
+        val key = KEY_PREFIX + bucket
+        val last = prefs.getInt(key, -1)
+        var index = pool.indices.random()
+        if (pool.size > 1 && index == last) {
+            // 撞上上一条就顺移一格，既换了文案又不用重摇。
+            index = (index + 1) % pool.size
+        }
+        prefs.edit().putInt(key, index).apply()
+        return pool[index]
+    }
+}
+
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
         when {
             action == ReminderScheduler.ACTION_SKIP -> {
+                AnalyticsTracker.logNotificationSkipped(context)
                 cancelNotification(context)
                 ReminderScheduler.scheduleNext(context)
             }
             action.startsWith(ReminderScheduler.ACTION_DRINK_PREFIX) -> {
                 val amount = action.removePrefix(ReminderScheduler.ACTION_DRINK_PREFIX).toIntOrNull()
                 if (amount != null && amount > 0) {
+                    // 通知 Action 是 WebView 不参与的一路，计数与事件都在这里落。
+                    AnalyticsTracker.logNotificationDrink(context, amount.toLong())
                     ReminderScheduler.appendPendingDrink(context, amount)
                     // 先出声再撤通知：声音和「通知消失」几乎同时发生，反馈才连贯。
                     ReminderScheduler.playConfirmTone(context)
@@ -820,7 +949,7 @@ class ReminderReceiver : BroadcastReceiver() {
                         // 投递成功才盖账本：顺序反了会出现「账本说提醒过、用户
                         // 却一条都没看到」，这是后台静默失败最难查的一种。
                         val delivered = ReminderScheduler.shouldNotify(context) &&
-                            showNotification(context)
+                            showNotification(context, "alarm")
                         if (delivered) {
                             ReminderScheduler.markReminder(context)
                         } else if (notifyGoalReached(context)) {
@@ -828,6 +957,12 @@ class ReminderReceiver : BroadcastReceiver() {
                         } else {
                             Log.i(ReminderScheduler.TAG, "不发通知：已暂停或今日饮水量已达标")
                         }
+                    } else {
+                        AnalyticsTracker.logNotificationBlocked(
+                            context,
+                            "alarm",
+                            ReminderScheduler.blockReason(context)
+                        )
                     }
                 } else {
                     Log.i(ReminderScheduler.TAG, "不发通知：间隔内已提醒过（前台全屏承接）")
@@ -860,7 +995,7 @@ class ReminderReceiver : BroadcastReceiver() {
         if (ReminderScheduler.goalNotifiedToday(context)) return false
         val progress = ReminderScheduler.goalProgress(context) ?: return false
         if (!ReminderScheduler.canPostNotifications(context)) return false
-        if (!showGoalNotification(context, progress.first, progress.second)) return false
+        if (!showGoalNotification(context, progress.first, progress.second, "alarm_fallback")) return false
         ReminderScheduler.markGoalNotified(context)
         return true
     }
@@ -869,7 +1004,12 @@ class ReminderReceiver : BroadcastReceiver() {
      * 非 private：自定义插件的 showGoalNotification 命令复用同一条构建逻辑，
      * 保证「App 前台记录达标」与「后台闹钟补发」两条路径的通知完全一致。
      */
-    fun showGoalNotification(context: Context, total: Long, goal: Long): Boolean {
+    fun showGoalNotification(
+        context: Context,
+        total: Long,
+        goal: Long,
+        trigger: String = "unknown"
+    ): Boolean {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         // 跟随「提醒音效」开关：静音档走无声渠道，但横幅照旧。
         val channelId = ReminderScheduler.channelId(context)
@@ -911,6 +1051,7 @@ class ReminderReceiver : BroadcastReceiver() {
         return try {
             manager.notify(ReminderScheduler.GOAL_NOTIFICATION_ID, builder.build())
             Log.i(ReminderScheduler.TAG, "达标通知已投递：渠道=$channelId")
+            AnalyticsTracker.logGoalNotification(context, total, goal, trigger)
             true
         } catch (error: SecurityException) {
             Log.w(ReminderScheduler.TAG, "达标通知投递被拒绝（POST_NOTIFICATIONS 未授予）", error)
@@ -918,7 +1059,7 @@ class ReminderReceiver : BroadcastReceiver() {
         }
     }
 
-    fun showNotification(context: Context): Boolean {
+    fun showNotification(context: Context, trigger: String = "alarm"): Boolean {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         // 「提醒音效」开关：关掉后切到无声渠道，通知本身照常送达。
         val channelId = ReminderScheduler.channelId(context)
@@ -940,13 +1081,20 @@ class ReminderReceiver : BroadcastReceiver() {
             return PendingIntent.getBroadcast(context, requestCode, broadcast, flags)
         }
 
+        // 进度快照：通知里直接展示「已喝 / 目标」和比例条，用户不打开 App
+        // 也能知道今天走到哪一步。未设置目标时不展示进度与副标题。
+        val total = ReminderScheduler.todayAmount(context)
+        val goal = ReminderScheduler.goalAmount(context)
+        val ratio = if (goal > 0) (total.toDouble() / goal).coerceIn(0.0, 1.0) else 0.0
+
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_stat_water)
             // 下拉大图标用桌面版「水」字 logo；状态栏小图标受系统限制只能单色剪影。
             .setLargeIcon(BitmapFactory.decodeResource(context.resources, R.drawable.ic_notification_large))
             .setColor(0xFF3B82F6.toInt())
             .setContentTitle("该喝水啦")
-            .setContentText("站起来喝杯水，顺便活动一下身体吧")
+            // 正文按今日完成度从文案池随机取，连续两条不重复。
+            .setContentText(ReminderCopy.pick(context, ratio))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             // 锁屏显示完整标题+正文：NotificationCompat 默认是 PRIVATE，锁屏上只会
             // 留一句「内容已隐藏」，看起来和「没收到通知」没区别。渠道侧的
@@ -958,6 +1106,18 @@ class ReminderReceiver : BroadcastReceiver() {
             .setOnlyAlertOnce(false)
             .setAutoCancel(true)
             .setContentIntent(content)
+            .apply {
+                if (goal > 0) {
+                    // 达标前最多显示 99%：1999/2000 时向上取整成 100% 会显得「已达成」，
+                    // 但达标通知并没有发，进度条也应该留一格。
+                    val percent = if (total >= goal) 100 else (ratio * 100).toInt().coerceIn(0, 99)
+                    // 副标题只有一行小字，手机窄屏下加「已喝」会被截断，
+                    // 直接写「450 / 2000ml」；分母即目标，进度条负责表达比例。
+                    setSubText("${total} / ${goal}ml · ${percent}%")
+                    // 确定进度条由系统渲染在正文下方，百分比同时写进副标题。
+                    setProgress(100, percent, false)
+                }
+            }
             // 声音/震动双保险：Android 8+ 官方以渠道为准，builder 上的设置会被忽略；
             // 但部分国产 ROM（含 ColorOS）实现有偏差，同时在 builder 上显式声明
             // 能让通知对象自身带齐 alert 属性，渠道正常时不冲突，渠道被降级时多一层兜底。
@@ -982,34 +1142,29 @@ class ReminderReceiver : BroadcastReceiver() {
                 }
             }
 
+        // Android 一条通知最多显示 3 个操作按钮，多出来的会被系统直接丢弃。
+        // 三档水量已占满名额，所以不放「稍后再说」——划掉通知本身就是忽略这一次。
         ReminderScheduler.DRINK_ACTIONS.forEachIndexed { index, amount ->
-            // 三档一律「动词 + 数量」：桌面端（macOS 折叠菜单）和 Android 的
-            // 收起态都用得上，纯 "100ml" 单独出现读不出是「喝了」还是「目标」。
+            // 收起态空间有限，动作一律用「+50ml」这种最省字的写法，
+            // 一眼就能看出是「加记这么多水」。
             builder.addAction(
                 R.drawable.ic_stat_water,
-                "喝了 ${amount}ml",
+                "+${amount}ml",
                 drinkAction(amount, 2 + index)
             )
         }
-        builder.addAction(
-            R.drawable.ic_stat_water,
-            "稍后再说",
-            PendingIntent.getBroadcast(
-                context, 2 + ReminderScheduler.DRINK_ACTIONS.size,
-                Intent(context, ReminderReceiver::class.java).setAction(ReminderScheduler.ACTION_SKIP),
-                flags
-            )
-        )
 
         val notification = builder.build()
 
         return try {
             manager.notify(ReminderScheduler.NOTIFICATION_ID, notification)
             Log.i(ReminderScheduler.TAG, "通知已投递：渠道=$channelId id=${ReminderScheduler.NOTIFICATION_ID}")
+            AnalyticsTracker.logNotificationShown(context, trigger, soundEnabled)
             true
         } catch (error: SecurityException) {
             // 未授予 POST_NOTIFICATIONS：不能盖账本，交给前台全屏补偿。
             Log.w(ReminderScheduler.TAG, "通知投递被拒绝（POST_NOTIFICATIONS 未授予）", error)
+            AnalyticsTracker.logNotificationFailed(context, trigger, "security_exception")
             false
         }
     }

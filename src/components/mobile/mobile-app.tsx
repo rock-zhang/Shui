@@ -12,6 +12,12 @@ import {
   onShowReminder,
   type MobileTabId,
 } from "@/lib/mobile";
+import {
+  installErrorTracking,
+  screenView,
+  syncAnalyticsProperties,
+  track,
+} from "@/lib/analytics";
 import { MOBILE_TABS, MobileTabBar } from "./mobile-tab-bar";
 import { MobileConfigProvider, useMobileConfig } from "./config-context";
 import { NotificationPermissionProvider } from "./notification-permission-context";
@@ -33,6 +39,9 @@ const HEADERS: Record<MobileTabId, { title: string; subtitle: string }> = {
 const TAB_STORAGE_KEY = "shui:mobile-tab";
 const TAB_IDS = MOBILE_TABS.map(({ id }) => id);
 
+/** 全屏提醒的触发来源：定时到点、点通知主体、提醒页预览。 */
+export type ReminderTrigger = "alarm" | "notification_click" | "preview";
+
 /** 读取上次停留的 tab；非法值或存储不可用时回落到「今日」。 */
 function readStoredTab(): MobileTabId {
   try {
@@ -51,7 +60,11 @@ function readStoredTab(): MobileTabId {
  * 到达（统计、账本都照常记），但不再弹出全屏页。此前这个开关只写进配置、没有
  * 任何地方消费，关掉后前台照样弹全屏——界面在骗人。
  */
-function ReminderEvents({ openReminder }: { openReminder: () => void }) {
+function ReminderEvents({
+  openReminder,
+}: {
+  openReminder: (trigger: ReminderTrigger) => void;
+}) {
   const { isTauri } = usePlatform();
   const { general } = useMobileConfig();
   // 回调不在渲染闭包里，用 ref 取最新值，避免改配置时重绑所有原生监听。
@@ -69,8 +82,8 @@ function ReminderEvents({ openReminder }: { openReminder: () => void }) {
         });
     };
 
-    const remind = () => {
-      if (fullScreen.current) openReminder();
+    const remind = (trigger: ReminderTrigger) => {
+      if (fullScreen.current) openReminder(trigger);
     };
 
     // `mobile-reminder` is emitted by the Android alarm bridge; `timer-complete`
@@ -78,9 +91,9 @@ function ReminderEvents({ openReminder }: { openReminder: () => void }) {
     bind("mobile-reminder", () => {
       // 原生闹钟 / 通知唤醒 App 时开启会话，让通知这一路也计入提醒统计。
       invoke("begin_mobile_reminder").catch(() => {});
-      remind();
+      remind("alarm");
     });
-    bind("timer-complete", remind);
+    bind("timer-complete", () => remind("alarm"));
     // A drink recorded from a notification action happens on the native side.
     bind("drink-recorded-from-notification", emitRefresh);
 
@@ -97,7 +110,7 @@ function ReminderEvents({ openReminder }: { openReminder: () => void }) {
         .then((pending) => {
           if (!pending) return;
           invoke("begin_mobile_reminder").catch(() => {});
-          if (fullScreen.current) openReminder();
+          if (fullScreen.current) openReminder("notification_click");
         })
         .catch(() => {
           // 桌面预览没有这个命令。
@@ -118,11 +131,14 @@ function ReminderEvents({ openReminder }: { openReminder: () => void }) {
   return null;
 }
 
+type ActiveReminder = { session: string | null; trigger: ReminderTrigger };
+
 export function MobileApp() {
   const [tab, setTab] = useState<MobileTabId>("today");
-  const [reminderSession, setReminderSession] = useState<string | null | undefined>(
+  const [activeReminder, setActiveReminder] = useState<ActiveReminder | undefined>(
     undefined
   );
+  const tabRef = useRef<MobileTabId>("today");
   // 系统栏底色 / 图标明暗跟随 App 内主题，避免亮色系统下出现紫色状态栏。
   useSystemBars();
   const scrollNodes = useRef<Partial<Record<MobileTabId, HTMLDivElement | null>>>(
@@ -137,10 +153,22 @@ export function MobileApp() {
   // 用 effect 而非 useState 初始值：静态导出的 HTML 里必须是「今日」，
   // 否则首帧 hydration 与服务端不一致。
   useEffect(() => {
-    setTab(readStoredTab());
+    const initial = readStoredTab();
+    tabRef.current = initial;
+    setTab(initial);
+    // 首帧挂载完成：记录初始 tab、安装 JS 异常捕获并同步一次用户属性。
+    track("app_ready", { initial_tab: initial });
+    screenView(initial);
+    installErrorTracking();
+    syncAnalyticsProperties();
   }, []);
 
   const changeTab = useCallback((next: MobileTabId) => {
+    const previous = tabRef.current;
+    if (previous !== next) {
+      screenView(next, previous, true);
+      tabRef.current = next;
+    }
     setTab(next);
     try {
       window.localStorage.setItem(TAB_STORAGE_KEY, next);
@@ -157,11 +185,14 @@ export function MobileApp() {
     if (node) node.scrollTop = scrollOffsets.current[tab] ?? 0;
   }, [tab]);
 
-  const openReminder = useCallback(() => setReminderSession(null), []);
+  const openReminder = useCallback(
+    (trigger: ReminderTrigger) => setActiveReminder({ session: null, trigger }),
+    []
+  );
 
   // "预览提醒" from the reminder tab opens the very same full-screen channel.
   // 用户主动预览不看「全屏提醒」开关，那个开关管的是被动提醒。
-  useEffect(() => onShowReminder(openReminder), [openReminder]);
+  useEffect(() => onShowReminder(() => openReminder("preview")), [openReminder]);
 
   const header = HEADERS[tab];
   const dateLabel = new Date().toLocaleDateString("zh-CN", {
@@ -231,11 +262,12 @@ export function MobileApp() {
             mobileOffset={{ top: "calc(16px + env(safe-area-inset-top, 0px))" }}
           />
 
-          {reminderSession !== undefined && (
+          {activeReminder !== undefined && (
             <FullscreenReminder
-              session={reminderSession}
+              session={activeReminder.session}
+              trigger={activeReminder.trigger}
               onClose={() => {
-                setReminderSession(undefined);
+                setActiveReminder(undefined);
                 emitRefresh();
               }}
             />

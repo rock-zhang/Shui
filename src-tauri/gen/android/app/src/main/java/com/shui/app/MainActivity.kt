@@ -12,6 +12,9 @@ import androidx.core.content.ContextCompat
 
 class MainActivity : TauriActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // 先初始化埋点：后续的权限申请、通知点击都需要它；没有 Firebase 配置时
+        // AnalyticsTracker 内部会整体降级为 no-op。
+        AnalyticsTracker.init(applicationContext)
         // targetSdk 36 在 Android 15+ 上强制 edge-to-edge。必须在 super 之前
         // 调用，否则 TauriActivity 创建 Window 时已经定下了非透明系统栏。
         // 内容避让由 WebView 的 env(safe-area-inset-*) 负责（viewportFit=cover）。
@@ -30,10 +33,28 @@ class MainActivity : TauriActivity() {
         // 转成 mobile-reminder 事件，让 App 内全屏提醒通道也能承接。
         ReminderPlugin.holdReminderIntent(intent)
 
+        // 冷启动来源：通知主体点击 / 桌面图标 / 其他（如分享回流）。
+        val fromNotification =
+            intent?.getBooleanExtra(ReminderPlugin.EXTRA_OPEN_REMINDER, false) == true
+        val launchSource = when {
+            fromNotification -> "notification"
+            intent?.action == Intent.ACTION_MAIN -> "icon"
+            else -> "other"
+        }
+        AnalyticsTracker.logAppOpen(this, launchSource, coldStart = true)
+        if (fromNotification) {
+            AnalyticsTracker.logNotificationOpened(this, coldStart = true)
+        }
+        AnalyticsTracker.logPermissionSnapshot(this, this, "startup")
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
             != PackageManager.PERMISSION_GRANTED
         ) {
+            // 首启的自动申请没有 UI 入口，单独标出来，便于和引导/提示卡的
+            // 主动申请区分开。结果在 onRequestPermissionsResult 里上报。
+            ReminderPlugin.permissionRequestSource = "startup_auto"
+            AnalyticsTracker.logPermissionRequest(this, "startup_auto", canRequest = true)
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(Manifest.permission.POST_NOTIFICATIONS),
@@ -63,6 +84,11 @@ class MainActivity : TauriActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        // 已在前台/后台时点通知主体：不重新走 onCreate，这里补一条打开来源。
+        if (intent.getBooleanExtra(ReminderPlugin.EXTRA_OPEN_REMINDER, false)) {
+            AnalyticsTracker.logAppOpen(this, "notification", coldStart = false)
+            AnalyticsTracker.logNotificationOpened(this, coldStart = false)
+        }
         ReminderPlugin.deliverIntent(intent)
     }
 
@@ -73,6 +99,26 @@ class MainActivity : TauriActivity() {
         // 系统设置页、电池优化「允许/不允许」弹窗返回时，WebView 不一定派发
         // visibilitychange，主动通知前端复查权限开关状态。
         ReminderPlugin.notifyForeground()
+        // 权限/渠道状态变化才会上报，内部按快照指纹去重。
+        AnalyticsTracker.logPermissionSnapshot(this, this, "resume")
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_NOTIFICATION_PERMISSION) {
+            val granted =
+                grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+            AnalyticsTracker.logPermissionResult(
+                this,
+                granted,
+                ReminderPlugin.permissionRequestSource
+            )
+            ReminderPlugin.permissionRequestSource = "unknown"
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

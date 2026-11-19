@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
+import { syncAnalyticsProperties, track } from "@/lib/analytics";
 import {
   DEFAULT_ALERT,
   DEFAULT_GENERAL,
@@ -50,6 +51,50 @@ const GENERAL_SCHEDULE_FIELDS = [
   "quietStart",
   "quietEnd",
 ] as const;
+
+/** 埋点用的字段名：只记录真正会改变行为或提醒节奏的开关。 */
+const ALERT_ANALYTICS_KEYS: Record<string, string> = {
+  gap: "gap",
+  gold: "goal_ml",
+  weekdays: "weekdays",
+  timeStart: "time_start",
+  timeEnd: "time_end",
+};
+const GENERAL_ANALYTICS_KEYS: Record<string, string> = {
+  isNotification: "is_notification",
+  isFullScreen: "is_full_screen",
+  isSound: "is_sound",
+  isPaused: "is_paused",
+  quietEnabled: "quiet_enabled",
+  quietStart: "quiet_start",
+  quietEnd: "quiet_end",
+};
+
+function formatSetting(value: unknown): string {
+  if (Array.isArray(value)) return value.join(",");
+  if (value === null || value === undefined) return "none";
+  return String(value).slice(0, 100);
+}
+
+/** 逐字段上报变化，避免把整份配置当字符串塞进同一个参数。 */
+function trackSettingChanges(
+  prev: object,
+  next: object,
+  mapping: Record<string, string>,
+  reschedule: boolean
+) {
+  for (const [field, key] of Object.entries(mapping)) {
+    const before = (prev as Record<string, unknown>)[field];
+    const after = (next as Record<string, unknown>)[field];
+    if (JSON.stringify(before) === JSON.stringify(after)) continue;
+    track("setting_changed", {
+      key,
+      from: formatSetting(before),
+      to: formatSetting(after),
+      reschedule,
+    });
+  }
+}
 
 function scheduleChanged<T extends object>(
   prev: T,
@@ -121,11 +166,14 @@ export function MobileConfigProvider({ children }: { children: ReactNode }) {
           // 不改变节奏的开关（音效/通知/目标/全屏）也要让 Kotlin 拿到新配置，
           // 否则原生会继续按旧值决定是否发通知、走哪个渠道、是否已达标。
           await syncReminderConfig();
-          return;
+        } else {
+          await rescheduleReminders();
+          // 通知今日页：原生已按新配置重排，重新读取下次提醒时间。
+          setScheduleRevision((revision) => revision + 1);
         }
-        await rescheduleReminders();
-        // 通知今日页：原生已按新配置重排，重新读取下次提醒时间。
-        setScheduleRevision((revision) => revision + 1);
+        // 目标量 / 间隔 / 提醒模式变了，user properties 也要跟着更新，
+        // 否则受众分组会一直停在旧值上。
+        syncAnalyticsProperties();
       } catch (failure) {
         console.error("保存提醒配置失败", failure);
         toast.error("设置未能保存，请重试");
@@ -142,6 +190,7 @@ export function MobileConfigProvider({ children }: { children: ReactNode }) {
         next,
         ALERT_SCHEDULE_FIELDS
       );
+      trackSettingChanges(alertRef.current, next, ALERT_ANALYTICS_KEYS, reschedule);
       alertRef.current = next;
       setAlert(next);
       void persist("alert", next, reschedule);
@@ -157,6 +206,7 @@ export function MobileConfigProvider({ children }: { children: ReactNode }) {
         next,
         GENERAL_SCHEDULE_FIELDS
       );
+      trackSettingChanges(generalRef.current, next, GENERAL_ANALYTICS_KEYS, reschedule);
       generalRef.current = next;
       setGeneral(next);
       void persist("general", next, reschedule);

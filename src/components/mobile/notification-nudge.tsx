@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BellOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { track } from "@/lib/analytics";
 import { useMobileConfig } from "./config-context";
 import { useNotificationPermission } from "./notification-permission-context";
 
@@ -46,6 +47,10 @@ export function NotificationNudge() {
   }, []);
 
   const snooze = useCallback(() => {
+    track("notification_nudge_action", {
+      action: "snooze",
+      can_request: canRequest,
+    });
     const until = Date.now() + SNOOZE_MS;
     setSnoozeUntil(until);
     try {
@@ -53,12 +58,16 @@ export function NotificationNudge() {
     } catch {
       // 只在本次会话内生效，不影响功能。
     }
-  }, []);
+  }, [canRequest]);
 
   async function go() {
     setPending(true);
+    track("notification_nudge_action", {
+      action: "allow",
+      can_request: canRequest,
+    });
     try {
-      await request();
+      await request("nudge");
     } finally {
       setPending(false);
     }
@@ -73,6 +82,13 @@ export function NotificationNudge() {
     permission === "denied" &&
     snoozeUntil !== null &&
     Date.now() >= snoozeUntil;
+
+  const shownLogged = useRef(false);
+  useEffect(() => {
+    if (!visible || shownLogged.current) return;
+    shownLogged.current = true;
+    track("notification_nudge_shown", { can_request: canRequest });
+  }, [visible, canRequest]);
 
   if (!visible) return null;
 

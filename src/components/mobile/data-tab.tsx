@@ -17,6 +17,7 @@ import type { DrinkHistoryValue } from "@/lib/drink-day";
 import type { ReminderSummary } from "@/lib/reminder-history";
 import { MobileEmpty, MobileSection, MobileSegmented, MobileStat } from "./ui";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 
 const PERIOD_OPTIONS = [
   { value: "7", label: "近 7 天" },
@@ -236,6 +237,7 @@ export function DataTab() {
       ]);
       const historyEntries = entries.filter(([key]) => /^\d{8}$/.test(key));
       if (historyEntries.length === 0) {
+        track("data_export_csv", { result: "empty", days: 0 });
         toast.info("还没有可导出的饮水记录");
         return;
       }
@@ -246,9 +248,14 @@ export function DataTab() {
       const saved = await invoke<string | null>("save_drink_history_csv", {
         content: csv,
       });
+      track("data_export_csv", {
+        result: saved ? "success" : "cancel",
+        days: historyEntries.length,
+      });
       if (saved) toast.success("饮水记录已导出");
     } catch (failure) {
       console.error("导出饮水记录失败", failure);
+      track("data_export_csv", { result: "failed", days: 0 });
       toast.error("导出失败，请稍后重试或检查系统分享是否可用");
     } finally {
       setExporting(false);
@@ -261,7 +268,12 @@ export function DataTab() {
         <MobileSegmented
           value={periodValue}
           options={PERIOD_OPTIONS}
-          onChange={setPeriodValue}
+          onChange={(next) => {
+            if (next !== periodValue) {
+              track("data_period_changed", { from: periodValue, to: next });
+            }
+            setPeriodValue(next);
+          }}
           label="统计周期"
         />
         <div className="mt-3 grid grid-cols-3 gap-2">
