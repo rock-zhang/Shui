@@ -25,6 +25,7 @@ __pycache__/
 
 # WorkBuddy project data
 /.workbuddy/
+/.trae-html-share-packages/
 
 # Android 端单独文档
 README-ANDROID.md
@@ -34,6 +35,12 @@ README-ANDROID.en.md
 *.jks
 *.keystore
 key.properties
+
+# 桌面端 GA4 Measurement Protocol 凭据（本地构建用，绝不入库）
+/src-tauri/ga4.local.json
+
+# Firebase CLI 本地缓存（部署时自动生成）
+/.firebase/
 
 # Editor directories and files
 .vscode/*
@@ -45,3 +52,4 @@ key.properties
 *.njsproj
 *.sln
 *.sw?
+docs/play-store/
