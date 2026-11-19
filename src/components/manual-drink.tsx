@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { recordDrink } from "@/utils/record-drink";
+import { trackDrinkRecorded } from "@/lib/analytics";
 
 export function ManualDrink({ onRecorded }: { onRecorded: () => void }) {
   const busy = useRef(false);
@@ -19,8 +20,10 @@ export function ManualDrink({ onRecorded }: { onRecorded: () => void }) {
     try {
       // A failed/uncertain response keeps its ID for an explicit retry.
       if (!pending.current) pending.current = { amount, id: crypto.randomUUID() };
-      const receipt = await recordDrink(pending.current.amount, pending.current.id);
+      const entry = pending.current;
+      const receipt = await recordDrink(entry.amount, entry.id);
       pending.current = null;
+      trackDrinkRecorded(receipt, entry.amount, "manual_today");
       setMessage(`${receipt.added ? "已记录" : "该笔饮水已记录"}，累计 ${receipt.total}ml${receipt.goalReached ? "，今日目标已完成！" : ""}`);
       onRecorded();
     } catch (failure) {

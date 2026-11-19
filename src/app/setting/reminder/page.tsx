@@ -31,6 +31,7 @@ import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { usePlatform } from "@/hooks/use-platform";
+import { track } from "@/lib/analytics";
 
 const goldList = ["1000", "1500", "2000", "2500", "3000", "3500", "4000"];
 const gapList = ["10", "20", "30", "45", "60"];
@@ -92,6 +93,22 @@ export default function Home() {
     filed: string,
     value: string | number[] | string[]
   ) => {
+    const mapping: Record<string, string> = {
+      gold: "goal_ml",
+      gap: "gap",
+      weekdays: "weekdays",
+    };
+    const format = (input: unknown) =>
+      Array.isArray(input) ? input.join(",") : String(input ?? "none");
+    track("setting_changed", {
+      key: mapping[filed] ?? filed,
+      from: format(
+        (config as unknown as Record<string, unknown>)[filed]
+      ),
+      to: format(value),
+      reschedule: true,
+    });
+
     setConfig({
       ...config,
       [filed]: value,

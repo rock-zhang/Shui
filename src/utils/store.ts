@@ -8,6 +8,7 @@ export async function getGeneralConfig() {
       isAutoStart: boolean;
       isCountDown: boolean;
       isFullScreen: boolean;
+      isSound?: boolean;
     }>("general"),
   ]);
 

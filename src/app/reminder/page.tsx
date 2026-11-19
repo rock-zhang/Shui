@@ -20,8 +20,13 @@ import { currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 import { STORE_NAME } from "@/lib/constants";
 import { usePlatform } from "@/hooks/use-platform";
 import { normalizeDrinkDay, type DrinkHistoryValue, type DrinkReceipt } from "@/lib/drink-day";
+import { progressBucket, track, trackDrinkRecorded } from "@/lib/analytics";
 
 async function hideWindowAction(outcome: "confirmed" | "skipped" = "confirmed", expectedSession?: string) {
+  track("reminder_outcome", { outcome, trigger: "desktop" });
+  if (outcome === "skipped") {
+    track("fullscreen_skip", { trigger: "desktop" });
+  }
   try {
     await invoke("hide_reminder_windows", { outcome, expectedSession: expectedSession ?? null });
   } finally {
@@ -94,6 +99,7 @@ const reminderTexts = [
 
 export default function ReminderPage() {
   const [reminderText, setReminderText] = useState("");
+  const shownLogged = useRef(false);
   const [water, setWater] = useState({
     gold: 0,
     drink: 0,
@@ -197,6 +203,17 @@ export default function ReminderPage() {
         gold: Number(goldSetting?.gold) || 0,
         drink: normalizeDrinkDay(drink, Number(goldSetting?.gold) || 0).total,
       });
+      if (!shownLogged.current) {
+        shownLogged.current = true;
+        const goal = Number(goldSetting?.gold) || 0;
+        const total = normalizeDrinkDay(drink, goal).total;
+        track("fullscreen_reminder_shown", {
+          trigger: "desktop",
+          progress_bucket: progressBucket(total, goal),
+          total_ml: total,
+          goal_ml: goal,
+        });
+      }
     };
 
     storeUpdate();
@@ -208,6 +225,7 @@ export default function ReminderPage() {
     if (saving.current) return;
     saving.current = true;
     setSaveError("");
+    track("fullscreen_drink_click", { amount: ml, source: "fullscreen" });
     try {
       // Refresh on click: a reused window can still hold the previous session
       // before the first countdown event of its next presentation arrives.
@@ -215,6 +233,7 @@ export default function ReminderPage() {
       if (!session) throw new Error("本次提醒已结束");
       const updated = await invoke<DrinkReceipt>("record_reminder_drink", { amount: ml, session });
       setWater({ gold: updated.goal, drink: updated.total });
+      trackDrinkRecorded(updated, ml, "fullscreen");
       if (updated.goalReached) sendNativeNotification().catch(console.error);
       setIsClosing(true);
       setTimeout(() => {
