@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { AlarmClockOff, CheckCircle2, Settings, X } from "lucide-react";
 import { readDiagnostics } from "@/lib/mobile";
+import { minutesBucket, track } from "@/lib/analytics";
 import { romProfile, type RomProfile } from "@/lib/rom";
 import { useMobileConfig } from "./config-context";
 import { OPEN_GUIDE_EVENT } from "./notification-setup-guide";
@@ -35,7 +36,7 @@ function clockLabel(ms: number): string {
  * 一起清掉，此后一条都收不到；这个弹窗就是那次失败的唯一可见证据。
  */
 export function MissedAlarmDialog() {
-  const { general, hydrated } = useMobileConfig();
+  const { general, alert, hydrated } = useMobileConfig();
   const [open, setOpen] = useState(false);
   const [missedAt, setMissedAt] = useState(0);
   // 当前弹窗对应的漏报时刻，供 close() 记确认用；不进 state，避免 close 依赖它重建。
@@ -97,27 +98,46 @@ export function MissedAlarmDialog() {
    * 否则下次冷启动还会读到同一条。本会话内另用 ackAtRef 挡住竞态复读，
    * 两层加起来的目的：既不让刚关的弹窗复活，也不把之后真新增的漏报吞掉。
    */
-  const close = useCallback(() => {
+  const close = useCallback((via: "close" | "acknowledge" = "close") => {
+    const at = currentAtRef.current;
+    const delayMinutes =
+      at > 0 ? Math.max(0, Math.round((Date.now() - at) / 60_000)) : 0;
+    track("missed_dialog_action", {
+      action: via === "acknowledge" ? "acknowledge" : "close",
+      delay_minutes: minutesBucket(delayMinutes),
+      alarm_cleared: cleared,
+    });
     setOpen(false);
     // 先在本会话确认掉这一条，再发异步清账。顺序反过来会留下竞态窗口：
     // clear 还在途时任意一次 read() 读到旧记录，就把刚关的弹窗又打开。
     // 只在内存里记，清账失败也只是本次会话不弹；下次冷启动仍会读原生记录，
     // 不会把真漏永久吞掉。
-    const at = currentAtRef.current;
-    if (at > 0) ackAtRef.current = Math.max(ackAtRef.current, at);
-    void invoke("clear_missed_alarm").catch(() => {
-      // 清账失败不会让本次会话复读；下次冷启动会再读一次记录。
-    });
-  }, []);
+    ackAtRef.current = Math.max(ackAtRef.current, at);
+    void invoke("clear_missed_alarm")
+      .then(() => {
+        track("missed_acknowledged", {
+          delay_minutes: minutesBucket(delayMinutes),
+          via,
+        });
+      })
+      .catch(() => {
+        // 清账失败不会让本次会话复读；下次冷启动会再读一次记录。
+      });
+  }, [cleared]);
 
   const acknowledge = useCallback(() => {
-    close();
+    close("acknowledge");
   }, [close]);
 
   function openGuide() {
+    track("missed_dialog_action", { action: "open_guide" });
     // 只收起弹窗，不清账：用户可能只是去看看步骤，证据要留到明确「知道了」。
     setOpen(false);
-    window.dispatchEvent(new CustomEvent(OPEN_GUIDE_EVENT, { detail: { step: 2 } }));
+    window.dispatchEvent(
+      new CustomEvent(OPEN_GUIDE_EVENT, {
+        detail: { step: 2, source: "missed_dialog" },
+      })
+    );
   }
 
   // 用户自己暂停了提醒、或关掉了系统通知，就是明确表示不想被打断，
@@ -127,11 +147,25 @@ export function MissedAlarmDialog() {
   useEffect(() => {
     if (!open || !enabled) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
+      if (event.key === "Escape") close("close");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [close, enabled, open]);
+
+  const shownAtRef = useRef(0);
+  useEffect(() => {
+    if (!open || !enabled) return;
+    if (shownAtRef.current === missedAt) return;
+    shownAtRef.current = missedAt;
+    const delayMinutes = Math.max(0, Math.round((Date.now() - missedAt) / 60_000));
+    track("missed_dialog_shown", {
+      delay_minutes: minutesBucket(delayMinutes),
+      alarm_cleared: cleared,
+      missed_hour: new Date(missedAt).getHours(),
+      gap_min: Number(alert.gap) || 0,
+    });
+  }, [open, enabled, missedAt, cleared, alert.gap]);
 
   if (!open || !enabled) return null;
 
@@ -174,7 +208,7 @@ export function MissedAlarmDialog() {
             <button
               type="button"
               aria-label="关闭"
-              onClick={close}
+              onClick={() => close("close")}
               className="-mr-1.5 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
             >
               <X className="h-4 w-4" />
@@ -186,7 +220,7 @@ export function MissedAlarmDialog() {
           <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground">
             检查这两项是否已开启
           </p>
-          <BackgroundGuideCards rom={rom} />
+          <BackgroundGuideCards rom={rom} source="missed_dialog" />
 
           <p className="mt-2.5 text-xs leading-[18px] text-muted-foreground">
             {cleared

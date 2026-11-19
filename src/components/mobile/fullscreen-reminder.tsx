@@ -14,6 +14,8 @@ import {
 } from "@/lib/drink-day";
 import { getLocalDateKey } from "@/lib/drink-history";
 import { emitNextReminder, notifyGoalReached } from "@/lib/mobile";
+import { progressBucket, track, trackDrinkRecorded } from "@/lib/analytics";
+import type { ReminderTrigger } from "./mobile-app";
 
 /** Same 15-layer rainbow backdrop as the desktop reminder, scoped to this card. */
 const BACKDROP = [
@@ -57,9 +59,11 @@ type Outcome = "confirmed" | "skipped" | "timedOut";
  */
 export function FullscreenReminder({
   session,
+  trigger,
   onClose,
 }: {
   session: string | null;
+  trigger: ReminderTrigger;
   onClose: () => void;
 }) {
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
@@ -70,11 +74,28 @@ export function FullscreenReminder({
   const [text] = useState(() => TEXTS[Math.floor(Math.random() * TEXTS.length)]);
   const busy = useRef(false);
   const closed = useRef(false);
+  const openedAt = useRef(Date.now());
 
   const finish = useCallback(
     async (outcome: Outcome) => {
       if (closed.current) return;
       closed.current = true;
+      const displaySeconds = Math.min(
+        30,
+        Math.max(0, Math.round((Date.now() - openedAt.current) / 1000))
+      );
+      // 会话结果（确认/跳过/超时）在这里统一上报，预览也带 trigger=preview，
+      // 分析时可以按来源过滤掉。
+      track("reminder_outcome", {
+        outcome,
+        display_seconds: displaySeconds,
+        trigger,
+      });
+      if (outcome === "skipped") {
+        track("fullscreen_skip", { trigger });
+      } else if (outcome === "timedOut") {
+        track("fullscreen_timeout", { trigger });
+      }
       try {
         if (session) {
           await invoke("hide_reminder_windows", {
@@ -92,7 +113,7 @@ export function FullscreenReminder({
       setClosing(true);
       window.setTimeout(onClose, 260);
     },
-    [onClose, session]
+    [onClose, session, trigger]
   );
 
   // 倒计时按绝对截止时间重算，而不是每秒累减。Android WebView 退到后台后
@@ -138,7 +159,14 @@ export function FullscreenReminder({
           getLocalDateKey(new Date())
         );
         if (!cancelled) {
-          setWater({ gold: goal, drink: normalizeDrinkDay(value, goal).total });
+          const total = normalizeDrinkDay(value, goal).total;
+          setWater({ gold: goal, drink: total });
+          track("fullscreen_reminder_shown", {
+            trigger,
+            progress_bucket: progressBucket(total, goal),
+            total_ml: total,
+            goal_ml: goal,
+          });
         }
       } catch {
         // Browser preview has no store.
@@ -147,13 +175,14 @@ export function FullscreenReminder({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [trigger]);
 
   async function record(amount: number) {
     if (busy.current || closed.current) return;
     busy.current = true;
     setSaving(true);
     setError("");
+    track("fullscreen_drink_click", { amount, source: "fullscreen" });
     try {
       const receipt = session
         ? await invoke<DrinkReceipt>("record_reminder_drink", {
@@ -165,6 +194,7 @@ export function FullscreenReminder({
             requestId: crypto.randomUUID(),
           });
       setWater({ gold: receipt.goal, drink: receipt.total });
+      trackDrinkRecorded(receipt, amount, "fullscreen");
       if (receipt.added && receipt.nextAt) {
         // 全屏提醒记的水同样要重锚：下一次从「刚喝完」起算，而不是从提醒响时起算。
         emitNextReminder(receipt.nextAt);

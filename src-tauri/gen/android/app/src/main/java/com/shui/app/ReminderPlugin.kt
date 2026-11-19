@@ -175,7 +175,7 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
     @Command
     fun showNotification(invoke: Invoke) {
         try {
-            ReminderReceiver().showNotification(activity)
+            ReminderReceiver().showNotification(activity, "test")
             invoke.resolve()
         } catch (error: Exception) {
             invoke.reject("发送通知失败：${error.message}")
@@ -199,7 +199,7 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
                 invoke.reject("目标值无效，无法生成达标通知")
                 return
             }
-            val delivered = ReminderReceiver().showGoalNotification(activity, total, goal)
+            val delivered = ReminderReceiver().showGoalNotification(activity, total, goal, "foreground_record")
             // 发出去才记「今天已播报」，否则闹钟那一路还能再补一次。
             if (delivered) ReminderScheduler.markGoalNotified(activity)
             invoke.resolve()
@@ -724,6 +724,8 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
             ContextCompat.checkSelfPermission(activity, Manifest.permission.POST_NOTIFICATIONS)
             != PackageManager.PERMISSION_GRANTED
         ) {
+            // 记录来源，供 onRequestPermissionsResult 关联（引导/提示卡/体检卡）。
+            permissionRequestSource = invoke.getArgs().optString("source", "unknown")
             val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             prefs.edit()
                 .putInt(KEY_NOTIFICATION_ASKED, prefs.getInt(KEY_NOTIFICATION_ASKED, 0) + 1)
@@ -775,6 +777,51 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         invoke.resolve()
     }
 
+    // ───────────────────────── Firebase 埋点桥 ─────────────────────────
+
+    @Command
+    fun logAnalyticsEvent(invoke: Invoke) {
+        val args = invoke.getArgs()
+        AnalyticsTracker.logEvent(
+            activity,
+            args.optString("name", ""),
+            args.optJSONObject("params")
+        )
+        invoke.resolve()
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    @Command
+    fun syncAnalyticsProperties(invoke: Invoke) {
+        AnalyticsTracker.syncProperties(activity)
+        invoke.resolve()
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    @Command
+    fun analyticsIsEnabled(invoke: Invoke) {
+        val payload = JSObject()
+        payload.put("enabled", AnalyticsTracker.isEnabled(activity))
+        invoke.resolve(payload)
+    }
+
+    @Command
+    fun setAnalyticsEnabled(invoke: Invoke) {
+        AnalyticsTracker.setEnabled(activity, invoke.getArgs().optBoolean("enabled", true))
+        invoke.resolve()
+    }
+
+    @Command
+    fun recordAnalyticsException(invoke: Invoke) {
+        val args = invoke.getArgs()
+        AnalyticsTracker.recordException(
+            args.optString("message", ""),
+            args.optString("stack", ""),
+            args.optString("screen", "")
+        )
+        invoke.resolve()
+    }
+
     companion object {
         const val PREFS = "shui_reminder"
         const val KEY_CONFIG = "config"
@@ -782,6 +829,10 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         /** 已发起过几次通知权限请求；用于区分「首次」与「永久拒绝」。 */
         const val KEY_NOTIFICATION_ASKED = "notification_asked_count"
         const val EXTRA_OPEN_REMINDER = "openReminder"
+
+        /** 最近一次通知权限请求的来源，供授权回调上报结果时使用。 */
+        @Volatile
+        var permissionRequestSource: String = "unknown"
 
         @Volatile
         var instance: ReminderPlugin? = null

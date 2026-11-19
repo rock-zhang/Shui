@@ -487,33 +487,59 @@ object ReminderScheduler {
      *          交给 AlarmManager 独占后台通知（暂停/关通知/无权限都归这里）
      */
     fun deliverForeground(context: Context): String {
-        if (canUseOverlay(context)) return "overlay"
+        if (canUseOverlay(context)) {
+            AnalyticsTracker.logReminderDelivered(context, "overlay")
+            return "overlay"
+        }
         val general = config(context)?.optJSONObject("general")
         // 刚点暂停、用户关掉系统通知、或无通知权限时不能把这次提醒静默吞掉：
         // 返回 defer 让 Rust 不盖账本，AlarmManager 那一路保留补偿机会。
         if (general?.optBoolean("isPaused", false) == true) {
             Log.i(TAG, "deliverForeground=defer：已暂停，交给 AlarmManager")
+            AnalyticsTracker.logReminderDelivered(context, "defer_paused")
             return "defer"
         }
         if (general?.optBoolean("isNotification", true) == false) {
             Log.i(TAG, "deliverForeground=defer：系统通知已关闭")
+            AnalyticsTracker.logReminderDelivered(context, "defer_notification_off")
             return "defer"
         }
         if (!canPostNotifications(context)) {
             Log.i(TAG, "deliverForeground=defer：无通知权限，不盖账本")
+            AnalyticsTracker.logNotificationBlocked(
+                context,
+                "foreground",
+                blockReason(context)
+            )
+            AnalyticsTracker.logReminderDelivered(context, "defer_no_permission")
             return "defer"
         }
         // 只在通知真正投递成功后才盖账本，杜绝「账本写了但通知没发出去」
         // 导致 AlarmManager 与前台全屏两路都被抑制的静默失败。
-        val delivered = shouldNotify(context) && ReminderReceiver().showNotification(context)
+        val delivered = shouldNotify(context) && ReminderReceiver().showNotification(context, "foreground")
         if (delivered) {
             markReminder(context)
             Log.i(TAG, "deliverForeground=notification：通知已投递并写账本")
+            AnalyticsTracker.logReminderDelivered(context, "notification")
         } else {
             // 已达标或投递失败：不盖账本，让 AlarmManager 按自己的判断处理。
             Log.i(TAG, "deliverForeground=defer：已达标或通知投递失败")
+            AnalyticsTracker.logReminderDelivered(context, "defer_goal_or_failed")
         }
         return if (delivered) "notification" else "defer"
+    }
+
+    /** 通知发不出去的具体原因，供埋点区分「应用级关闭」与「渠道被关」。 */
+    fun blockReason(context: Context): String {
+        if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+            return "app_disabled"
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val importance = manager.getNotificationChannel(channelId(context))?.importance
+            if (importance == NotificationManager.IMPORTANCE_NONE) return "channel_disabled"
+        }
+        return "no_permission"
     }
 
     /** 原生当前排定的下一次提醒；没有有效闹钟时为 0。 */
@@ -732,6 +758,7 @@ object ReminderScheduler {
         if (!found) {
             // 当前配置下没有任何可提醒的时间：撤掉旧闹钟，也让今日页如实显示。
             Log.w(TAG, "scheduleNext 跳过：未来 8 天内没有落在提醒时段/工作日且避开勿扰的时刻")
+            AnalyticsTracker.logScheduleFailed(context, "no_slot")
             cancel(context)
             return
         }
@@ -886,12 +913,15 @@ class ReminderReceiver : BroadcastReceiver() {
         val action = intent.action ?: return
         when {
             action == ReminderScheduler.ACTION_SKIP -> {
+                AnalyticsTracker.logNotificationSkipped(context)
                 cancelNotification(context)
                 ReminderScheduler.scheduleNext(context)
             }
             action.startsWith(ReminderScheduler.ACTION_DRINK_PREFIX) -> {
                 val amount = action.removePrefix(ReminderScheduler.ACTION_DRINK_PREFIX).toIntOrNull()
                 if (amount != null && amount > 0) {
+                    // 通知 Action 是 WebView 不参与的一路，计数与事件都在这里落。
+                    AnalyticsTracker.logNotificationDrink(context, amount.toLong())
                     ReminderScheduler.appendPendingDrink(context, amount)
                     // 先出声再撤通知：声音和「通知消失」几乎同时发生，反馈才连贯。
                     ReminderScheduler.playConfirmTone(context)
@@ -919,7 +949,7 @@ class ReminderReceiver : BroadcastReceiver() {
                         // 投递成功才盖账本：顺序反了会出现「账本说提醒过、用户
                         // 却一条都没看到」，这是后台静默失败最难查的一种。
                         val delivered = ReminderScheduler.shouldNotify(context) &&
-                            showNotification(context)
+                            showNotification(context, "alarm")
                         if (delivered) {
                             ReminderScheduler.markReminder(context)
                         } else if (notifyGoalReached(context)) {
@@ -927,6 +957,12 @@ class ReminderReceiver : BroadcastReceiver() {
                         } else {
                             Log.i(ReminderScheduler.TAG, "不发通知：已暂停或今日饮水量已达标")
                         }
+                    } else {
+                        AnalyticsTracker.logNotificationBlocked(
+                            context,
+                            "alarm",
+                            ReminderScheduler.blockReason(context)
+                        )
                     }
                 } else {
                     Log.i(ReminderScheduler.TAG, "不发通知：间隔内已提醒过（前台全屏承接）")
@@ -959,7 +995,7 @@ class ReminderReceiver : BroadcastReceiver() {
         if (ReminderScheduler.goalNotifiedToday(context)) return false
         val progress = ReminderScheduler.goalProgress(context) ?: return false
         if (!ReminderScheduler.canPostNotifications(context)) return false
-        if (!showGoalNotification(context, progress.first, progress.second)) return false
+        if (!showGoalNotification(context, progress.first, progress.second, "alarm_fallback")) return false
         ReminderScheduler.markGoalNotified(context)
         return true
     }
@@ -968,7 +1004,12 @@ class ReminderReceiver : BroadcastReceiver() {
      * 非 private：自定义插件的 showGoalNotification 命令复用同一条构建逻辑，
      * 保证「App 前台记录达标」与「后台闹钟补发」两条路径的通知完全一致。
      */
-    fun showGoalNotification(context: Context, total: Long, goal: Long): Boolean {
+    fun showGoalNotification(
+        context: Context,
+        total: Long,
+        goal: Long,
+        trigger: String = "unknown"
+    ): Boolean {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         // 跟随「提醒音效」开关：静音档走无声渠道，但横幅照旧。
         val channelId = ReminderScheduler.channelId(context)
@@ -1010,6 +1051,7 @@ class ReminderReceiver : BroadcastReceiver() {
         return try {
             manager.notify(ReminderScheduler.GOAL_NOTIFICATION_ID, builder.build())
             Log.i(ReminderScheduler.TAG, "达标通知已投递：渠道=$channelId")
+            AnalyticsTracker.logGoalNotification(context, total, goal, trigger)
             true
         } catch (error: SecurityException) {
             Log.w(ReminderScheduler.TAG, "达标通知投递被拒绝（POST_NOTIFICATIONS 未授予）", error)
@@ -1017,7 +1059,7 @@ class ReminderReceiver : BroadcastReceiver() {
         }
     }
 
-    fun showNotification(context: Context): Boolean {
+    fun showNotification(context: Context, trigger: String = "alarm"): Boolean {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         // 「提醒音效」开关：关掉后切到无声渠道，通知本身照常送达。
         val channelId = ReminderScheduler.channelId(context)
@@ -1117,10 +1159,12 @@ class ReminderReceiver : BroadcastReceiver() {
         return try {
             manager.notify(ReminderScheduler.NOTIFICATION_ID, notification)
             Log.i(ReminderScheduler.TAG, "通知已投递：渠道=$channelId id=${ReminderScheduler.NOTIFICATION_ID}")
+            AnalyticsTracker.logNotificationShown(context, trigger, soundEnabled)
             true
         } catch (error: SecurityException) {
             // 未授予 POST_NOTIFICATIONS：不能盖账本，交给前台全屏补偿。
             Log.w(ReminderScheduler.TAG, "通知投递被拒绝（POST_NOTIFICATIONS 未授予）", error)
+            AnalyticsTracker.logNotificationFailed(context, trigger, "security_exception")
             false
         }
     }

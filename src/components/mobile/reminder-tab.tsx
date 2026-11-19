@@ -12,6 +12,7 @@ import {
   emitShowReminder,
 } from "@/lib/mobile";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 import { sendReminderNotification } from "@/utils/notification";
 import { useMobileConfig } from "./config-context";
 import { useNotificationPermission } from "./notification-permission-context";
@@ -91,8 +92,10 @@ export function ReminderTab() {
   async function sendTestNotification() {
     try {
       await sendReminderNotification();
+      track("test_notification_click", { success: true });
       toast.success("测试通知已发送");
     } catch {
+      track("test_notification_click", { success: false });
       toast.info("当前为桌面预览，通知由 Android 原生通道发送");
     }
   }
@@ -300,7 +303,13 @@ export function ReminderTab() {
       <NotificationHealthCard />
 
       <div className="mb-3 flex gap-2">
-        <Button className="min-h-12 flex-1" onClick={() => emitShowReminder()}>
+        <Button
+          className="min-h-12 flex-1"
+          onClick={() => {
+            track("preview_reminder_click");
+            emitShowReminder();
+          }}
+        >
           <BellRing className="mr-1.5 h-4 w-4" />
           预览全屏提醒
         </Button>

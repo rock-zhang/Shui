@@ -13,6 +13,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { isPermissionGranted } from "@tauri-apps/plugin-notification";
 import { toast } from "sonner";
+import { track } from "@/lib/analytics";
 
 /**
  * `unsupported` = 桌面浏览器预览，没有这套系统权限概念。
@@ -40,7 +41,7 @@ interface NotificationPermissionValue {
   /** 重新读取系统权限（从设置页返回、切回前台时用）。 */
   refresh: () => void;
   /** 申请权限：能弹框就弹，已被永久拒绝则跳系统设置页。 */
-  request: () => Promise<void>;
+  request: (source?: string) => Promise<void>;
 }
 
 const NotificationPermissionContext =
@@ -105,17 +106,27 @@ export function NotificationPermissionProvider({
    * 停在旧状态；这里最多持续 WATCH_TOTAL_MS，状态变成已授权即停并提示。
    */
   const watch = useCallback(
-    (successText: string) => {
+    (successText: string, source: string, reportResult: boolean) => {
       stopWatching();
       const deadline = Date.now() + WATCH_TOTAL_MS;
       const tick = async () => {
         const granted = await read();
         if (granted) {
           stopWatching();
+          // 系统授权框的拒绝/允许由原生 onRequestPermissionsResult 上报；
+          // 设置页返回没有回调，只能在这里补一条结果。
+          if (reportResult) {
+            track("permission_result", { source, result: "granted" });
+          }
           toast.success(successText);
           return;
         }
-        if (!alive.current || Date.now() >= deadline) stopWatching();
+        if (!alive.current || Date.now() >= deadline) {
+          stopWatching();
+          if (reportResult) {
+            track("permission_result", { source, result: "timeout" });
+          }
+        }
       };
       void tick();
       watchTimer.current = window.setInterval(() => void tick(), WATCH_INTERVAL_MS);
@@ -127,38 +138,51 @@ export function NotificationPermissionProvider({
    * 打开系统通知设置页。Android 13+ 拒绝两次后 requestPermissions 会静默失败，
    * 那时只有设置页能救回来。
    */
-  const openSettings = useCallback(async () => {
-    try {
-      await invoke("open_notification_settings");
-      toast.info("系统已不再弹授权窗，请在设置中允许通知");
-      watch("通知权限已开启");
-    } catch {
-      toast.error("无法打开通知设置，请到 应用信息 → 通知 手动开启");
-    }
-  }, [watch]);
+  const openSettings = useCallback(
+    async (source: string) => {
+      track("settings_opened", { target: "notification", source });
+      try {
+        await invoke("open_notification_settings");
+        toast.info("系统已不再弹授权窗，请在设置中允许通知");
+        watch("通知权限已开启", source, true);
+      } catch {
+        toast.error("无法打开通知设置，请到 应用信息 → 通知 手动开启");
+      }
+    },
+    [watch]
+  );
 
-  const request = useCallback(async () => {
-    try {
-      const state = await invoke<NativePermissionState>(
-        "notification_permission_state"
-      );
-      // 竞态：用户可能刚在系统设置里打开，只是本地还没刷新。
-      if (state.granted) {
-        setPermission("granted");
-        toast.success("通知权限已开启");
-        return;
+  const request = useCallback(
+    async (source = "unknown") => {
+      try {
+        const state = await invoke<NativePermissionState>(
+          "notification_permission_state"
+        );
+        // 竞态：用户可能刚在系统设置里打开，只是本地还没刷新。
+        if (state.granted) {
+          setPermission("granted");
+          track("permission_result", { source, result: "already_granted" });
+          toast.success("通知权限已开启");
+          return;
+        }
+        track("permission_request", {
+          source,
+          can_request: state.canRequest,
+        });
+        if (state.canRequest) {
+          // 系统授权框本身就是反馈，这里不再叠一层 toast。
+          // 授权结果由原生 onRequestPermissionsResult 上报，避免重复。
+          await invoke("request_notification_permission", { source });
+          watch("通知权限已开启", source, false);
+          return;
+        }
+        await openSettings(source);
+      } catch {
+        toast.info("当前为桌面预览，通知权限由系统管理");
       }
-      if (state.canRequest) {
-        // 系统授权框本身就是反馈，这里不再叠一层 toast。
-        await invoke("request_notification_permission");
-        watch("通知权限已开启");
-        return;
-      }
-      await openSettings();
-    } catch {
-      toast.info("当前为桌面预览，通知权限由系统管理");
-    }
-  }, [openSettings, watch]);
+    },
+    [openSettings, watch]
+  );
 
   const refresh = useCallback(() => {
     void read();

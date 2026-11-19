@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/analytics";
 import { emitRefresh, readNotificationHealth, type NotificationHealth } from "@/lib/mobile";
 import { romFromHealth, romProfile, type RomProfile } from "@/lib/rom";
 import { useNotificationPermission } from "./notification-permission-context";
@@ -72,6 +73,8 @@ function bumpDismissCount(): number {
 type Step = 0 | 1 | 2;
 
 const STEP_LABELS = ["允许通知", "打开开关", "后台运行"] as const;
+/** 埋点用英文步骤名，避免中文参数在分析平台里出现编码问题。 */
+const STEP_NAMES = ["permission", "switches", "background"] as const;
 const STEP_COUNT = STEP_LABELS.length;
 
 function readSeen(): boolean {
@@ -351,6 +354,8 @@ export function NotificationSetupGuide() {
   const [rom, setRom] = useState<RomProfile>(() => romProfile());
   // 检测守卫或用户手动唤起过：本次挂载内不要再让首启逻辑改 step。
   const manualOpenRef = useRef(false);
+  const showStartedAt = useRef(Date.now());
+  const loggedSteps = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     let alive = true;
@@ -378,8 +383,17 @@ export function NotificationSetupGuide() {
       if (profile.domestic) {
         // 已经由检测守卫（或用户手动）打开过的话，别把 step 覆盖回首启进度。
         if (manualOpenRef.current) return;
-        setStep(readStep());
+        const startStep = readStep();
+        setStep(startStep);
         setVisible(true);
+        showStartedAt.current = Date.now();
+        loggedSteps.current = new Set();
+        track("guide_shown", {
+          trigger: "auto_first_launch",
+          entry_source: "startup",
+          start_step: startStep,
+          domestic_rom: profile.domestic,
+        });
       }
     })();
     return () => {
@@ -392,16 +406,26 @@ export function NotificationSetupGuide() {
   useEffect(() => {
     const open = (event: Event) => {
       manualOpenRef.current = true;
-      const requested = (event as CustomEvent<{ step?: number }>).detail?.step;
+      const detail = (event as CustomEvent<{ step?: number; source?: string }>)
+        .detail;
+      const requested = detail?.step;
       const next: Step = requested === 2 ? 2 : requested === 1 ? 1 : 0;
       setStep(next);
       writeStep(next);
       setVisible(true);
       refresh();
+      showStartedAt.current = Date.now();
+      loggedSteps.current = new Set();
+      track("guide_shown", {
+        trigger: "manual",
+        entry_source: detail?.source ?? "unknown",
+        start_step: next,
+        domestic_rom: rom.domestic,
+      });
     };
     window.addEventListener(OPEN_GUIDE_EVENT, open);
     return () => window.removeEventListener(OPEN_GUIDE_EVENT, open);
-  }, [refresh]);
+  }, [refresh, rom.domestic]);
 
   // 第一步可检测：系统权限一旦通过就自动推进，不让用户做无谓确认。
   useEffect(() => {
@@ -411,12 +435,29 @@ export function NotificationSetupGuide() {
     }
   }, [permission, step, visible]);
 
+  // 每一步只记一次浏览；自动推进或来回切换都不会刷出重复的 step_view。
+  useEffect(() => {
+    if (!visible) return;
+    if (loggedSteps.current.has(step)) return;
+    loggedSteps.current.add(step);
+    track("guide_step_view", {
+      step,
+      step_name: STEP_NAMES[step],
+    });
+  }, [visible, step]);
+
   const dismiss = useCallback(() => {
     // 跳过不立刻标记已看过：前两次关闭只关掉本次，下次启动还会再提示一次；
     // 连按三次才视为「用户明确不想要」，从此只在体检卡里留入口。
-    if (bumpDismissCount() >= DISMISS_LIMIT) writeSeen();
+    const next = bumpDismissCount();
+    if (next >= DISMISS_LIMIT) writeSeen();
     setVisible(false);
-  }, []);
+    track("guide_dismiss", {
+      step,
+      dismiss_count: next,
+      will_auto_show_again: next < DISMISS_LIMIT,
+    });
+  }, [step]);
 
   const finish = useCallback(() => {
     writeSeen();
@@ -426,18 +467,60 @@ export function NotificationSetupGuide() {
       // 计数残留无害：seen 已置位，不会再读它。
     }
     setVisible(false);
+    const durationMs = Date.now() - showStartedAt.current;
+    // 完成时再读一次健康状态：用户可能刚在系统设置里打开了精确闹钟/电池。
+    void readNotificationHealth()
+      .then((health) => {
+        track("guide_complete", {
+          steps_seen: 3,
+          notification_granted: health?.notificationsEnabled ?? false,
+          exact_alarm: health?.exactAlarm ?? false,
+          battery_ignored: health?.batteryIgnored ?? false,
+          duration_ms: Math.max(0, durationMs),
+        });
+      })
+      .catch(() => {
+        track("guide_complete", {
+          steps_seen: 3,
+          duration_ms: Math.max(0, durationMs),
+        });
+      });
     // 引导里可能改了通知/精确闹钟/渠道，完成后主动通知体检卡重读，
     // 否则它的「打开引导」主按钮和检查项会停留在改之前的状态。
     emitRefresh();
     toast.success("设置完成，到点会有横幅、声音和震动");
   }, []);
 
-  const goTo = useCallback((next: Step) => {
-    setStep(next);
-    writeStep(next);
-  }, []);
+  const goTo = useCallback(
+    (next: Step) => {
+      track("guide_step_nav", {
+        from_step: step,
+        to_step: next,
+        direction: next > step ? "next" : "back",
+      });
+      setStep(next);
+      writeStep(next);
+    },
+    [step]
+  );
 
   async function openSetting(command: string) {
+    const target =
+      command === "open_notification_settings"
+        ? "notification"
+        : command === "open_exact_alarm_settings"
+          ? "exact_alarm"
+          : "battery";
+    track("settings_opened", { target, source: `guide_step${step + 1}` });
+    track("guide_step_action", {
+      step,
+      action:
+        command === "open_notification_settings"
+          ? "open_notification_settings"
+          : command === "open_exact_alarm_settings"
+            ? "open_exact_alarm"
+            : "open_battery",
+    });
     setPending(true);
     try {
       await invoke(command);
@@ -450,8 +533,9 @@ export function NotificationSetupGuide() {
 
   async function allowNotifications() {
     setPending(true);
+    track("guide_step_action", { step: 0, action: "allow_notification" });
     try {
-      await request();
+      await request("guide_step1");
       // 系统弹窗返回后立刻读一次；通过则上面的 effect 会自动推进。
       refresh();
     } finally {
@@ -579,7 +663,7 @@ export function NotificationSetupGuide() {
                 {/* 与漏提醒弹窗共用同一套分步引导：同样的路径、同样的跳转。
                     厂商开关读不到状态，每次出现都只请用户按路径检查。 */}
                 <div className="mt-3.5">
-                  <BackgroundGuideCards rom={rom} />
+                  <BackgroundGuideCards rom={rom} source="guide_step3" />
                 </div>
 
                 <div className="mt-2 space-y-1.5">

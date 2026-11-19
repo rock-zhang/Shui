@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   backupError,
   confirmDrinkImport,
@@ -26,6 +27,12 @@ import {
   previewDrinkImport,
   type ImportPreview,
 } from "@/lib/data-backup";
+import {
+  isAnalyticsEnabled,
+  setAnalyticsEnabled as setNativeAnalyticsEnabled,
+  track,
+  trackNow,
+} from "@/lib/analytics";
 import { emitRefresh } from "@/lib/mobile";
 import { MobileRow, MobileSection, MobileSegmented } from "./ui";
 
@@ -46,12 +53,23 @@ export function MeTab() {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [analyticsOn, setAnalyticsOn] = useState(true);
   const locked = useRef(false);
 
   useEffect(() => {
     setMounted(true);
     getVersion().then(setVersion).catch(() => {});
+    isAnalyticsEnabled().then(setAnalyticsOn).catch(() => {});
   }, []);
+
+  async function toggleAnalytics(next: boolean) {
+    if (!next) {
+      // 先等最后一条事件落到原生，再关闭采集；否则这条也会被一起丢掉。
+      await trackNow("analytics_opt_out");
+    }
+    setAnalyticsOn(next);
+    await setNativeAnalyticsEnabled(next);
+  }
 
   async function run(operation: () => Promise<void>) {
     if (locked.current) return;
@@ -74,13 +92,27 @@ export function MeTab() {
       setPreview(null);
       const selected = await previewDrinkImport();
       setPreview(selected);
-      if (!selected) setMessage("已取消选择文件。");
+      if (selected) {
+        track("backup_import_preview", {
+          days: selected.days,
+          new_days: selected.newDays,
+          skipped_days: selected.skippedDays,
+        });
+      } else {
+        setMessage("已取消选择文件。");
+      }
     });
 
   const confirm = () =>
     run(async () => {
       if (!preview) return;
       const receipt = await confirmDrinkImport(preview.token);
+      track("backup_import_confirm", {
+        imported_days: receipt.importedDays,
+        imported_amount: receipt.importedAmount,
+        skipped_days: receipt.skippedDays,
+        already_imported: receipt.alreadyImported,
+      });
       setPreview(null);
       setMessage(
         `${receipt.alreadyImported ? "本次导入已完成" : "导入完成"}：新增 ${receipt.importedDays} 天，共 ${receipt.importedAmount} ml；跳过 ${receipt.skippedDays} 个已有日期。`
@@ -89,9 +121,10 @@ export function MeTab() {
       emitRefresh();
     });
 
-  const openExternal = async (url: string) => {
+  const openExternal = async (url: string, target: "store" | "github") => {
     try {
       await openUrl(url);
+      track("external_link_open", { target });
     } catch {
       toast.info("当前为桌面预览，链接将在原生环境打开");
     }
@@ -101,8 +134,10 @@ export function MeTab() {
     try {
       const info = await invoke("get_app_runtime_info");
       await writeText(JSON.stringify(info));
+      track("app_info_copy", { success: true });
       toast.success("软件信息已复制");
     } catch {
+      track("app_info_copy", { success: false });
       toast.error("复制失败，请稍后重试");
     }
   };
@@ -110,6 +145,9 @@ export function MeTab() {
   const copyContact = async (label: string, value: string) => {
     try {
       await writeText(value);
+      track("contact_copy", {
+        channel: label === "微信号" ? "wechat" : "email",
+      });
       toast.success(`${label}已复制`);
     } catch {
       toast.error("复制失败，请长按手动复制");
@@ -122,7 +160,13 @@ export function MeTab() {
         <MobileSegmented
           value={mounted ? theme ?? "system" : "system"}
           options={THEME_OPTIONS}
-          onChange={setTheme}
+          onChange={(next) => {
+            const current = theme ?? "system";
+            if (next !== current) {
+              track("theme_changed", { from: current, to: next });
+            }
+            setTheme(next);
+          }}
           label="外观主题"
         />
       </MobileSection>
@@ -143,6 +187,9 @@ export function MeTab() {
               onClick={() =>
                 run(async () => {
                   const path = await exportDrinkBackup();
+                  track("backup_export", {
+                    result: path ? "success" : "cancel",
+                  });
                   setMessage(path ? "饮水记录备份已保存。" : "已取消保存备份。");
                 })
               }
@@ -207,6 +254,7 @@ export function MeTab() {
                 className="min-h-11"
                 disabled={busy}
                 onClick={() => {
+                  track("backup_import_cancel");
                   setPreview(null);
                   setMessage("已取消导入，本地记录未修改。");
                 }}
@@ -236,6 +284,27 @@ export function MeTab() {
         </p>
       </MobileSection>
 
+      <MobileSection
+        title="隐私与统计"
+        description="只统计功能使用与崩溃，不包含饮水记录、时间或任何可识别身份的信息"
+      >
+        <MobileRow
+          title="匿名使用统计"
+          description={
+            analyticsOn
+              ? "已开启：帮助我们了解哪些功能真正有用，可随时关闭"
+              : "已关闭：应用不再上报任何使用数据或崩溃信息"
+          }
+          control={
+            <Switch
+              checked={analyticsOn}
+              onCheckedChange={(next) => void toggleAnalytics(next)}
+              aria-label="匿名使用统计"
+            />
+          }
+        />
+      </MobileSection>
+
       <MobileSection title="关于">
         <div className="mb-3 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 p-4 dark:from-blue-950/40 dark:to-indigo-950/30">
           <p className="text-sm leading-6">
@@ -251,7 +320,7 @@ export function MeTab() {
               variant="outline"
               size="sm"
               className="min-h-10"
-              onClick={() => openExternal(STORE_URL)}
+              onClick={() => openExternal(STORE_URL, "store")}
             >
               <ExternalLink className="mr-1 h-3.5 w-3.5" />
               前往商店
@@ -275,7 +344,7 @@ export function MeTab() {
         />
         <button
           type="button"
-          onClick={() => openExternal(GITHUB_URL)}
+          onClick={() => openExternal(GITHUB_URL, "github")}
           className="mt-1 flex min-h-12 w-full items-center gap-2 rounded-xl bg-muted/50 px-3 text-left text-sm"
         >
           <Github className="h-4 w-4 shrink-0" />

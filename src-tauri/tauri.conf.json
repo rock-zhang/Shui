@@ -64,7 +64,10 @@
     ],
     "resources": [
       "icons/**/*"
-    ]
+    ],
+    "macOS": {
+      "signingIdentity": "-"
+    }
   },
   "plugins": {
     "updater": {

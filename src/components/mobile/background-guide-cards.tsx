@@ -4,6 +4,7 @@ import { Fragment, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ChevronRight, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import { track } from "@/lib/analytics";
 import type { RomProfile } from "@/lib/rom";
 
 type Command = "open_autostart_settings" | "open_app_settings";
@@ -15,10 +16,29 @@ type Command = "open_autostart_settings" | "open_app_settings";
  * 给出路径、分别提供入口。厂商开关没有公开 API，App 读不到真实状态，因此
  * 不保存、也不展示「已开启」——每次出现都请用户按路径自己检查一遍。
  */
-export function BackgroundGuideCards({ rom }: { rom: RomProfile }) {
+export function BackgroundGuideCards({
+  rom,
+  source = "unknown",
+}: {
+  rom: RomProfile;
+  /** 埋点来源：三步引导 guide_step3 / 漏提醒弹窗 missed_dialog。 */
+  source?: string;
+}) {
   const [pending, setPending] = useState<Command | null>(null);
 
   async function open(command: Command) {
+    track("settings_opened", {
+      target: command === "open_autostart_settings" ? "autostart" : "app_details",
+      source,
+    });
+    // 只有三步引导内的点击才算 guide_step_action；漏提醒弹窗只是复用同一套卡片。
+    if (source.startsWith("guide")) {
+      track("guide_step_action", {
+        step: 2,
+        action:
+          command === "open_autostart_settings" ? "open_autostart" : "open_app_details",
+      });
+    }
     setPending(command);
     try {
       await invoke(command);

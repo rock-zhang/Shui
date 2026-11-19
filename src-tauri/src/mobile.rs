@@ -422,8 +422,69 @@ pub fn notification_permission_state(
 }
 
 #[tauri::command]
-pub fn request_notification_permission(app: tauri::AppHandle) -> Result<(), String> {
-    native::<Value>(&app, "requestNotificationPermission", json!({})).map(|_| ())
+pub fn request_notification_permission(
+    app: tauri::AppHandle,
+    source: Option<String>,
+) -> Result<(), String> {
+    native::<Value>(
+        &app,
+        "requestNotificationPermission",
+        json!({ "source": source.unwrap_or_else(|| "unknown".to_string()) }),
+    )
+    .map(|_| ())
+}
+
+// ───────────────────────── Firebase 埋点桥 ─────────────────────────
+// 事件与参数由 Kotlin AnalyticsTracker 统一清洗、计数并写入 user properties。
+// 这里只做透传，业务侧（JS/原生）不直接依赖 Firebase SDK。
+
+#[tauri::command]
+pub fn analytics_log(
+    app: tauri::AppHandle,
+    name: String,
+    params: Option<Value>,
+) -> Result<(), String> {
+    native::<Value>(
+        &app,
+        "logAnalyticsEvent",
+        json!({ "name": name, "params": params.unwrap_or_else(|| json!({})) }),
+    )
+    .map(|_| ())
+}
+
+#[tauri::command]
+pub fn analytics_sync_properties(app: tauri::AppHandle) -> Result<(), String> {
+    native::<Value>(&app, "syncAnalyticsProperties", json!({})).map(|_| ())
+}
+
+#[tauri::command]
+pub fn analytics_is_enabled(app: tauri::AppHandle) -> Result<bool, String> {
+    native::<Value>(&app, "analyticsIsEnabled", json!({}))
+        .map(|value| value.get("enabled").and_then(Value::as_bool).unwrap_or(true))
+}
+
+#[tauri::command]
+pub fn analytics_set_enabled(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    native::<Value>(&app, "setAnalyticsEnabled", json!({ "enabled": enabled })).map(|_| ())
+}
+
+#[tauri::command]
+pub fn analytics_record_exception(
+    app: tauri::AppHandle,
+    message: Option<String>,
+    stack: Option<String>,
+    screen: Option<String>,
+) -> Result<(), String> {
+    native::<Value>(
+        &app,
+        "recordAnalyticsException",
+        json!({
+            "message": message.unwrap_or_default(),
+            "stack": stack.unwrap_or_default(),
+            "screen": screen.unwrap_or_default()
+        }),
+    )
+    .map(|_| ())
 }
 
 #[tauri::command]

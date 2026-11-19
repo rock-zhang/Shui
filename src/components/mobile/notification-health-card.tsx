@@ -27,6 +27,7 @@ import {
   type NotificationHealth,
 } from "@/lib/mobile";
 import { romFromHealth } from "@/lib/rom";
+import { track } from "@/lib/analytics";
 import { useNotificationPermission } from "./notification-permission-context";
 import { OPEN_GUIDE_EVENT } from "./notification-setup-guide";
 import { MobileSection } from "./ui";
@@ -236,6 +237,7 @@ export function NotificationHealthCard() {
 
   /** 渠道被系统改坏时重建：这是渠道层面唯一能自愈的手段。 */
   const repair = useCallback(async () => {
+    track("health_item_action", { item: "channel", action: "repair" });
     setBusy("repair");
     try {
       await invoke("repair_notification_channels");
@@ -253,6 +255,7 @@ export function NotificationHealthCard() {
    * 这是唯一能让 isIgnoringBatteryOptimizations 变 true 的 App 内路径。
    */
   const addToWhitelist = useCallback(async () => {
+    track("health_item_action", { item: "battery", action: "add" });
     setBusy("battery");
     try {
       const res = await invoke<{ result: string }>("open_battery_settings");
@@ -272,11 +275,38 @@ export function NotificationHealthCard() {
     if (!diag) return;
     try {
       await navigator.clipboard.writeText(toReport(health, diag));
+      track("health_diagnostics_copy", { result: "success" });
       toast.success("诊断信息已复制");
     } catch {
+      track("health_diagnostics_copy", { result: "failed" });
       toast.error("复制失败，请截图");
     }
   }, [diag, health]);
+
+  // 体检卡浏览一次记一次：用失败项数量做维度，能看出「哪类问题最常见」。
+  const viewLogged = useRef(false);
+  useEffect(() => {
+    if (viewLogged.current || !health || !diag) return;
+    viewLogged.current = true;
+    const channelHealthy =
+      health.channelExists &&
+      health.headsUp &&
+      health.channelSound &&
+      health.channelVibration;
+    const failed =
+      Number(!health.notificationsEnabled) +
+      Number(!health.exactAlarm) +
+      Number(!channelHealthy);
+    track("health_card_view", {
+      failed_items: failed,
+      channel_ok: channelHealthy,
+      overdue_seconds:
+        diag.nextAt > 0
+          ? Math.max(0, Math.round((Date.now() - diag.nextAt) / 1000))
+          : 0,
+      guide_needs_attention: failed > 0 || !channelHealthy,
+    });
+  }, [health, diag]);
 
   if (loading) {
     return (
@@ -340,7 +370,13 @@ export function NotificationHealthCard() {
           size="sm"
           className="min-h-8 px-2.5 text-xs"
           disabled={busy !== null}
-          onClick={() => void request()}
+          onClick={() => {
+            track("health_item_action", {
+              item: "permission",
+              action: canRequest ? "request" : "open_settings",
+            });
+            void request("health_card");
+          }}
         >
           {canRequest ? "允许" : "去开启"}
         </Button>
@@ -358,6 +394,10 @@ export function NotificationHealthCard() {
           className="min-h-8 px-2.5 text-xs"
           disabled={busy !== null}
           onClick={() => {
+            track("health_item_action", {
+              item: "exact_alarm",
+              action: "open_settings",
+            });
             void run("open_exact_alarm_settings", "请允许 Shui 使用「闹钟和提醒」").then(
               () => watchUntil((value) => value.exactAlarm, "精确闹钟已开启")
             );
@@ -384,7 +424,14 @@ export function NotificationHealthCard() {
    * 全部通过后才收起成低调的复查入口——没事可做还吆喝，反而像广告。
    */
   const guideNeedsAttention = todo.length > 0 || !channelOk;
-  const openGuide = () => window.dispatchEvent(new Event(OPEN_GUIDE_EVENT));
+  const openGuide = () => {
+    track("health_item_action", { item: "guide", action: "open_guide" });
+    window.dispatchEvent(
+      new CustomEvent(OPEN_GUIDE_EVENT, {
+        detail: { source: "health_card" },
+      })
+    );
+  };
 
   return (
     <MobileSection
@@ -445,7 +492,13 @@ export function NotificationHealthCard() {
                 variant="outline"
                 className="min-h-8 px-2.5 text-xs"
                 disabled={busy !== null}
-                onClick={() => void run("open_notification_settings")}
+                onClick={() => {
+                  track("health_item_action", {
+                    item: "channel",
+                    action: "open_settings",
+                  });
+                  void run("open_notification_settings");
+                }}
               >
                 去设置
               </Button>
@@ -505,11 +558,17 @@ export function NotificationHealthCard() {
           size="sm"
           className="mt-2 w-full min-h-9 bg-amber-500 text-white shadow-none hover:bg-amber-600 dark:text-amber-950"
           disabled={busy !== null}
-          onClick={() =>
+          onClick={() => {
+            track("health_item_action", {
+              item: "background",
+              action: "open_guide",
+            });
             window.dispatchEvent(
-              new CustomEvent(OPEN_GUIDE_EVENT, { detail: { step: 2 } })
-            )
-          }
+              new CustomEvent(OPEN_GUIDE_EVENT, {
+                detail: { step: 2, source: "health_card" },
+              })
+            );
+          }}
         >
           去检查后台设置
         </Button>
@@ -532,7 +591,13 @@ export function NotificationHealthCard() {
                 : "确认这四项在本机通知设置里都已打开"
             }
             disabled={busy !== null}
-            onClick={() => void run("open_notification_settings", "在这页打开这四项开关")}
+            onClick={() => {
+              track("health_item_action", {
+                item: "channel",
+                action: "open_settings",
+              });
+              void run("open_notification_settings", "在这页打开这四项开关");
+            }}
           />
         </div>
       </div>
