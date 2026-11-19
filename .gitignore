@@ -49,3 +49,4 @@ key.properties
 *.njsproj
 *.sln
 *.sw?
+docs/play-store/
