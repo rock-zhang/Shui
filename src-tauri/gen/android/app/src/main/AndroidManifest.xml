@@ -29,6 +29,17 @@
         android:label="@string/app_name"
         android:theme="@style/Theme.shui"
         android:usesCleartextTraffic="${usesCleartextTraffic}">
+
+        <!-- 本应用不做广告：关闭 Advertising ID 采集与广告个性化信号，
+             把 Data safety 的申报范围压到最小（仅匿名使用统计与崩溃日志）。 -->
+        <meta-data
+            android:name="google_analytics_adid_collection_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="google_analytics_default_allow_ad_personalization_signals"
+            android:value="false" />
+
+
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
             android:launchMode="singleTask"

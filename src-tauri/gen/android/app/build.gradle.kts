@@ -7,6 +7,15 @@ plugins {
     id("rust")
 }
 
+// 只有下载了 google-services.json 才启用 Firebase 插件：
+// 缺少配置时（本地开发 / CI 未注入）项目仍可正常编译，AnalyticsTracker
+// 会在运行时检测不到 FirebaseApp 并整体降级为 no-op。
+val hasFirebaseConfig = file("google-services.json").exists()
+if (hasFirebaseConfig) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
+}
+
 val tauriProperties = Properties().apply {
     val propFile = file("tauri.properties")
     if (propFile.exists()) {
@@ -123,6 +132,11 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.10.1")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.lifecycle:lifecycle-process:2.10.0")
+    // Firebase：版本由 BOM 统一管理；没有 google-services.json 时
+    // FirebaseApp 不会初始化，AnalyticsTracker 会自动跳过上报。
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-crashlytics")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.4")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.0")

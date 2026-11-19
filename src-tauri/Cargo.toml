@@ -16,6 +16,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+# build.rs 读取本地 ga4.local.json 并注入编译期环境变量。
+serde_json = "1"
 
 # ---------------------------------------------------------------------------
 # 平台无关依赖。Android 与桌面共用同一套业务代码（饮水记录 / 统计 / 备份 /
@@ -52,6 +54,10 @@ tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 tauri-plugin-drag = "2"
 tauri-plugin-macos-permissions = "2"
+# 桌面端 GA4 Measurement Protocol 上报（Android 走 Firebase 原生 SDK，
+# 不需要这两个依赖，所以只在非 Android 目标启用）。
+reqwest = { version = "0.13", features = ["json"] }
+uuid = { version = "1", features = ["v4"] }
 # impl-default 不可省：core/setup/windows.rs 用 MSG::default() 初始化消息结构，
 # 该 impl 由 winapi 的 `impl-default` feature 门控。过去它是由已删除的
 # tauri-plugin-sql（sqlx 链路）间接启用的，改成显式声明，避免再次被连带移除。
@@ -73,10 +79,14 @@ windows = { version = "0.48", features = [
 # Scenario::Reminder 常驻 toast，否则收进通知中心后点击不再上报）、macOS 需要
 # actions_label 把折叠下拉的英文 "Options" 改成中文，且动作要在 WebView
 # 之外落盘。版本与 plugin-notification 2.8.1 内部依赖保持一致，避免重复编译。
-[target.'cfg(any(target_os = "macos", windows))'.dependencies]
+[target.'cfg(windows)'.dependencies]
 notify-rust = "4.18"
 
 [target.'cfg(target_os = "macos")'.dependencies]
+# macOS 27 起 NSUserNotificationCenter 对 launchd 拉起的 App 不再投递，
+# 必须走 UNUserNotificationCenter 后端（notify-rust 的 preview-macos-un）。
+notify-rust = { version = "4.18", features = ["preview-macos-un"] }
+mac-usernotifications = "0.3.1"
 tauri-nspanel.workspace = true
 core-foundation = "0.9.4"
 core-graphics = "0.23.1"

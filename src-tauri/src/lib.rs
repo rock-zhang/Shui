@@ -12,6 +12,8 @@ mod timer;
 #[cfg(not(target_os = "android"))]
 mod autostart;
 #[cfg(not(target_os = "android"))]
+mod desktop_analytics;
+#[cfg(not(target_os = "android"))]
 mod startup;
 #[cfg(not(target_os = "android"))]
 mod statistics_export;
@@ -147,6 +149,7 @@ pub fn run() {
         crate::drink_recording::record_drink,
         crate::drink_recording::undo_drink,
         crate::desktop_notification::send_desktop_reminder_notification,
+        crate::desktop_notification::send_desktop_test_notification,
         crate::desktop_notification::get_desktop_notification_state,
         crate::desktop_notification::open_desktop_notification_settings,
         commands::call_reminder,
@@ -164,6 +167,11 @@ pub fn run() {
         commands::get_app_runtime_info,
         commands::get_installed_apps,
         crate::statistics_export::save_drink_history_csv,
+        crate::desktop_analytics::analytics_log,
+        crate::desktop_analytics::analytics_sync_properties,
+        crate::desktop_analytics::analytics_is_enabled,
+        crate::desktop_analytics::analytics_set_enabled,
+        crate::desktop_analytics::analytics_record_exception,
         commands::quit
     ]);
 
@@ -204,6 +212,11 @@ pub fn run() {
         mobile::get_diagnostics,
         mobile::clear_missed_alarm,
         mobile::open_app_settings,
+        mobile::analytics_log,
+        mobile::analytics_sync_properties,
+        mobile::analytics_is_enabled,
+        mobile::analytics_set_enabled,
+        mobile::analytics_record_exception,
         mobile::export_drink_backup,
         mobile::preview_drink_import,
         crate::data_backup::confirm_drink_import,

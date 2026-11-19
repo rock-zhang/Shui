@@ -1,0 +1,6 @@
+{
+  "hosting": {
+    "public": "docs/play-store",
+    "ignore": ["firebase.json", ".firebaserc", "**/.*", "**/node_modules/**", "listing.md"]
+  }
+}
