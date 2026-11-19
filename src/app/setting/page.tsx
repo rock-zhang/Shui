@@ -33,12 +33,7 @@ import {
   sendTestNotification,
   type DesktopNotificationStatus,
 } from "@/utils/notification";
-
-const themeOptions = [
-  { value: "system", label: "跟随系统" },
-  { value: "light", label: "浅色" },
-  { value: "dark", label: "深色" },
-];
+import { useI18n, type LanguagePreference } from "@/lib/i18n";
 
 /** 与 Android config-context 的 setting_changed 参数名保持一致。 */
 const GENERAL_ANALYTICS_KEYS: Record<string, string> = {
@@ -49,6 +44,12 @@ const GENERAL_ANALYTICS_KEYS: Record<string, string> = {
 };
 
 export default function Home() {
+  const { t, preference, setPreference } = useI18n();
+  const themeOptions = [
+    { value: "system", label: t("common.system") },
+    { value: "light", label: t("common.light") },
+    { value: "dark", label: t("common.dark") },
+  ];
   const [config, setConfig] = useState({
     isAutoStart: false,
     isCountDown: false,
@@ -66,10 +67,10 @@ export default function Home() {
     } catch {
       toast.info(
         isMacOS
-          ? "请打开「系统设置 → 通知 → Shui」，开启「允许通知」"
+          ? t("settings.general.notification.openHintMac")
           : isWindows
-            ? "请打开「设置 → 系统 → 通知」，找到 Shui 开启通知"
-            : "请在系统设置的通知页面中找到 Shui 并开启通知"
+            ? t("settings.general.notification.openHintWindows")
+            : t("settings.general.notification.openHintLinux")
       );
     }
   };
@@ -84,11 +85,11 @@ export default function Home() {
     setTestPending(true);
     try {
       await sendTestNotification();
-      toast.info("测试通知已发送；若没看到，请确认系统已允许 Shui 通知", {
+      toast.info(t("settings.general.notification.testSent"), {
         duration: 6000,
       });
     } catch {
-      toast.error("发送测试通知失败，请检查系统通知设置");
+      toast.error(t("settings.general.notification.testFailed"));
     } finally {
       setTestPending(false);
     }
@@ -139,7 +140,7 @@ export default function Home() {
         }));
       } catch (error) {
         console.error("读取通用设置失败:", error);
-        toast.error("读取通用设置失败，请重新打开设置");
+        toast.error(t("settings.general.error.load"));
       } finally {
         setAutoStartPending(false);
       }
@@ -147,7 +148,7 @@ export default function Home() {
 
     loadConfig();
     isAnalyticsEnabled().then(setAnalyticsOn).catch(() => {});
-  }, []);
+  }, [t]);
 
   async function toggleAnalytics(next: boolean) {
     if (!next) {
@@ -194,7 +195,7 @@ export default function Home() {
       await saveConfig("isAutoStart", checked);
     } catch (error) {
       console.error("更新开机自启动失败:", error);
-      toast.error("更新开机自启动失败，请重试");
+      toast.error(t("settings.general.error.autoStart"));
     } finally {
       setAutoStartPending(false);
     }
@@ -207,39 +208,39 @@ export default function Home() {
           tone: "border-destructive/40 bg-destructive/5",
           icon: "text-destructive",
           title: "text-destructive",
-          titleText: "系统通知已被关闭",
-          description:
-            "系统设置中关闭了 Shui 的通知，倒计时结束后你将收不到任何提醒。请打开通知设置重新允许。",
+          titleText: t("settings.general.notification.deniedTitle"),
+          description: t("settings.general.notification.deniedDescription"),
         }
       : {
           tone: "border-amber-500/40 bg-amber-50 dark:bg-amber-950/20",
           icon: "text-amber-600 dark:text-amber-400",
           title: "text-amber-800 dark:text-amber-300",
-          titleText: "系统通知可能不可达",
-          description:
-            "当前使用系统通知提醒。若系统设置中未允许 Shui 发送通知，倒计时结束后你将收不到任何提醒。请在下方开启权限后，再等待下一次提醒验证。",
+          titleText: t("settings.general.notification.unknownTitle"),
+          description: t("settings.general.notification.unknownDescription"),
         };
 
   return (
     <div>
-      <h3 className="mb-4 text-lg font-medium">通用</h3>
+      <h3 className="mb-4 text-lg font-medium">
+        {t("settings.general.title")}
+      </h3>
 
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            开机自启动
+            {t("settings.general.autoStart.title")}
           </label>
           <p
             id=":r233:-form-item-description"
             className="text-[0.8rem] text-muted-foreground"
           >
-            登录后在后台开始倒计时，不弹出窗口；可从托盘打开偏好设置
+            {t("settings.general.autoStart.description")}
           </p>
         </div>
         <Switch
           checked={config.isAutoStart}
           disabled={autoStartPending}
-          aria-label="开机自启动"
+          aria-label={t("settings.general.autoStart.title")}
           onCheckedChange={handleAutoStartChange}
         />
       </div>
@@ -247,13 +248,13 @@ export default function Home() {
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            倒计时
+            {t("settings.general.countdown.title")}
           </label>
           <p
             id=":r233:-form-item-description"
             className="text-[0.8rem] text-muted-foreground"
           >
-            开启后将在菜单栏显示倒计时，支持macOS和linux
+            {t("settings.general.countdown.description")}
           </p>
         </div>
         <Switch
@@ -270,13 +271,13 @@ export default function Home() {
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            全屏提醒
+            {t("settings.general.fullScreen.title")}
           </label>
           <p
             id=":r233:-form-item-description"
             className="text-[0.8rem] text-muted-foreground"
           >
-            开启后将以全屏方式显示提醒，关闭则使用系统通知
+            {t("settings.general.fullScreen.description")}
           </p>
         </div>
         <Switch
@@ -286,10 +287,10 @@ export default function Home() {
             if (!checked) {
               // 关闭全屏提醒的当下就把话说清楚：能否收到取决于系统通知权限。
               // toast 的 action 让用户可以一键直达，不必自己翻系统设置。
-              toast.warning("提醒将改用系统通知，请确认已允许 Shui 发送通知", {
+              toast.warning(t("settings.general.fullScreen.turnOffToast"), {
                 duration: 8000,
                 action: {
-                  label: "去授权",
+                  label: t("settings.general.fullScreen.authorize"),
                   onClick: () => void goToNotificationSettings(),
                 },
               });
@@ -301,18 +302,18 @@ export default function Home() {
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            提醒音效
+            {t("settings.general.sound.title")}
           </label>
           <p
             id=":r233:-form-item-description"
             className="text-[0.8rem] text-muted-foreground"
           >
-            记录饮水后播放一声确认音，关闭后完全静音
+            {t("settings.general.sound.description")}
           </p>
         </div>
         <Switch
           checked={config.isSound}
-          aria-label="提醒音效"
+          aria-label={t("settings.general.sound.title")}
           onCheckedChange={async (checked) => {
             await saveConfig("isSound", checked);
           }}
@@ -342,7 +343,7 @@ export default function Home() {
                   onClick={() => void goToNotificationSettings()}
                 >
                   <ExternalLink className="mr-1.5 size-3.5" />
-                  打开系统通知设置
+                  {t("settings.general.notification.openSettings")}
                 </Button>
                 <Button
                   variant="outline"
@@ -351,18 +352,48 @@ export default function Home() {
                   onClick={() => void sendTest()}
                 >
                   <SendHorizontal className="mr-1.5 size-3.5" />
-                  发送测试通知
+                  {t("settings.general.notification.sendTest")}
                 </Button>
               </div>
             </div>
           </div>
         )}
 
+      <div className="mb-4 flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs">
+        <div>
+          <label className="text-sm font-medium leading-none">
+            {t("settings.general.language.title")}
+          </label>
+          <p className="text-[0.8rem] text-muted-foreground">
+            {t("settings.general.language.description")}
+          </p>
+        </div>
+        <Select
+          value={preference}
+          onValueChange={(next) =>
+            setPreference(next as LanguagePreference)
+          }
+        >
+          <SelectTrigger className="w-[120px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="system">{t("language.system")}</SelectItem>
+              <SelectItem value="zh-CN">{t("language.zh")}</SelectItem>
+              <SelectItem value="en-US">{t("language.en")}</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs">
         <div>
-          <label className="text-sm font-medium leading-none">外观主题</label>
+          <label className="text-sm font-medium leading-none">
+            {t("settings.general.appearance.title")}
+          </label>
           <p className="text-[0.8rem] text-muted-foreground">
-            可选择浅色、深色或跟随系统外观
+            {t("settings.general.appearance.description")}
           </p>
         </div>
         <Select
@@ -371,7 +402,9 @@ export default function Home() {
           onValueChange={setTheme}
         >
           <SelectTrigger className="w-[120px]">
-            <SelectValue placeholder="选择主题" />
+            <SelectValue
+              placeholder={t("settings.general.appearance.placeholder")}
+            />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
@@ -388,15 +421,15 @@ export default function Home() {
       <div className="mt-4 flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs">
         <div>
           <label className="text-sm font-medium leading-none">
-            匿名使用统计
+            {t("settings.general.analytics.title")}
           </label>
           <p className="text-[0.8rem] text-muted-foreground">
-            仅统计功能使用与崩溃，不含饮水记录和时间，可随时关闭
+            {t("settings.general.analytics.description")}
           </p>
         </div>
         <Switch
           checked={analyticsOn}
-          aria-label="匿名使用统计"
+          aria-label={t("settings.general.analytics.title")}
           onCheckedChange={(checked) => void toggleAnalytics(checked)}
         />
       </div>

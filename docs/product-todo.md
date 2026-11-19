@@ -50,13 +50,18 @@
 > 排期说明：先在 1.1 把首次启动流程跑通，再接 i18n，避免词典键随引导改版反复返工；它仍是上架阻塞项，不能拖到发版前。
 
 - **待办**：
-  - [ ] 引入轻量词典（自建 dictionary + Context，不引入 next-intl），先支持 `en` / `zh-CN`，默认跟随系统语言。
-  - [ ] 覆盖 Android 各 tab、全屏提醒页、设置页、引导页、toast 文案。
-  - [ ] 原生侧同步：`ReminderReceiver.kt` 的通知标题 / 副标题 / 按钮文案必须跟随系统语言。
-  - [ ] 桌面端复用同一套词典。
-- **现状**：`src` 下没有任何 i18n 方案，界面文案全部硬编码中文；`src/app/layout.tsx` 写死 `lang="zh-CN"`；商店默认语言定为 en-US。
-- **影响**：英文用户打开即见中文界面和中文通知，几乎必然卸载，还会拉低评分。这是上架前最大的硬伤。
-- **验收**：系统语言为英文时，App 内与通知文案全为英文；切回中文冷启动后恢复中文。
+  - [x] 基础设施：`src/lib/i18n`（localStorage 镜像 + config store `language`）、`I18nProvider`、`useI18n`、中英词典、`html lang` 同步、`tests/i18n.test.cjs`。
+  - [x] 语言切换入口：桌面「设置 → 通用」、移动「我的 → 语言」，支持跟随系统 / 中文 / English。
+  - [x] 试点页面：桌面通用设置、移动端外观与语言区块。
+  - [x] 语言检测：`localeFromLanguageTag` 统一归一化（zh* → zh-CN，其余 → en-US），偏好读取放进 layout effect，首屏绘制前完成切换；桌面主窗口默认隐藏、移动端先渲染骨架，首帧不会出现中文再跳英文。
+  - [x] 桌面提醒设置页翻译。
+  - [ ] 桌面剩余页面：统计、导出/导入等。
+  - [ ] 移动剩余组件：今日、提醒、数据、全屏提醒、通知引导、首启引导、toast。
+  - [ ] 共享纯函数：`reminder-schedule.ts`、`mobile.ts` 返回结构化数据，渲染层翻译。
+  - [ ] Rust：托盘状态、桌面通知标题与按钮、健康文案。
+  - [ ] Kotlin：通知渠道、提醒标题/正文、水量按钮、达标通知。
+- **现状**：语言偏好与词典骨架已就位；桌面通用设置与移动端语言/外观区块已可切换；其余页面仍是中文硬编码。
+- **注意**：首帧固定 zh-CN 再在挂载后切到偏好，避免静态导出 hydration 不一致；桌面主窗口启动时隐藏、移动端先渲染骨架，因此没有可见闪烁。
 
 ### 1.3 禁止横屏（P0，小改动）
 
@@ -147,6 +152,17 @@
 ### 3.5 Health Connect 写入（P2，可选）
 
 - [ ] 能进健康生态，但合规成本高（数据安全表单、隐私政策都要改），不建议第一版做。
+
+### 3.6 邮箱反馈入口（P2）
+
+- **方案**：参考 Easy China 的 `china_travel_essentials/lib/services/feedback_service.dart`。主路径用 `mailto:` 拉起系统邮件客户端并预填主题与正文，不建后端、不自动上传；无邮件客户端时在页面兜底「复制邮箱地址」，不谎报发送成功。
+- **待办**：
+  - [ ] 新增统一的反馈服务封装：收件地址 `hey47_zhang@163.com`、固定英文主题 `Shui - User Feedback`、分类标签（General / Bug Report / Feature Request / Translation Issue / Other）同样固定英文，界面显示文案可本地化。
+  - [ ] 正文只放用户主动填写的内容 + App 版本 + 平台与系统版本（只取首段，不带完整 build 指纹）+ 当前语言；不含设备标识、广告 ID、位置与账号。正文长度上限 4000 字符。
+  - [ ] 拉起结果区分 `opened / noMailApp / failed` 三种，分别提示；`noMailApp` 与 `failed` 提供复制邮箱兜底。
+  - [ ] 入口接到桌面端 [about/page.tsx](../src/app/setting/about/page.tsx) 与安卓 [me-tab.tsx](../src/components/mobile/me-tab.tsx) 的「反馈与联系」区，替换当前只能复制的静态邮箱。
+- **注意**：安卓端需先验证 `mailto:` 经 Tauri opener 或原生 Intent 是否能被系统邮件 App 正常处理，不能处理时直接走复制兜底；不要用 Crashlytics 写日志冒充「提交成功」。
+- **验收**：两端点击「邮箱反馈」能拉起邮件 App 且主题正文已预填；设备无邮件 App 时提示并提供一键复制邮箱。
 
 ---
 

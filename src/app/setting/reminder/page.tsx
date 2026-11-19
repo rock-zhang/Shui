@@ -32,15 +32,26 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { usePlatform } from "@/hooks/use-platform";
 import { track } from "@/lib/analytics";
+import { useI18n } from "@/lib/i18n";
 
 const goldList = ["1000", "1500", "2000", "2500", "3000", "3500", "4000"];
 const gapList = ["10", "20", "30", "45", "60"];
+const weekdayKeys = [
+  "weekday.short.0",
+  "weekday.short.1",
+  "weekday.short.2",
+  "weekday.short.3",
+  "weekday.short.4",
+  "weekday.short.5",
+  "weekday.short.6",
+] as const;
 
 if (process.env.NODE_ENV === "development") {
   gapList.unshift("1");
 }
 
 export default function Home() {
+  const { t } = useI18n();
   const [config, setConfig] = useState({
     gold: goldList[0],
     gap: gapList[0],
@@ -131,18 +142,20 @@ export default function Home() {
 
   return (
     <div>
-      <h3 className="mb-4 text-lg font-medium">提醒</h3>
+      <h3 className="mb-4 text-lg font-medium">
+        {t("settings.reminder.title")}
+      </h3>
 
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            每日目标
+            {t("settings.reminder.goal.title")}
           </label>
           <p
             id=":r233:-form-item-description"
             className="text-[0.8rem] text-muted-foreground"
           >
-            完成目标前将定时提醒
+            {t("settings.reminder.goal.description")}
           </p>
         </div>
         <Select
@@ -153,14 +166,14 @@ export default function Home() {
           defaultValue={config.gold}
         >
           <SelectTrigger className="w-[120px]">
-            <SelectValue placeholder="选择目标" />
+            <SelectValue placeholder={t("settings.reminder.goal.placeholder")} />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
-              <SelectLabel>建议不低于 1500ml</SelectLabel>
+              <SelectLabel>{t("settings.reminder.goal.hint")}</SelectLabel>
               {goldList.map((gold) => (
                 <SelectItem key={gold} value={gold}>
-                  {gold}ml
+                  {t("settings.reminder.goal.option", { amount: gold })}
                 </SelectItem>
               ))}
             </SelectGroup>
@@ -170,7 +183,7 @@ export default function Home() {
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            提醒间隔
+            {t("settings.reminder.gap.title")}
           </label>
           <p
             id=":r233:-form-item-description"
@@ -185,14 +198,16 @@ export default function Home() {
           defaultValue={config.gap}
         >
           <SelectTrigger className="w-[120px]">
-            <SelectValue placeholder="选择间隔" />
+            <SelectValue
+              placeholder={t("settings.reminder.gap.placeholder")}
+            />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
               {/* <SelectLabel>分钟</SelectLabel> */}
               {gapList.map((gap) => (
                 <SelectItem key={gap} value={gap}>
-                  {gap}分钟
+                  {t("settings.reminder.gap.option", { minutes: gap })}
                 </SelectItem>
               ))}
             </SelectGroup>
@@ -203,14 +218,16 @@ export default function Home() {
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            重复
+            {t("settings.reminder.weekdays.title")}
           </label>
-          <p className="text-[0.8rem] text-muted-foreground">按星期提醒</p>
+          <p className="text-[0.8rem] text-muted-foreground">
+            {t("settings.reminder.weekdays.description")}
+          </p>
         </div>
         <div className="flex gap-2">
-          {["日", "一", "二", "三", "四", "五", "六"].map((day, index) => (
+          {weekdayKeys.map((key, index) => (
             <button
-              key={day}
+              key={key}
               className={`h-8 w-8 rounded-full text-sm font-medium transition-colors cursor-pointer
                 ${
                   config.weekdays?.includes(index)
@@ -226,7 +243,7 @@ export default function Home() {
                 saveConfig("weekdays", newWeekdays);
               }}
             >
-              {day}
+              {t(key)}
             </button>
           ))}
         </div>
@@ -235,10 +252,10 @@ export default function Home() {
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            时间范围
+            {t("settings.reminder.time.title")}
           </label>
           <p className="text-[0.8rem] text-muted-foreground">
-            仅在指定时间段内提醒
+            {t("settings.reminder.time.description")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -255,7 +272,9 @@ export default function Home() {
             defaultValue={config.timeStart}
           >
             <SelectTrigger className="w-[90px]">
-              <SelectValue placeholder="开始时间" />
+              <SelectValue
+                placeholder={t("settings.reminder.time.start")}
+              />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
@@ -267,7 +286,9 @@ export default function Home() {
               </SelectGroup>
             </SelectContent>
           </Select>
-          <span className="text-sm text-muted-foreground">至</span>
+          <span className="text-sm text-muted-foreground">
+            {t("settings.reminder.time.separator")}
+          </span>
           <Select
             value={config.timeEnd}
             onValueChange={(value) => {
@@ -276,7 +297,7 @@ export default function Home() {
             defaultValue={config.timeEnd}
           >
             <SelectTrigger className="w-[90px]">
-              <SelectValue placeholder="结束时间" />
+              <SelectValue placeholder={t("settings.reminder.time.end")} />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
@@ -298,10 +319,10 @@ export default function Home() {
         <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
           <div>
             <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-              应用白名单
+              {t("settings.reminder.whitelist.title")}
             </label>
             <p className="text-[0.8rem] text-muted-foreground">
-              在这些应用活跃时暂停提醒
+              {t("settings.reminder.whitelist.description")}
             </p>
           </div>
           <Popover>
@@ -322,7 +343,9 @@ export default function Home() {
                       </Badge>
                     ))
                   ) : (
-                    <span className="text-muted-foreground">选择应用</span>
+                    <span className="text-muted-foreground">
+                      {t("settings.reminder.whitelist.placeholder")}
+                    </span>
                   )}
                 </div>
                 <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
@@ -333,8 +356,12 @@ export default function Home() {
               style={{ maxHeight: "300px" }}
             >
               <Command>
-                <CommandInput placeholder="搜索应用..." />
-                <CommandEmpty>未找到应用</CommandEmpty>
+                <CommandInput
+                  placeholder={t("settings.reminder.whitelist.search")}
+                />
+                <CommandEmpty>
+                  {t("settings.reminder.whitelist.empty")}
+                </CommandEmpty>
                 <CommandGroup className="max-h-[250px] overflow-y-auto">
                   {installedApps.map((app) => (
                     <CommandItem

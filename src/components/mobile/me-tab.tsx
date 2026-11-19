@@ -34,18 +34,19 @@ import {
   trackNow,
 } from "@/lib/analytics";
 import { emitRefresh } from "@/lib/mobile";
+import { useI18n, type LanguagePreference } from "@/lib/i18n";
 import { MobileRow, MobileSection, MobileSegmented } from "./ui";
-
-const THEME_OPTIONS = [
-  { value: "system", label: "跟随系统" },
-  { value: "light", label: "浅色" },
-  { value: "dark", label: "深色" },
-];
 
 const GITHUB_URL = "https://github.com/rock-zhang/Shui";
 const STORE_URL = "https://play.google.com/store/apps/details?id=com.shui.app";
 
 export function MeTab() {
+  const { t, preference, setPreference } = useI18n();
+  const themeOptions = [
+    { value: "system", label: t("common.system") },
+    { value: "light", label: t("common.light") },
+    { value: "dark", label: t("common.dark") },
+  ];
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [version, setVersion] = useState("");
@@ -156,10 +157,13 @@ export function MeTab() {
 
   return (
     <>
-      <MobileSection title="外观" description="浅色、深色或跟随系统">
+      <MobileSection
+        title={t("settings.general.appearance.title")}
+        description={t("settings.general.appearance.description")}
+      >
         <MobileSegmented
           value={mounted ? theme ?? "system" : "system"}
-          options={THEME_OPTIONS}
+          options={themeOptions}
           onChange={(next) => {
             const current = theme ?? "system";
             if (next !== current) {
@@ -167,7 +171,25 @@ export function MeTab() {
             }
             setTheme(next);
           }}
-          label="外观主题"
+          label={t("settings.general.appearance.title")}
+        />
+      </MobileSection>
+
+      <MobileSection
+        title={t("language.title")}
+        description={t("language.description")}
+      >
+        <MobileSegmented
+          value={preference}
+          options={[
+            { value: "system", label: t("language.system") },
+            { value: "zh-CN", label: t("language.zh") },
+            { value: "en-US", label: t("language.en") },
+          ]}
+          onChange={(next) =>
+            setPreference(next as LanguagePreference)
+          }
+          label={t("language.title")}
         />
       </MobileSection>
 
