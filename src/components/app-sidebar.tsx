@@ -44,14 +44,14 @@ const items = [
     icon: DatabaseBackup,
   },
   {
-    title: "关于",
-    url: "/setting/about/",
-    icon: Info,
-  },
-  {
     title: "统计",
     url: "/setting/statistics/",
     icon: ChartNoAxesCombined,
+  },
+  {
+    title: "关于",
+    url: "/setting/about/",
+    icon: Info,
   },
 ];
 

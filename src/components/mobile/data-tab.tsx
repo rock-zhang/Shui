@@ -1,19 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { load } from "@tauri-apps/plugin-store";
-import { Download } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { useDrinkData } from "@/hooks/use-drink-data";
-import { STORE_NAME } from "@/lib/constants";
 import {
-  exportDrinkHistoryCsv,
   type DrinkDaySummary,
   type DrinkPatternAnalysis,
 } from "@/lib/drink-history";
-import type { DrinkHistoryValue } from "@/lib/drink-day";
 import type { ReminderSummary } from "@/lib/reminder-history";
 import { MobileEmpty, MobileSection, MobileSegmented, MobileStat } from "./ui";
 import { cn } from "@/lib/utils";
@@ -215,52 +207,12 @@ export function DataTab() {
     summary,
     loading,
     error,
-    reload,
     goal,
   } = useDrinkData(period);
   // 全新安装每天都会写入当天目标；只有从桌面导入的旧格式数字总量才缺少它。
   const hasLegacyData = days.some(
     (day) => day.total > 0 && !day.hasHistoricalGoal
   );
-  const [exporting, setExporting] = useState(false);
-
-  async function handleExport() {
-    setExporting(true);
-    try {
-      const [configStore, historyStore] = await Promise.all([
-        load(STORE_NAME.config, { autoSave: false }),
-        load(STORE_NAME.drink_history, { autoSave: false }),
-      ]);
-      const [alertConfig, entries] = await Promise.all([
-        configStore.get<{ gold?: string | number }>("alert"),
-        historyStore.entries<DrinkHistoryValue>(),
-      ]);
-      const historyEntries = entries.filter(([key]) => /^\d{8}$/.test(key));
-      if (historyEntries.length === 0) {
-        track("data_export_csv", { result: "empty", days: 0 });
-        toast.info("还没有可导出的饮水记录");
-        return;
-      }
-      const csv = exportDrinkHistoryCsv(
-        historyEntries,
-        Number(alertConfig?.gold) || 0
-      );
-      const saved = await invoke<string | null>("save_drink_history_csv", {
-        content: csv,
-      });
-      track("data_export_csv", {
-        result: saved ? "success" : "cancel",
-        days: historyEntries.length,
-      });
-      if (saved) toast.success("饮水记录已导出");
-    } catch (failure) {
-      console.error("导出饮水记录失败", failure);
-      track("data_export_csv", { result: "failed", days: 0 });
-      toast.error("导出失败，请稍后重试或检查系统分享是否可用");
-    } finally {
-      setExporting(false);
-    }
-  }
 
   return (
     <>
@@ -284,27 +236,6 @@ export function DataTab() {
             value={loading ? "--" : summary.completedDays}
             unit="天"
           />
-        </div>
-        <div className="mt-3 flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="min-h-10 flex-1"
-            disabled={loading}
-            onClick={reload}
-          >
-            刷新
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="min-h-10 flex-1"
-            disabled={exporting}
-            onClick={handleExport}
-          >
-            <Download className="mr-1 h-3.5 w-3.5" />
-            {exporting ? "导出中" : "导出 CSV"}
-          </Button>
         </div>
       </MobileSection>
 

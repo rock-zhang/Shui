@@ -168,6 +168,8 @@ export function MobileApp() {
     if (previous !== next) {
       screenView(next, previous, true);
       tabRef.current = next;
+      // 数据 tab 常驻挂载，切回来不会重新读取统计；进入时主动刷新一次。
+      if (next === "data") emitRefresh();
     }
     setTab(next);
     try {
