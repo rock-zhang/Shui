@@ -13,6 +13,10 @@ import {
   type MobileTabId,
 } from "@/lib/mobile";
 import {
+  readOnboardingSeen,
+  type OnboardingOutcome,
+} from "@/lib/onboarding";
+import {
   installErrorTracking,
   screenView,
   syncAnalyticsProperties,
@@ -27,6 +31,7 @@ import { DataTab } from "./data-tab";
 import { MeTab } from "./me-tab";
 import { FullscreenReminder } from "./fullscreen-reminder";
 import { NotificationSetupGuide } from "./notification-setup-guide";
+import { OnboardingTour } from "./onboarding-tour";
 import { MissedAlarmDialog } from "./missed-alarm-dialog";
 
 const HEADERS: Record<MobileTabId, { title: string; subtitle: string }> = {
@@ -138,6 +143,10 @@ export function MobileApp() {
   const [activeReminder, setActiveReminder] = useState<ActiveReminder | undefined>(
     undefined
   );
+  // 首启引导走完后才挂载通知三步引导，避免两个浮层同帧抢首屏。
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const [onboardingCleared, setOnboardingCleared] = useState(false);
+  const [notificationGuideReady, setNotificationGuideReady] = useState(false);
   const tabRef = useRef<MobileTabId>("today");
   // 系统栏底色 / 图标明暗跟随 App 内主题，避免亮色系统下出现紫色状态栏。
   useSystemBars();
@@ -186,6 +195,31 @@ export function MobileApp() {
     const node = scrollNodes.current[tab];
     if (node) node.scrollTop = scrollOffsets.current[tab] ?? 0;
   }, [tab]);
+
+  // 全新安装：先切到「提醒」页再开始引导，高亮目标必须在当前可见 tab 里。
+  useEffect(() => {
+    if (readOnboardingSeen()) {
+      setOnboardingCleared(true);
+      return;
+    }
+    changeTab("reminder");
+    setOnboardingOpen(true);
+  }, [changeTab]);
+
+  const finishOnboarding = useCallback((outcome: OnboardingOutcome) => {
+    setOnboardingOpen(false);
+    // 只有走完，或连按三次跳过后才放行通知引导；单次跳过留到下次启动。
+    if (outcome === "completed" || outcome === "limit") {
+      setOnboardingCleared(true);
+    }
+  }, []);
+
+  // 引导结束/放弃后留出关闭动画时间，再让通知引导自动弹。
+  useEffect(() => {
+    if (!onboardingCleared) return;
+    const timer = window.setTimeout(() => setNotificationGuideReady(true), 400);
+    return () => window.clearTimeout(timer);
+  }, [onboardingCleared]);
 
   const openReminder = useCallback(
     (trigger: ReminderTrigger) => setActiveReminder({ session: null, trigger }),
@@ -250,8 +284,12 @@ export function MobileApp() {
             ))}
           </main>
 
-          <NotificationSetupGuide />
+          {notificationGuideReady && <NotificationSetupGuide />}
           <MissedAlarmDialog />
+
+          {onboardingOpen && (
+            <OnboardingTour open onDone={finishOnboarding} />
+          )}
 
           <MobileTabBar active={tab} onChange={changeTab} />
           <Toaster

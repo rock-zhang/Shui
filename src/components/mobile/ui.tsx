@@ -9,14 +9,18 @@ export function MobileSection({
   description,
   children,
   className,
+  tourId,
 }: {
   title?: string;
   description?: string;
   children: ReactNode;
   className?: string;
+  /** 首次引导的高亮锚点；只有个性化引导会读它。 */
+  tourId?: string;
 }) {
   return (
     <section
+      data-onboarding={tourId}
       className={cn(
         "mb-3 rounded-2xl border border-border/70 bg-card p-4 shadow-sm",
         className
@@ -92,13 +96,19 @@ export function MobileTimeInput({
   label,
   value,
   onChange,
+  tourId,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  /** 首次引导的高亮锚点；开始与结束时间各占一步。 */
+  tourId?: string;
 }) {
   return (
-    <div className="flex min-h-11 min-w-0 flex-1 items-stretch rounded-xl border border-input bg-background pl-3 pr-4">
+    <div
+      data-onboarding={tourId}
+      className="flex min-h-11 min-w-0 flex-1 items-stretch rounded-xl border border-input bg-background pl-3 pr-4"
+    >
       <input
         type="time"
         aria-label={label}

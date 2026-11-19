@@ -111,6 +111,7 @@ export function ReminderTab() {
       <MobileSection
         title="每日目标"
         description="达成目标后不再重复提醒，建议不低于 1500ml"
+        tourId="goal"
       >
         <div className="mobile-scroll-x flex gap-2 overflow-x-auto overflow-y-hidden pb-1">
           {GOLD_OPTIONS.map((value) => (
@@ -129,6 +130,7 @@ export function ReminderTab() {
       <MobileSection
         title="提醒间隔"
         description="每隔设定时间提醒一次，单位为分钟"
+        tourId="gap"
       >
         <div className="grid grid-cols-5 gap-1.5">
           {GAP_OPTIONS.map((value) => (
@@ -146,7 +148,11 @@ export function ReminderTab() {
         </div>
       </MobileSection>
 
-      <MobileSection title="重复" description="不选择任何一天则每天提醒">
+      <MobileSection
+        title="重复"
+        description="不选择任何一天则每天提醒"
+        tourId="weekdays"
+      >
         <div className="grid grid-cols-7 gap-1.5">
           {WEEKDAY_LABELS.map((label, day) => {
             const selected = (alert.weekdays ?? []).includes(day);
@@ -176,12 +182,14 @@ export function ReminderTab() {
             label="开始时间"
             value={alert.timeStart}
             onChange={(value) => patchAlert({ timeStart: value })}
+            tourId="timeStart"
           />
           <span className="shrink-0 text-xs text-muted-foreground">至</span>
           <MobileTimeInput
             label="结束时间"
             value={alert.timeEnd}
             onChange={(value) => patchAlert({ timeEnd: value })}
+            tourId="timeEnd"
           />
         </div>
       </MobileSection>
