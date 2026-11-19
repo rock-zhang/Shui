@@ -1,0 +1,281 @@
+<!doctype html>
+<!--
+  Shui 隐私政策 / Privacy Policy
+  ---------------------------------------------------------------
+  托管方式（任选其一，得到公开 URL 后填进 Play Console）：
+  1) GitHub Pages：把本文件放到仓库 docs/ 或 gh-pages 分支，在
+     Settings → Pages 里选择分支与目录，URL 形如
+     https://<user>.github.io/<repo>/privacy-policy.html
+  2) Cloudflare Pages / Netlify / Vercel：新建静态站点，拖入本文件即可
+  3) 自己的域名：上传到任意静态服务器
+  要求：URL 无需登录即可访问，不能是 PDF 下载链接。
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shui 隐私政策 / Privacy Policy</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #0b1f33;
+    --muted: #5a7184;
+    --line: #e3edf6;
+    --accent: #1573c4;
+    --soft: #f4f9fe;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #020618;
+      --fg: #e8f1f9;
+      --muted: #93a7ba;
+      --line: #1c2b3f;
+      --accent: #61b0f2;
+      --soft: #0a1424;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.75;
+    font-size: 16px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 56px 24px 96px; }
+  header { border-bottom: 1px solid var(--line); padding-bottom: 28px; margin-bottom: 36px; }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .mark {
+    width: 40px; height: 40px; border-radius: 12px; background: var(--soft);
+    display: grid; place-items: center; font-size: 22px; font-weight: 600;
+    color: var(--fg); border: 1px solid var(--line);
+  }
+  .brand-name { font-size: 18px; font-weight: 600; letter-spacing: .02em; }
+  h1 { font-size: 30px; line-height: 1.3; margin: 0 0 10px; letter-spacing: -.01em; }
+  .meta { color: var(--muted); font-size: 14px; margin: 0; }
+  .switch { display: flex; gap: 8px; margin: 24px 0 0; }
+  .switch button {
+    appearance: none; border: 1px solid var(--line); background: transparent;
+    color: var(--muted); font: inherit; font-size: 13px; padding: 6px 14px;
+    border-radius: 999px; cursor: pointer;
+  }
+  .switch button[aria-pressed="true"] {
+    background: var(--soft); color: var(--accent); border-color: transparent; font-weight: 600;
+  }
+  h2 { font-size: 19px; margin: 40px 0 12px; letter-spacing: -.005em; }
+  h3 { font-size: 16px; margin: 24px 0 8px; }
+  p { margin: 0 0 14px; }
+  ul { margin: 0 0 16px; padding-left: 22px; }
+  li { margin: 0 0 8px; }
+  a { color: var(--accent); text-decoration: none; word-break: break-word; }
+  a:hover { text-decoration: underline; }
+  .callout {
+    background: var(--soft); border-radius: 14px; padding: 18px 20px;
+    margin: 24px 0; border: 1px solid var(--line);
+  }
+  .callout p:last-child { margin-bottom: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 20px; font-size: 15px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; letter-spacing: .02em; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px;
+    background: var(--soft); padding: 2px 6px; border-radius: 6px;
+  }
+  footer { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="mark">水</div>
+      <div class="brand-name">Shui</div>
+    </div>
+    <h1 id="title">Privacy Policy</h1>
+    <p class="meta" id="meta">Effective: November 19, 2026 · Applies to: Shui for Android (package com.shui.app)</p>
+    <div class="switch" role="group" aria-label="Language">
+      <button type="button" id="btn-en" aria-pressed="true">English</button>
+      <button type="button" id="btn-zh" aria-pressed="false">简体中文</button>
+    </div>
+  </header>
+
+  <!-- ===================== 中文 ===================== -->
+  <main id="doc-zh" hidden>
+    <div class="callout">
+      <p><strong>一句话概括：Shui 不收集、不上传、不共享你的任何个人数据。</strong>饮水记录、提醒设置和统计结果全部保存在你手机上的应用私有目录里，开发者无法访问。</p>
+    </div>
+
+    <h2>1. 我们存储哪些数据</h2>
+    <p>为了提供喝水提醒与记录功能，Shui 会在你的设备本地保存以下内容：</p>
+    <ul>
+      <li>饮水记录：每一杯的时间、水量（50 / 100 / 200 / 300 ml）、当日目标与撤销标记；</li>
+      <li>提醒设置：提醒间隔、重复日、生效时段、勿扰时段、暂停状态；</li>
+      <li>功能偏好：全屏提醒或系统通知、提醒音效开关、每日目标、外观主题；</li>
+      <li>提醒记录：提醒触发、确认、跳过、超时的时间与展示时长；</li>
+      <li>你主动创建的 JSON 备份文件或导出的 CSV 文件（仅在你操作时生成）。</li>
+    </ul>
+    <p>以上数据均存放在 Android 应用私有存储区（<code>files/</code> 等目录）中，其他应用无法读取，开发者也没有任何服务器接收这些数据。</p>
+
+    <h2>2. 我们不收集什么</h2>
+    <p>Shui <strong>不会</strong>收集或上传以下任何信息：</p>
+    <ul>
+      <li>姓名、邮箱、电话号码或任何账号信息（应用没有账号体系，无需注册）；</li>
+      <li>精确或粗略地理位置；</li>
+      <li>设备标识符、IMEI、MAC 地址、Android 广告 ID；</li>
+      <li>通讯录、短信、通话记录、照片或文件；</li>
+      <li>使用行为分析、崩溃日志、页面停留时长等统计信息；</li>
+      <li>已安装应用列表。</li>
+    </ul>
+    <p>应用内没有任何第三方分析、广告、推送或社交 SDK。</p>
+
+    <h2>3. 权限及用途</h2>
+    <p>Shui 申请的 Android 权限均有明确、单一用途，且只在实现对应功能时使用：</p>
+    <table>
+      <thead><tr><th>权限</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td>通知（POST_NOTIFICATIONS）</td><td>应用退到后台时，用系统通知提醒你喝水，并在通知栏提供「记一杯水」按钮。</td></tr>
+        <tr><td>精确闹钟（SCHEDULE_EXACT_ALARM）</td><td>按照你设置的间隔，准时触发提醒。非精确闹钟可能延迟 15 分钟以上，会让提醒节奏失效。</td></tr>
+        <tr><td>开机自启（RECEIVE_BOOT_COMPLETED）</td><td>手机重启后重建你已有的提醒闹钟，避免重启后不再提醒。</td></tr>
+        <tr><td>振动（VIBRATE）</td><td>提醒时按你的设置提供振动反馈。</td></tr>
+        <tr><td>忽略电池优化（REQUEST_IGNORE_BATTERY_OPTIMIZATIONS）</td><td>仅在你在应用内主动点击「改善后台提醒」时跳转系统设置页，避免系统省电策略拦截提醒。应用不会读取你的电池设置内容。</td></tr>
+        <tr><td>网络（INTERNET）</td><td>Android WebView 渲染本地界面所需的基础权限。应用不向任何服务器发送数据，也没有后端服务。</td></tr>
+      </tbody>
+    </table>
+    <p>应用还会在「改善后台提醒」引导中打开系统设置页或厂商的自启动管理页，这只是跳转，不会读取这些页面中的任何信息。</p>
+
+    <h2>4. 数据导出与备份</h2>
+    <p>CSV 导出与 JSON 备份都由你主动触发。生成的文件会通过 Android 系统分享面板交给你选择的其他应用或存储位置。文件内容只包含你自己的饮水记录与设置，不包含任何设备标识或个人信息。开发者无法得知你导出了什么、导给了谁。</p>
+
+    <h2>5. 第三方服务</h2>
+    <p>Shui 不集成广告、分析、崩溃上报、推送或社交登录等第三方服务。应用依赖的开源组件（Tauri、React 等）全部在设备本地运行，不会向外部传输数据。</p>
+
+    <h2>6. 儿童隐私</h2>
+    <p>Shui 面向成年人设计，不面向 13 岁以下儿童，也不会主动收集儿童的个人信息。由于应用本身不收集任何用户数据，不存在针对儿童的专项数据处理。</p>
+
+    <h2>7. 数据删除</h2>
+    <p>你的数据只存在于设备本地，因此删除方式完全由你掌控：</p>
+    <ul>
+      <li>在应用内删除单条饮水记录；</li>
+      <li>清除应用数据（系统设置 → 应用 → Shui → 存储 → 清除数据）；</li>
+      <li>卸载应用，所有本地数据随之删除。</li>
+    </ul>
+    <p>由于开发者从未获取你的数据，无需也无法代为删除。</p>
+
+    <h2>8. 政策变更</h2>
+    <p>如果本政策发生实质性变更，我们会更新本页面顶部的生效日期，并在应用更新说明中注明。继续使用应用即表示你接受更新后的政策。</p>
+
+    <h2>9. 联系我们</h2>
+    <p>对本政策有任何疑问，请联系：<a href="mailto:hey47_zhang@163.com">hey47_zhang@163.com</a></p>
+  </main>
+
+  <!-- ===================== English ===================== -->
+  <main id="doc-en">
+    <div class="callout">
+      <p><strong>In one sentence: Shui does not collect, upload, or share any personal data.</strong> Your drink records, reminder settings and statistics stay in the app's private storage on your device. The developer has no access to them.</p>
+    </div>
+
+    <h2>1. What we store</h2>
+    <p>To provide hydration reminders and tracking, Shui stores the following locally on your device:</p>
+    <ul>
+      <li>Drink records: time, volume (50 / 100 / 200 / 300 ml), daily goal and undo flags;</li>
+      <li>Reminder settings: interval, repeat days, active hours, do-not-disturb window, pause state;</li>
+      <li>Preferences: full-screen reminder or system notification, sound on/off, daily goal, theme;</li>
+      <li>Reminder history: when reminders fired, were confirmed, skipped or timed out, and how long they were shown;</li>
+      <li>JSON backups and CSV exports — created only when you explicitly ask for them.</li>
+    </ul>
+    <p>All of this lives in Android's app-private storage (e.g. the <code>files/</code> directory). Other apps cannot read it, and there is no server that receives it.</p>
+
+    <h2>2. What we do not collect</h2>
+    <p>Shui does <strong>not</strong> collect or transmit:</p>
+    <ul>
+      <li>Name, email address, phone number, or any account information — there is no sign-up;</li>
+      <li>Precise or approximate location;</li>
+      <li>Device identifiers, IMEI, MAC address, or the Android advertising ID;</li>
+      <li>Contacts, SMS, call logs, photos, or files;</li>
+      <li>Usage analytics, crash reports, or behavioural metrics;</li>
+      <li>Your list of installed apps.</li>
+    </ul>
+    <p>The app contains no third-party analytics, advertising, push-notification, or social SDKs.</p>
+
+    <h2>3. Permissions and why we need them</h2>
+    <table>
+      <thead><tr><th>Permission</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>Notifications (POST_NOTIFICATIONS)</td><td>Deliver hydration reminders as system notifications while the app is in the background, including a "log a glass" action.</td></tr>
+        <tr><td>Exact alarms (SCHEDULE_EXACT_ALARM)</td><td>Fire reminders at the exact interval you configure. Inexact alarms can drift by 15 minutes or more, which would break the reminder cadence.</td></tr>
+        <tr><td>Boot completed (RECEIVE_BOOT_COMPLETED)</td><td>Rebuild your scheduled reminders after the device restarts.</td></tr>
+        <tr><td>Vibrate (VIBRATE)</td><td>Provide haptic feedback for reminders, according to your settings.</td></tr>
+        <tr><td>Ignore battery optimizations (REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)</td><td>Only opened when you tap "improve background reliability" inside the app, so system power saving does not drop reminder alarms. The app never reads your battery settings.</td></tr>
+        <tr><td>Internet (INTERNET)</td><td>Required by the Android WebView that renders the local interface. The app sends no data to any server and has no backend.</td></tr>
+      </tbody>
+    </table>
+    <p>Our in-app guidance may open system settings or a manufacturer auto-start screen. This is only a navigation shortcut; the app does not read any information from those screens.</p>
+
+    <h2>4. Exports and backups</h2>
+    <p>CSV exports and JSON backups are triggered only by you. The resulting file is handed to the app or storage location you choose through the Android share sheet. It contains only your own drink records and settings — no device identifiers, no personal information. The developer cannot see what you export or where it goes.</p>
+
+    <h2>5. Third-party services</h2>
+    <p>Shui integrates no advertising, analytics, crash-reporting, push, or social-login services. The open-source components it uses (Tauri, React, and others) run entirely on your device and transmit nothing.</p>
+
+    <h2>6. Children's privacy</h2>
+    <p>Shui is designed for adults, is not directed to children under 13, and does not knowingly collect any information from children. Because the app collects no user data at all, no special handling for children's data is involved.</p>
+
+    <h2>7. Deleting your data</h2>
+    <p>Your data exists only on your device, so you are in full control:</p>
+    <ul>
+      <li>Delete individual drink records inside the app;</li>
+      <li>Clear app data (Settings → Apps → Shui → Storage → Clear data);</li>
+      <li>Uninstall the app — all local data is removed.</li>
+    </ul>
+    <p>The developer never receives your data and therefore cannot delete it on your behalf.</p>
+
+    <h2>8. Changes to this policy</h2>
+    <p>If this policy changes materially, we will update the effective date at the top of this page and note the change in the app's release notes. Continued use of the app means you accept the updated policy.</p>
+
+    <h2>9. Contact</h2>
+    <p>Questions about this policy? Email <a href="mailto:hey47_zhang@163.com">hey47_zhang@163.com</a>.</p>
+  </main>
+
+  <footer>
+    <p>Shui · <span id="footer-note">This page is available in Chinese and English. In case of conflict, the Chinese version prevails.</span></p>
+  </footer>
+</div>
+
+<script>
+  (function () {
+    var zh = document.getElementById('doc-zh');
+    var en = document.getElementById('doc-en');
+    var bz = document.getElementById('btn-zh');
+    var be = document.getElementById('btn-en');
+    var title = document.getElementById('title');
+    var meta = document.getElementById('meta');
+    var note = document.getElementById('footer-note');
+
+    function select(lang) {
+      var isZh = lang === 'zh';
+      zh.hidden = !isZh;
+      en.hidden = isZh;
+      bz.setAttribute('aria-pressed', String(isZh));
+      be.setAttribute('aria-pressed', String(!isZh));
+      title.textContent = isZh ? '隐私政策' : 'Privacy Policy';
+      meta.textContent = isZh
+        ? '生效日期：2026 年 11 月 19 日 · 适用应用：Shui（Android，包名 com.shui.app）'
+        : 'Effective: November 19, 2026 · Applies to: Shui for Android (package com.shui.app)';
+      note.textContent = isZh
+        ? '本页面同时提供中文与英文版本，如有歧义以中文版本为准。'
+        : 'This page is available in Chinese and English. In case of conflict, the Chinese version prevails.';
+      document.documentElement.lang = isZh ? 'zh-CN' : 'en';
+    }
+
+    bz.addEventListener('click', function () { select('zh'); });
+    be.addEventListener('click', function () { select('en'); });
+
+    select('en');
+  })();
+</script>
+</body>
+</html>

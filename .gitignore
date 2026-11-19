@@ -36,6 +36,9 @@ README-ANDROID.en.md
 *.keystore
 key.properties
 
+# Firebase CLI 本地缓存（部署时自动生成）
+/.firebase/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
