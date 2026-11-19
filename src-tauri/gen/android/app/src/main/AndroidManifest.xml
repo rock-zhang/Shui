@@ -30,6 +30,12 @@
         android:theme="@style/Theme.shui"
         android:usesCleartextTraffic="${usesCleartextTraffic}">
 
+        <!-- targetSdk 36 在最小宽度 ≥600dp 的大屏上默认忽略方向锁定。
+             声明该属性后，系统继续尊重下面的 screenOrientation（手机与平板均锁定竖屏）。 -->
+        <property
+            android:name="android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY"
+            android:value="true" />
+
         <!-- 本应用不做广告：关闭 Advertising ID 采集与广告个性化信号，
              把 Data safety 的申报范围压到最小（仅匿名使用统计与崩溃日志）。 -->
         <meta-data
@@ -43,6 +49,7 @@
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
             android:launchMode="singleTask"
+            android:screenOrientation="portrait"
             android:label="@string/main_activity_title"
             android:name=".MainActivity"
             android:exported="true">
