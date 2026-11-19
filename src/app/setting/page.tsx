@@ -2,7 +2,7 @@
 
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ExternalLink } from "lucide-react";
+import { AlertTriangle, ExternalLink, SendHorizontal } from "lucide-react";
 import { useEffect, useCallback, useState } from "react";
 import { load } from "@tauri-apps/plugin-store";
 import { useTray } from "@/hooks/use-tray";
@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import {
   getDesktopNotificationState,
   openNotificationSettings,
+  sendTestNotification,
   type DesktopNotificationStatus,
 } from "@/utils/notification";
 
@@ -38,6 +39,7 @@ export default function Home() {
     isAutoStart: false,
     isCountDown: false,
     isFullScreen: false, // 新增全屏提醒选项
+    isSound: true,
   });
   const { isWindows, isMacOS, isMobile, isTauri } = usePlatform();
 
@@ -59,6 +61,23 @@ export default function Home() {
   };
   const [notificationStatus, setNotificationStatus] =
     useState<DesktopNotificationStatus | null>(null);
+  const [testPending, setTestPending] = useState(false);
+
+  // 发一条测试通知：macOS 会顺带请求一次授权，用户从系统弹窗回来后靠
+  // window focus 重新读取状态，警告卡片会自动消失。
+  const sendTest = async () => {
+    setTestPending(true);
+    try {
+      await sendTestNotification();
+      toast.info("测试通知已发送；若没看到，请确认系统已允许 Shui 通知", {
+        duration: 6000,
+      });
+    } catch {
+      toast.error("发送测试通知失败，请检查系统通知设置");
+    } finally {
+      setTestPending(false);
+    }
+  };
 
   // 用户从系统设置切回来时窗口会重新聚焦，这时再读一次，
   // 不必关掉设置页重开。移动端与浏览器预览没有这条命令。
@@ -99,6 +118,8 @@ export default function Home() {
           ...current,
           isCountDown: generalSetting?.isCountDown || false,
           isFullScreen: generalSetting?.isFullScreen || false,
+          // 旧版本没有这个字段：默认开启，与移动端口径一致。
+          isSound: generalSetting?.isSound !== false,
           isAutoStart,
         }));
       } catch (error) {
@@ -243,6 +264,27 @@ export default function Home() {
         />
       </div>
 
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
+        <div>
+          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+            提醒音效
+          </label>
+          <p
+            id=":r233:-form-item-description"
+            className="text-[0.8rem] text-muted-foreground"
+          >
+            记录饮水后播放一声确认音，关闭后完全静音
+          </p>
+        </div>
+        <Switch
+          checked={config.isSound}
+          aria-label="提醒音效"
+          onCheckedChange={async (checked) => {
+            await saveConfig("isSound", checked);
+          }}
+        />
+      </div>
+
       {!autoStartPending &&
         !config.isFullScreen &&
         notificationStatus !== "granted" && (
@@ -259,15 +301,25 @@ export default function Home() {
               <p className="mt-1.5 text-[0.8rem] text-muted-foreground">
                 {notificationCard.description}
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-2.5"
-                onClick={() => void goToNotificationSettings()}
-              >
-                <ExternalLink className="mr-1.5 size-3.5" />
-                打开系统通知设置
-              </Button>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void goToNotificationSettings()}
+                >
+                  <ExternalLink className="mr-1.5 size-3.5" />
+                  打开系统通知设置
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={testPending}
+                  onClick={() => void sendTest()}
+                >
+                  <SendHorizontal className="mr-1.5 size-3.5" />
+                  发送测试通知
+                </Button>
+              </div>
             </div>
           </div>
         )}

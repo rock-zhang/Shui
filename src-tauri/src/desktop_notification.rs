@@ -7,24 +7,27 @@
 //!    通知一收进操作中心，点按钮就没有任何回调，表现为「点了没反应、没记录」。
 //!    改由这里发送并给 `Urgency::Critical`（映射成 toast 的 `Scenario::Reminder`），
 //!    toast 会常驻到用户处理为止，点击才稳定可回收。
-//! 2. **macOS 把两个以上动作折叠成一个下拉按钮**，下拉标题由 `actions_label` 决定，
-//!    插件不暴露这个参数，默认就是英文 "Options"。改成中文只能自己发；最终这里
+//! 2. **macOS 把两个以上动作折叠成一个下拉按钮**。改成中文只能自己发；最终这里
 //!    干脆只给 macOS 一个动作，省掉下拉、一次点击完成（见 `send_desktop_reminder_notification`）。
 //! 3. **动作落盘不依赖 WebView**：记水在 Rust 里直接写库，再向前端广播事件。
 //!    窗口隐藏、脚本被节流、Channel 掉线都不会丢记录。
 //!
 //! 记水成功后前端只负责两件事：刷新明细 + 补一声确认音（对齐 Android）。
+//!
+//! 通知正文与副标题也在这里生成：按今日完成度分档随机取文案，并带上「已喝 / 目标」
+//! 进度，与 Android `ReminderReceiver.kt` 的口径保持一致。
 
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use notify_rust::NotificationResponse;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::drink_store::save_drink;
+use crate::reminder_session::{ClosedSession, Outcome};
 
 /// 前端收到后刷新饮水明细并播放确认音。payload 是 `Receipt` 的 JSON。
 pub const DRINK_RECORDED_EVENT: &str = "shui:drink-recorded";
@@ -38,13 +41,13 @@ const SKIP_ACTION_LABEL: &str = "稍后再说";
 #[cfg(target_os = "macos")]
 const DEFAULT_DRINK_AMOUNT: u64 = 50;
 
-/// 按钮文案必须自带动词。
+/// 按钮文案必须自带水量符号。
 ///
 /// Windows / Linux 的 toast 按钮、Android 的通知按钮都是脱离正文单独展示的，
-/// `100ml` 这种纯数量读不出是「喝了」还是「目标」。所以三档长一个样：
-/// `喝了 50ml` / `喝了 100ml` / `喝了 200ml`，Windows、Linux、Android 一致。
+/// `100ml` 这种纯数量读不出是「加记」还是「目标」。三端统一为 `+50ml`，
+/// 一眼就能看出是「加记这么多水」。macOS 只发一个动作，同样用这个文案。
 pub fn drink_action_label(amount: u64) -> String {
-    format!("喝了 {amount}ml")
+    format!("+{amount}ml")
 }
 
 fn drink_action_id(amount: u64) -> String {
@@ -155,6 +158,202 @@ fn commit_drink(app: &AppHandle, amount: u64) {
             }
         }
         Err(error) => report(&format!("通知记水失败 +{amount}ml：{error}")),
+    }
+}
+
+/// 通知副标题：今日进度。与 Android 通知栏展示的文案一致。
+///
+/// 未设置目标时只展示已喝量，连一口都还没喝就不占副标题这一行。
+fn progress_label(total: u64, goal: u64) -> String {
+    if goal > 0 {
+        let ratio = (total as f64 / goal as f64).clamp(0.0, 1.0);
+        // 达标前最多显示 99%，避免 1999/2000 时看起来像已经完成。
+        let percent = if total >= goal {
+            100
+        } else {
+            ((ratio * 100.0) as u64).min(99)
+        };
+        format!("已喝 {total} / {goal}ml · {percent}%")
+    } else if total > 0 {
+        format!("今日已喝 {total}ml")
+    } else {
+        String::new()
+    }
+}
+
+/// 提醒通知的文案池：按今日完成度分四档。
+///
+/// 与 Android `ReminderReceiver.kt` 的 `ReminderCopy` 逐条一致——固定文案用久了会被
+/// 当成背景噪音直接划掉，进度不同给不同的鼓励也更贴合当下。改文案时两端要同步。
+mod copy {
+    use std::sync::Mutex;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    const START: [&str; 12] = [
+        "新的一天从一杯水开始，来一杯吧",
+        "刚起步，先喝口水润润嗓子",
+        "身体刚开始补水，别停下",
+        "现在喝一杯，今天会很轻松",
+        "第一杯水永远最值，先从这杯开始",
+        "还早，慢慢把节奏建立起来",
+        "起身走走，顺便接杯水",
+        "提醒一下：该补水了",
+        "别等到口渴才喝，现在正好",
+        "一小口水也是进步，来吧",
+        "给身体开个好头，干杯",
+        "先来一杯，给今天开个好头",
+    ];
+
+    const HALF: [&str; 12] = [
+        "已经四分之一了，继续保持",
+        "进度不错，再来一杯稳稳推进",
+        "节奏起来了，别断",
+        "喝一口，离目标更近一点",
+        "身体正在变好，别停下来",
+        "这一杯下去，状态会更清醒",
+        "补水进行中，保持这个势头",
+        "再补几杯，进度会更稳",
+        "现在的你比刚起床时更水润了",
+        "不必大口，小口多次最有效",
+        "继续按节奏来，稳稳的",
+        "记得喝水，也记得起身活动",
+    ];
+
+    const NEAR: [&str; 12] = [
+        "已经过半，胜利在望",
+        "再补几杯，今天就很稳了",
+        "势头很好，别松懈",
+        "今天的目标越来越近了",
+        "继续喝，身体会感谢你",
+        "过半的进度，值得再喝一杯",
+        "保持住，这个节奏刚刚好",
+        "再来一杯，向目标冲刺",
+        "你已经比大多数人喝得多了",
+        "喝口水，给自己一个小小的奖励",
+        "补水过半，状态在线",
+        "剩下的交给每一杯水",
+    ];
+
+    const ALMOST: [&str; 12] = [
+        "只差最后几杯，别放弃",
+        "快到目标了，一鼓作气",
+        "胜利就在眼前，再来一杯",
+        "最后冲刺，今天的目标马上达成",
+        "已经很接近了，坚持一下",
+        "再喝一杯就离目标更近了",
+        "收尾阶段，稳稳喝完",
+        "今天的你非常自律，继续",
+        "最后这一段，交给这杯水",
+        "差距不大了，喝完就达标",
+        "保持住，马上就能完成目标",
+        "再补一杯，今天就算圆满",
+    ];
+
+    /// 每档上一次用过的下标：连续两条不重复，固定文案更容易被当成噪音。
+    static LAST: Mutex<[Option<usize>; 4]> = Mutex::new([None; 4]);
+
+    pub(super) fn pick(ratio: f64) -> &'static str {
+        let (bucket, pool): (usize, &'static [&'static str]) = if ratio >= 0.75 {
+            (3, &ALMOST)
+        } else if ratio >= 0.5 {
+            (2, &NEAR)
+        } else if ratio >= 0.25 {
+            (1, &HALF)
+        } else {
+            (0, &START)
+        };
+
+        let mut index = random_index(pool.len());
+        let mut last = LAST.lock().unwrap();
+        if pool.len() > 1 && last[bucket] == Some(index) {
+            index = (index + 1) % pool.len();
+        }
+        last[bucket] = Some(index);
+        pool[index]
+    }
+
+    /// 不引入 rand：时间纳秒 + 自增序号混一遍，足够避免固定顺序。
+    fn random_index(len: usize) -> usize {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static SEQ: AtomicU64 = AtomicU64::new(0);
+
+        let seq = SEQ.fetch_add(1, Ordering::Relaxed);
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|elapsed| elapsed.subsec_nanos() as u64)
+            .unwrap_or(0);
+        let mut state = nanos ^ seq.wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        state ^= state >> 33;
+        state = state.wrapping_mul(0xff51_afd7_ed55_8ccd);
+        state ^= state >> 33;
+        (state as usize) % len.max(1)
+    }
+}
+
+/// 通知模式下的一次提醒也算进提醒统计。
+///
+/// 全屏提醒由 `reminder_session` 记账；系统通知没有会话概念，直接按同一条
+/// `reminder-session-closed` 事件补一条，统计页才不会只统计全屏模式。
+fn record_notification_outcome(app: &AppHandle, day: &str, started: Instant, confirmed: bool) {
+    let closed = ClosedSession {
+        day: day.to_string(),
+        outcome: if confirmed {
+            Outcome::Confirmed
+        } else {
+            Outcome::Skipped
+        },
+        display_seconds: started.elapsed().as_secs().min(30),
+    };
+    if let Err(error) = app.emit("reminder-session-closed", closed) {
+        report(&format!("提醒统计事件广播失败：{error}"));
+    }
+}
+
+/// macOS 默认的 `NSUserNotificationCenter` 不提供单条通知句柄，做不到精确淘汰最旧一条。
+/// 这里用「已投递未处理」的计数近似：满 3 条就整批清空再发新的，任意时刻最多保留 3 条。
+#[cfg(target_os = "macos")]
+mod delivered {
+    use super::report;
+    use objc::runtime::{Class, Object};
+    use objc::{msg_send, sel, sel_impl};
+    use std::sync::Mutex;
+    use tauri::AppHandle;
+
+    const LIMIT: usize = 3;
+    static PENDING: Mutex<usize> = Mutex::new(0);
+
+    pub(super) fn reserve(app: &AppHandle) {
+        let clear = {
+            let mut pending = PENDING.lock().unwrap();
+            let clear = *pending >= LIMIT;
+            if clear {
+                *pending = 0;
+            }
+            // 本次马上要发出去的那条也要算进去。
+            *pending += 1;
+            clear
+        };
+        if !clear {
+            return;
+        }
+        let result = app.run_on_main_thread(|| unsafe {
+            let Some(class) = Class::get("NSUserNotificationCenter") else {
+                return;
+            };
+            let center: *mut Object = msg_send![class, defaultUserNotificationCenter];
+            if center.is_null() {
+                return;
+            }
+            let _: () = msg_send![center, removeAllDeliveredNotifications];
+        });
+        if let Err(error) = result {
+            report(&format!("清理旧提醒通知失败：{error}"));
+        }
+    }
+
+    pub(super) fn release() {
+        let mut pending = PENDING.lock().unwrap();
+        *pending = pending.saturating_sub(1);
     }
 }
 
@@ -463,17 +662,30 @@ pub fn open_desktop_notification_settings(app: AppHandle) -> Result<(), String> 
 }
 
 /// 发一条带记水按钮的提醒通知。立即返回，等待交互在独立线程里做。
+///
+/// 标题、正文、副标题都在这里生成：正文按今日完成度从文案池随机取，副标题带
+/// 「已喝 / 目标」进度，与 Android 通知栏同一套口径。前端只负责告诉这里「哪几档水量」。
 #[tauri::command]
-pub fn send_desktop_reminder_notification(
-    app: AppHandle,
-    title: String,
-    body: String,
-    amounts: Vec<u64>,
-) -> Result<(), String> {
+pub fn send_desktop_reminder_notification(app: AppHandle, amounts: Vec<u64>) -> Result<(), String> {
     configure_log(&app);
 
+    let (total, goal) = crate::drink_store::today_progress(&app);
+    let ratio = if goal > 0 {
+        (total as f64 / goal as f64).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+
     let mut notification = notify_rust::Notification::new();
-    notification.summary(&title).body(&body).auto_icon();
+    notification
+        .summary("该喝水啦")
+        .body(copy::pick(ratio))
+        .auto_icon();
+    let progress = progress_label(total, goal);
+    if !progress.is_empty() {
+        // subtitle 在 macOS / Windows 上都有对应的展示位；Linux 会忽略。
+        notification.subtitle(&progress);
+    }
 
     // macOS 只给一个动作。两个及以上会被系统折叠成一个下拉按钮（还得单独设下拉标题），
     // 变成「点开下拉 → 再选一项」两步；单动作则渲染成真实按钮，一次点击就记上。
@@ -537,24 +749,35 @@ pub fn send_desktop_reminder_notification(
         .unwrap_or(false);
 
     let handler_app = app.clone();
+    let day = chrono::Local::now().format("%Y%m%d").to_string();
     report(&format!("发送提醒通知（{action_count} 个动作）"));
     std::thread::Builder::new()
         .name("shui-notification".into())
         .spawn(move || {
+            let started = Instant::now();
+            #[cfg(target_os = "macos")]
+            delivered::reserve(&handler_app);
+
             let handle = match notification.show() {
                 Ok(handle) => handle,
                 Err(error) => {
                     report(&format!("通知发送失败：{error}"));
+                    #[cfg(target_os = "macos")]
+                    delivered::release();
                     return;
                 }
             };
             let outcome = handle.wait_for_response(move |response: &NotificationResponse| {
+                let mut confirmed = false;
                 match response {
                     NotificationResponse::Action(action) => {
                         mark_action();
                         report(&format!("收到通知动作：{action}"));
                         match parse_drink_amount(action) {
-                            Some(amount) => commit_drink(&handler_app, amount),
+                            Some(amount) => {
+                                confirmed = true;
+                                commit_drink(&handler_app, amount);
+                            }
                             // 稍后再说：只关掉通知，不记账也不打扰。
                             None if action == SKIP_ACTION_ID => {}
                             None => report(&format!("未知的通知动作：{action}")),
@@ -569,9 +792,96 @@ pub fn send_desktop_reminder_notification(
                     }
                     _ => {}
                 }
+                record_notification_outcome(&handler_app, &day, started, confirmed);
+                #[cfg(target_os = "macos")]
+                delivered::release();
             });
             if let Err(error) = outcome {
                 report(&format!("等待通知交互结束失败：{error}"));
+            }
+        })
+        .map_err(|error| format!("无法启动通知线程：{error}"))?;
+
+    Ok(())
+}
+
+/// macOS：主动请求一次通知授权，让「系统设置 → 通知」里出现 Shui。
+///
+/// 默认的 `NSUserNotificationCenter` 只会在首次投递时被动触发系统弹窗，代码里
+/// 没有别的时机能确保这个开关被创建出来。这里 fire-and-forget：用户在系统弹窗里
+/// 选完之后，设置页靠窗口重新聚焦时刷新状态即可。
+///
+/// dev 模式下进程没有自己的 bundle，调用 `currentNotificationCenter` 会抛 ObjC
+/// 异常把进程带崩，所以只在正式包里调用。
+#[cfg(target_os = "macos")]
+fn request_notification_authorization() {
+    use block::ConcreteBlock;
+    use objc::runtime::{Class, Object};
+    use objc::{msg_send, sel, sel_impl};
+
+    if tauri::is_dev() {
+        return;
+    }
+    unsafe {
+        let Some(class) = Class::get("UNUserNotificationCenter") else {
+            return;
+        };
+        let center: *mut Object = msg_send![class, currentNotificationCenter];
+        if center.is_null() {
+            return;
+        }
+        // UNAuthorizationOptionBadge | Sound | Alert
+        let options: core::ffi::c_ulong = 1 | 2 | 4;
+        let completion =
+            ConcreteBlock::new(|_granted: core::ffi::c_char, _error: *mut Object| {}).copy();
+        let _: () = msg_send![
+            center,
+            requestAuthorizationWithOptions: options
+            completionHandler: &*completion
+        ];
+    }
+}
+
+/// 发一条没有任何按钮的测试通知，用来验证权限链路是否打通。
+///
+/// 和正式提醒走同一个后端：macOS 的默认后端要到 `wait_for_response` 才真正投递，
+/// 所以测试通知也必须等一次交互（或自动消失），否则用户什么都看不到。
+#[tauri::command]
+pub fn send_desktop_test_notification(app: AppHandle) -> Result<(), String> {
+    configure_log(&app);
+
+    #[cfg(target_os = "macos")]
+    request_notification_authorization();
+
+    let handler_app = app.clone();
+    std::thread::Builder::new()
+        .name("shui-notification-test".into())
+        .spawn(move || {
+            #[cfg(not(target_os = "macos"))]
+            let _ = &handler_app;
+            // 系统授权弹窗需要用户先点一下，留一点时间再投递，避免被直接丢弃。
+            std::thread::sleep(std::time::Duration::from_millis(800));
+
+            let mut notification = notify_rust::Notification::new();
+            notification
+                .summary("通知正常")
+                .body("以后提醒会以这个形式出现，看到这一条说明链路通了")
+                .auto_icon();
+
+            #[cfg(target_os = "macos")]
+            if let Err(error) = notify_rust::set_application(&notification_owner(&handler_app)) {
+                report(&format!("设置通知归属应用失败：{error}"));
+            }
+
+            match notification.show() {
+                Ok(handle) => {
+                    report("发送测试通知");
+                    #[cfg(target_os = "macos")]
+                    let _ = handle.wait_for_response(|_response: &NotificationResponse| {});
+                    #[cfg(not(target_os = "macos"))]
+                    drop(handle);
+                }
+                Err(error) => report(&format!("测试通知发送失败：{error}")),
             }
         })
         .map_err(|error| format!("无法启动通知线程：{error}"))?;
@@ -600,9 +910,27 @@ mod tests {
     }
 
     #[test]
-    fn labels_carry_the_verb() {
-        assert_eq!(drink_action_label(100), "喝了 100ml");
-        assert_eq!(drink_action_label(50), "喝了 50ml");
+    fn labels_match_android_notification_actions() {
+        assert_eq!(drink_action_label(100), "+100ml");
+        assert_eq!(drink_action_label(50), "+50ml");
+    }
+
+    #[test]
+    fn progress_label_matches_android_rules() {
+        // 达标前最多 99%，避免看起来像已经完成。
+        assert_eq!(progress_label(1999, 2000), "已喝 1999 / 2000ml · 99%");
+        assert_eq!(progress_label(1000, 2000), "已喝 1000 / 2000ml · 50%");
+        assert_eq!(progress_label(2000, 2000), "已喝 2000 / 2000ml · 100%");
+        // 没设目标只展示已喝量；一口没喝时副标题留空。
+        assert_eq!(progress_label(250, 0), "今日已喝 250ml");
+        assert_eq!(progress_label(0, 0), "");
+    }
+
+    #[test]
+    fn copy_pool_never_repeats_back_to_back() {
+        let first = copy::pick(0.1);
+        let second = copy::pick(0.1);
+        assert_ne!(first, second);
     }
 
     #[test]

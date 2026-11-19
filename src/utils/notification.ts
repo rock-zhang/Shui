@@ -14,13 +14,13 @@ export const DRINK_RECORDED_EVENT = "shui:drink-recorded";
  * - macOS 只取其中**最小**的一档（50ml）做成单按钮。macOS 把两个以上动作折叠成
  *   下拉，点下拉按钮本身还会被上报成第一个动作；单按钮一次点击就完成，没有误点空间；
  * - Windows / Linux 三个按钮 + 「稍后再说」并列展示；
- * - Android 的 `ReminderScheduler.DRINK_ACTIONS` 与这里同序、同文案。
+ * - Android 的 `ReminderScheduler.DRINK_ACTIONS` 与这里同序、同文案（`+Xml`）。
  */
 export const DRINK_ACTION_AMOUNTS = [50, 100, 200] as const;
 
 /**
  * 桌面端记水事件的桥：Rust 已经把水记进库里了，这里只补界面层——
- * 刷新明细 + 播一声确认音（对齐 Android 通知栏记水后的 ding）。
+ * 刷新明细 + 播一声确认音（对齐 Android 通知栏记水后的确认音）。
  *
  * 之所以不在这里做记账：通知点击发生在 WebView 之外，窗口隐藏、脚本被节流
  * 或 Channel 掉线时 JS 根本收不到回调。落盘放在 Rust 才不会再丢记录。
@@ -83,12 +83,10 @@ export const sendReminderNotification = async () => {
 
   // 桌面三端由 Rust（desktop_notification.rs）直接调 notify-rust 发送：
   // Windows 需要 Critical 让 toast 常驻（否则收进操作中心后点击不上报），
-  // macOS 需要 actions_label 把折叠下拉的英文 "Options" 换成中文，
-  // 而且点击后的记水在 Rust 落盘，不依赖这条 WebView 通道。
+  // macOS 只发一个动作避免被折叠成下拉；标题、正文与进度副标题都在 Rust 侧
+  // 按今日完成度生成，点击后的记水同样在 Rust 落盘，不依赖这条 WebView 通道。
   try {
     await invoke("send_desktop_reminder_notification", {
-      title: "⏰ 该喝水啦",
-      body: "站起来喝杯水，顺便活动一下身体吧！",
       amounts: DRINK_ACTION_AMOUNTS,
     });
   } catch (error) {
@@ -96,3 +94,12 @@ export const sendReminderNotification = async () => {
     console.error("系统通知发送失败", error);
   }
 };
+
+/**
+ * 发一条只用于验证权限链路的测试通知。
+ *
+ * macOS 会顺带请求一次系统通知授权（让「系统设置 → 通知」里出现 Shui），
+ * 用户从系统弹窗切回来后，设置页靠窗口重新聚焦刷新授权状态。
+ */
+export const sendTestNotification = () =>
+  invoke("send_desktop_test_notification");

@@ -147,6 +147,7 @@ pub fn run() {
         crate::drink_recording::record_drink,
         crate::drink_recording::undo_drink,
         crate::desktop_notification::send_desktop_reminder_notification,
+        crate::desktop_notification::send_desktop_test_notification,
         crate::desktop_notification::get_desktop_notification_state,
         crate::desktop_notification::open_desktop_notification_settings,
         commands::call_reminder,

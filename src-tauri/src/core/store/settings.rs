@@ -228,11 +228,16 @@ impl AppSettings {
             && self.today_drink_amount < self.gold
     }
 
-    pub fn get_status_message(&self) -> (&str, &str) {
+    pub fn get_status_message(&self) -> (&'static str, &'static str) {
         if self.today_drink_amount >= self.gold {
             ("已达标", "太棒啦，再接再厉")
+        } else if self.is_paused {
+            // 手动暂停与「非工作日/非工作时间」要分开说，否则用户会以为是时段问题。
+            ("已暂停", "提醒已暂停，可在托盘菜单点「重新计时」")
+        } else if !self.is_work_day {
+            ("", "今天不是提醒日")
         } else {
-            ("", "非工作日或非工作时间")
+            ("", "不在提醒时段")
         }
     }
 }

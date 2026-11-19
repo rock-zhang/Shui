@@ -28,7 +28,7 @@ export default function RootLayout({
     setMobile(isMobileHost);
     if (isMobileHost) return;
 
-    // 通知里的「喝了 Xml」由 Rust 记进库，这里只订阅它的广播来刷新明细 + 播确认音。
+    // 通知里的「+Xml」由 Rust 记进库，这里只订阅它的广播来刷新明细 + 播确认音。
     void setupDesktopNotificationBridge();
 
     const unlisten = listen("timer-complete", async (event) => {
