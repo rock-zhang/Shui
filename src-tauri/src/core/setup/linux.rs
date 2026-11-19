@@ -1,5 +1,3 @@
-use crate::timer::IS_RUNNING;
-use std::sync::atomic::Ordering;
 use std::thread;
 use std::time::Duration;
 use std::process::Command;
@@ -18,10 +16,10 @@ pub fn monitor_lock_screen() {
                 check_cmd_lock_status()
             });
             
-            // 状态变化时更新计时器
+            // 状态变化时更新计时器：锁屏只临时停表，不覆盖手动暂停。
             if previous_lock_state != lock_state {
                 previous_lock_state = lock_state;
-                IS_RUNNING.store(!lock_state, Ordering::SeqCst);
+                crate::timer::set_system_inactive(lock_state);
                 
                 let (status, action) = if lock_state {
                     ("锁屏", "停止")

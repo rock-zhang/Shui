@@ -19,10 +19,42 @@ use winapi::{
 // use windows::Win32::Foundation::HWND;
 use chrono::Local;
 // use winapi::um::wtsapi32::{WTS_SESSION_LOCK, WTS_SESSION_UNLOCK};
-use crate::timer::IS_RUNNING;
-use std::sync::atomic::Ordering;
+use crate::timer::set_system_inactive;
+use std::sync::atomic::{AtomicBool, Ordering};
 use windows::Win32::System::RemoteDesktop::WTSRegisterSessionNotification;
 use windows::Win32::System::RemoteDesktop::NOTIFY_FOR_THIS_SESSION;
+
+// 会话锁定与显示器关闭是两个独立来源，任一个生效都算「系统不可用」。
+static SESSION_LOCKED: AtomicBool = AtomicBool::new(false);
+static DISPLAY_OFF: AtomicBool = AtomicBool::new(false);
+
+fn update_system_inactive() {
+    set_system_inactive(
+        SESSION_LOCKED.load(Ordering::SeqCst) || DISPLAY_OFF.load(Ordering::SeqCst),
+    );
+}
+
+fn set_session_locked(locked: bool) {
+    SESSION_LOCKED.store(locked, Ordering::SeqCst);
+    update_system_inactive();
+    let (status, action) = if locked {
+        ("锁屏", "停止")
+    } else {
+        ("解锁", "开始")
+    };
+    println!("系统{}，{}计时", status, action);
+}
+
+fn set_display_off(off: bool) {
+    DISPLAY_OFF.store(off, Ordering::SeqCst);
+    update_system_inactive();
+    let (status, action) = if off {
+        ("显示器关闭", "停止")
+    } else {
+        ("显示器打开", "开始")
+    };
+    println!("系统{}，{}计时", status, action);
+}
 
 // 显示器状态 GUID
 const GUID_CONSOLE_DISPLAY_STATE: GUID = GUID {
@@ -52,16 +84,6 @@ impl From<u32> for MonitorState {
     }
 }
 
-fn reset_timer_running(lock_state: bool) {
-    IS_RUNNING.store(lock_state, Ordering::SeqCst);
-    let (status, action) = if lock_state {
-        ("锁屏", "停止")
-    } else {
-        ("解锁", "开始")
-    };
-    println!("系统{}，{}计时", status, action);
-}
-
 // 窗口处理函数
 extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     println!("wparam: {:?}: {:?}", wparam, Local::now().time());
@@ -70,11 +92,11 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
             match wparam as u32 {
                 7 => {
                     println!("[事件] 系统已锁定");
-                    reset_timer_running(false);
+                    set_session_locked(true);
                 }
                 8 => {
                     println!("[事件] 系统已解锁");
-                    reset_timer_running(true);
+                    set_session_locked(false);
                 }
                 _ => {}
             }
@@ -99,11 +121,11 @@ extern "system" fn wnd_proc(hwnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARA
                         match state {
                             MonitorState::Off => {
                                 println!("[事件] 显示器已关闭");
-                                reset_timer_running(false);
+                                set_display_off(true);
                             }
                             MonitorState::On => {
                                 println!("[事件] 显示器已打开");
-                                reset_timer_running(true);
+                                set_display_off(false);
                             }
                             MonitorState::Dim => println!("[事件] 显示器变暗"),
                             MonitorState::Unknown(x) => println!("[事件] 未知状态: {}", x),

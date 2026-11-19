@@ -11,9 +11,9 @@ pub(crate) static WRITER: Mutex<()> = Mutex::new(());
 pub struct Receipt {
     date: String,
     pub(crate) total: u64,
-    goal: u64,
+    pub(crate) goal: u64,
     pub added: bool,
-    goal_reached: bool,
+    pub(crate) goal_reached: bool,
     /// 重锚后原生排定的下一次提醒（毫秒）。0 表示非 Android、没重排或已达标。
     /// 前端拿到就能直接刷新「预计下一杯」，不必等 refresh 广播再往返读一次。
     pub(crate) next_at: i64,
@@ -133,21 +133,60 @@ pub(crate) fn save_drink(
     amount: u64,
     request_id: &str,
 ) -> Result<Receipt, String> {
-    let config = app.store("config_store.json").map_err(|e| e.to_string())?;
-    let goal = config
-        .get("alert")
-        .and_then(|value| {
-            value["gold"]
-                .as_str()
-                .and_then(|s| s.parse().ok())
-                .or_else(|| value["gold"].as_u64())
-        })
-        .filter(|value| *value > 0)
-        .unwrap_or(1000);
+    save_drink_at(app, amount, request_id, Local::now())
+}
+
+/// 指定记录时间写入一笔饮水。
+///
+/// 通知栏记水在进程被杀后先落 `pending_drinks.json`，要等 App 重新打开才回灌；
+/// 回灌若用 `Local::now()`，整批补记会共用「打开 App 的那一刻」，明细时间全一样，
+/// 跨零点的记录也会落到打开当天。所以这类延迟落库必须带上点击当时的时间。
+pub(crate) fn save_drink_at(
+    app: &tauri::AppHandle,
+    amount: u64,
+    request_id: &str,
+    now: DateTime<Local>,
+) -> Result<Receipt, String> {
+    let goal = goal_amount(app);
     let store = app
         .store("drink_history_store.json")
         .map_err(|e| e.to_string())?;
-    record(store.as_ref(), amount, request_id, goal, Local::now())
+    record(store.as_ref(), amount, request_id, goal, now)
+}
+
+/// 每日目标；读不到时与 `record` 的兜底保持一致。
+pub(crate) fn goal_amount(app: &tauri::AppHandle) -> u64 {
+    app.store("config_store.json")
+        .ok()
+        .and_then(|config| {
+            config.get("alert").and_then(|value| {
+                value["gold"]
+                    .as_str()
+                    .and_then(|s| s.parse().ok())
+                    .or_else(|| value["gold"].as_u64())
+            })
+        })
+        .filter(|value| *value > 0)
+        .unwrap_or(1000)
+}
+
+/// 今日已喝量与每日目标，供桌面通知的文案分档与进度副标题使用。
+///
+/// 与通知栏记水共用同一份账本，不另开数据源。
+pub(crate) fn today_progress(app: &tauri::AppHandle) -> (u64, u64) {
+    let goal = goal_amount(app);
+    let total = app
+        .store("drink_history_store.json")
+        .ok()
+        .and_then(|store| store.get(&Local::now().format("%Y%m%d").to_string()))
+        .map(|value| {
+            value
+                .as_u64()
+                .or_else(|| value["total"].as_u64())
+                .unwrap_or(0)
+        })
+        .unwrap_or(0);
+    (total, goal)
 }
 
 #[cfg(test)]

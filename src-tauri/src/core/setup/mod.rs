@@ -2,8 +2,6 @@
 // Android 由 Kotlin AlarmManager 驱动，整个模块不参与编译。
 #![cfg(not(target_os = "android"))]
 
-use crate::commands::pause_timer;
-// mod timer;
 use crate::timer::IS_RUNNING;
 use tauri::Manager;
 
@@ -110,6 +108,15 @@ fn run_timer(app_handle: &tauri::AppHandle, is_running: &std::sync::atomic::Atom
 
         // 检查非工作状态
         if !app_settings.should_run_timer() {
+            // 暂停 / 达标 / 非工作日不该继续累加：恢复时要等满一个间隔，而不是立刻补弹。
+            // 仅「不在提醒时段」保留累加——进入时段就先提醒一次，符合久坐一小时的预期。
+            if app_settings.is_paused
+                || !app_settings.is_work_day
+                || app_settings.today_drink_amount >= app_settings.gold
+            {
+                elapsed_total = 0;
+                timer = Instant::now();
+            }
             let (status, tooltip) = app_settings.get_status_message();
             update_tray_status(&mut tray, status, tooltip);
             thread::sleep(Duration::from_secs(1));
@@ -140,7 +147,8 @@ fn run_timer(app_handle: &tauri::AppHandle, is_running: &std::sync::atomic::Atom
         }
 
         if rest == 0 && app_settings.should_run_timer() {
-            pause_timer();
+            // 到点停表但不记为手动暂停：提醒结束后 reset_timer 会重新放行。
+            crate::timer::suspend_for_reminder();
             if let Err(e) = app_handle.emit_to("main", "timer-complete", {}) {
                 eprintln!("发送提醒事件失败: {}", e);
             }

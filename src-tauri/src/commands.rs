@@ -61,7 +61,8 @@ pub fn call_reminder(app_handle: tauri::AppHandle) -> bool {
     if !reminder_session::begin() { return true; }
     println!("call_reminder");
 
-    pause_timer();
+    // 到点停表，但不记为「手动暂停」：提醒结束后 reset_timer 会重新放行。
+    timer::suspend_for_reminder();
     window::show_reminder_windows(&app_handle);
 
     countdown_async(app_handle);
@@ -77,7 +78,8 @@ pub async fn call_reminder(app_handle: tauri::AppHandle) -> bool {
     if !reminder_session::begin() { return true; }
     println!("call_reminder");
 
-    pause_timer();
+    // 到点停表，但不记为「手动暂停」：提醒结束后 reset_timer 会重新放行。
+    timer::suspend_for_reminder();
     // 直接传递引用，避免不必要的 clone
     window::show_reminder_windows(&app_handle);
 
@@ -111,25 +113,26 @@ pub fn hide_reminder_window(app_handle: tauri::AppHandle, label: &str) {
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub fn reset_timer() {
-    // 重置计时器
+    // 重置计时器：先停一秒让线程从头开始，再按「手动暂停 / 锁屏」两道闸门放行。
     IS_RUNNING.store(false, Ordering::SeqCst);
 
     tauri::async_runtime::spawn(async move {
         sleep(Duration::from_millis(1000)).await;
-        IS_RUNNING.store(true, Ordering::SeqCst);
+        timer::refresh_gate();
     });
 }
 
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub fn pause_timer() {
-    IS_RUNNING.store(false, Ordering::SeqCst);
+    // 只有用户主动暂停才写 MANUAL_PAUSED；锁屏/到点提醒都不走这里。
+    timer::pause_manually();
 }
 
 #[cfg(not(target_os = "android"))]
 #[tauri::command]
 pub fn start_timer() {
-    IS_RUNNING.store(true, Ordering::SeqCst);
+    timer::resume_manually();
 }
 
 #[tauri::command]

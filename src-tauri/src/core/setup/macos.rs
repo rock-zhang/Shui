@@ -1,9 +1,5 @@
-use crate::timer::IS_RUNNING;
-
-use std::thread::{self, sleep};
+use std::thread;
 use std::time::Duration;
-
-use std::sync::atomic::Ordering;
 
 extern crate core_foundation;
 
@@ -26,7 +22,8 @@ pub fn monitor_lock_screen() {
 
             if previous_lock_state != current_lock_state {
                 previous_lock_state = current_lock_state;
-                IS_RUNNING.store(!current_lock_state, Ordering::SeqCst);
+                // 锁屏只是临时停表，不能覆盖用户手动点的「暂停计时」。
+                crate::timer::set_system_inactive(current_lock_state);
                 let (status, action) = if current_lock_state {
                     ("锁屏", "停止")
                 } else {
