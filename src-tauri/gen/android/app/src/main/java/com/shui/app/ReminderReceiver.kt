@@ -190,7 +190,11 @@ object ReminderScheduler {
         (config(context)?.optJSONObject("alert")?.optString("gap", "20")?.toLongOrNull() ?: 20L)
             .coerceIn(1, 720)
 
-    fun todayAmount(context: Context): Long {
+    fun todayAmount(context: Context): Long =
+        storedTodayAmount(context) + pendingTodayAmount(context)
+
+    /** 已回灌进 store 的今日总量。 */
+    private fun storedTodayAmount(context: Context): Long {
         return try {
             val file = File(appDataDir(context), "drink_history_store.json")
             if (!file.exists()) return 0
@@ -200,6 +204,41 @@ object ReminderScheduler {
             if (value is Number) value.toLong()
             else (value as? JSONObject)?.optLong("total", 0) ?: 0
         } catch (_: Exception) {
+            0
+        }
+    }
+
+    /**
+     * 还在 `pending_drinks.json` 里、尚未被 Rust 回灌的今日饮水量。
+     *
+     * 通知栏记水只写待处理队列，要等 App 启动后 drain 线程才落进 store。
+     * 若进度只读 store，用户连续用通知记水而不打开 App 时，下一条通知里的
+     * 进度和达标判断会一直停在旧值。这里按点击时间戳只累加当天的记录：
+     * 队列清空（已落库）后自然归零，不会重复计数；旧版本写入的记录没有
+     * 时间戳，按当天计。
+     *
+     * 只读 pending 文件、不读 processing 文件：drain 期间 store 可能已写入
+     * 而 processing 还没删，同时读会重复计数。
+     */
+    private fun pendingTodayAmount(context: Context): Long {
+        return try {
+            val file = File(appDataDir(context), "pending_drinks.json")
+            if (!file.exists()) return 0
+            val array = JSONArray(file.readText())
+            val format = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
+            val today = format.format(Date())
+            var sum = 0L
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val amount = item.optLong("amount", 0)
+                if (amount <= 0) continue
+                val timestamp = item.optLong("timestamp", 0)
+                val day = if (timestamp > 0) format.format(Date(timestamp)) else today
+                if (day == today) sum += amount
+            }
+            sum
+        } catch (_: Exception) {
+            // 与 Kotlin 侧并发追加撞上写入中的文件时按 0 处理：只影响一次展示。
             0
         }
     }
