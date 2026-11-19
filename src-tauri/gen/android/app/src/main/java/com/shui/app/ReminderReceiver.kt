@@ -774,6 +774,9 @@ object ReminderScheduler {
                 array.put(
                     JSONObject()
                         .put("amount", amount)
+                        // 点击时刻：进程被杀时这批记录要等 App 重新启动才回灌，
+                        // 不带时间就会被记成「打开 App 的那一刻」，明细时间全一样。
+                        .put("timestamp", System.currentTimeMillis())
                         .put("requestId", "notification:${UUID.randomUUID()}")
                 )
                 file.writeText(array.toString())
@@ -1037,7 +1040,7 @@ class ReminderReceiver : BroadcastReceiver() {
         }
 
         // 进度快照：通知里直接展示「已喝 / 目标」和比例条，用户不打开 App
-        // 也能知道今天走到哪一步。未设置目标时只展示已喝量。
+        // 也能知道今天走到哪一步。未设置目标时不展示进度与副标题。
         val total = ReminderScheduler.todayAmount(context)
         val goal = ReminderScheduler.goalAmount(context)
         val ratio = if (goal > 0) (total.toDouble() / goal).coerceIn(0.0, 1.0) else 0.0
@@ -1066,13 +1069,11 @@ class ReminderReceiver : BroadcastReceiver() {
                     // 达标前最多显示 99%：1999/2000 时向上取整成 100% 会显得「已达成」，
                     // 但达标通知并没有发，进度条也应该留一格。
                     val percent = if (total >= goal) 100 else (ratio * 100).toInt().coerceIn(0, 99)
-                    // 副标题只有一行小字，用「已喝 250 / 2000ml」最省字数；
-                    // 分母即目标，进度条负责表达比例。
-                    setSubText("已喝 ${total} / ${goal}ml · ${percent}%")
+                    // 副标题只有一行小字，手机窄屏下加「已喝」会被截断，
+                    // 直接写「450 / 2000ml」；分母即目标，进度条负责表达比例。
+                    setSubText("${total} / ${goal}ml · ${percent}%")
                     // 确定进度条由系统渲染在正文下方，百分比同时写进副标题。
                     setProgress(100, percent, false)
-                } else if (total > 0) {
-                    setSubText("今日已喝 ${total}ml")
                 }
             }
             // 声音/震动双保险：Android 8+ 官方以渠道为准，builder 上的设置会被忽略；

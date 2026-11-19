@@ -11,7 +11,7 @@ use crate::data_backup::{self, ImportPreview};
 use crate::drink_store;
 use crate::reminder_session::{self, Outcome};
 use crate::timer::IS_RUNNING;
-use chrono::Local;
+use chrono::{DateTime, Local, TimeZone};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -216,6 +216,24 @@ struct PendingDrink {
     amount: u64,
     #[serde(default, rename = "requestId")]
     request_id: String,
+    /// 点击通知按钮的时刻（毫秒）。进程被杀后这批记录要等 App 重新启动才回灌，
+    /// 落库必须用它而不是回灌时刻；旧版本写下的队列没有这个字段，默认 0。
+    #[serde(default)]
+    timestamp: i64,
+}
+
+/// 回灌记录的落库时间：优先用点击时刻，缺失或不合理时退回当前时间。
+///
+/// 晚于当前时间（设备校时把过去的记录推到未来）会让明细出现「还没到就先记上」，
+/// 所以只接受不超过 1 分钟时钟偏差的时间；其余情况按回灌时刻兜底。
+fn pending_recorded_at(millis: i64, now: DateTime<Local>) -> DateTime<Local> {
+    if millis <= 0 {
+        return now;
+    }
+    match Local.timestamp_millis_opt(millis) {
+        chrono::LocalResult::Single(time) if time <= now + chrono::Duration::minutes(1) => time,
+        _ => now,
+    }
 }
 
 fn drain_pending_drinks(app: &tauri::AppHandle) {
@@ -236,6 +254,7 @@ fn drain_pending_drinks(app: &tauri::AppHandle) {
         Err(_) => return,
     };
     let items = serde_json::from_str::<Vec<PendingDrink>>(&raw).unwrap_or_default();
+    let now = Local::now();
     let mut recorded = false;
     for item in items {
         if item.amount == 0 || item.amount > 5000 {
@@ -249,7 +268,10 @@ fn drain_pending_drinks(app: &tauri::AppHandle) {
         } else {
             item.request_id
         };
-        if drink_store::save_drink(app, item.amount, &format!("manual:{id}")).is_ok() {
+        // 用点击时刻落库：进程被杀期间攒下的多条记录各自有各自的真实时间，
+        // 不能统一记成回灌这一刻。
+        let at = pending_recorded_at(item.timestamp, now);
+        if drink_store::save_drink_at(app, item.amount, &format!("manual:{id}"), at).is_ok() {
             recorded = true;
         }
     }

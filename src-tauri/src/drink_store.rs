@@ -133,11 +133,25 @@ pub(crate) fn save_drink(
     amount: u64,
     request_id: &str,
 ) -> Result<Receipt, String> {
+    save_drink_at(app, amount, request_id, Local::now())
+}
+
+/// 指定记录时间写入一笔饮水。
+///
+/// 通知栏记水在进程被杀后先落 `pending_drinks.json`，要等 App 重新打开才回灌；
+/// 回灌若用 `Local::now()`，整批补记会共用「打开 App 的那一刻」，明细时间全一样，
+/// 跨零点的记录也会落到打开当天。所以这类延迟落库必须带上点击当时的时间。
+pub(crate) fn save_drink_at(
+    app: &tauri::AppHandle,
+    amount: u64,
+    request_id: &str,
+    now: DateTime<Local>,
+) -> Result<Receipt, String> {
     let goal = goal_amount(app);
     let store = app
         .store("drink_history_store.json")
         .map_err(|e| e.to_string())?;
-    record(store.as_ref(), amount, request_id, goal, Local::now())
+    record(store.as_ref(), amount, request_id, goal, now)
 }
 
 /// 每日目标；读不到时与 `record` 的兜底保持一致。

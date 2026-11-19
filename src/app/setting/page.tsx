@@ -264,27 +264,6 @@ export default function Home() {
         />
       </div>
 
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
-        <div>
-          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            提醒音效
-          </label>
-          <p
-            id=":r233:-form-item-description"
-            className="text-[0.8rem] text-muted-foreground"
-          >
-            记录饮水后播放一声确认音，关闭后完全静音
-          </p>
-        </div>
-        <Switch
-          checked={config.isSound}
-          aria-label="提醒音效"
-          onCheckedChange={async (checked) => {
-            await saveConfig("isSound", checked);
-          }}
-        />
-      </div>
-
       {!autoStartPending &&
         !config.isFullScreen &&
         notificationStatus !== "granted" && (
@@ -323,6 +302,27 @@ export default function Home() {
             </div>
           </div>
         )}
+
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
+        <div>
+          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+            提醒音效
+          </label>
+          <p
+            id=":r233:-form-item-description"
+            className="text-[0.8rem] text-muted-foreground"
+          >
+            记录饮水后播放一声确认音，关闭后完全静音
+          </p>
+        </div>
+        <Switch
+          checked={config.isSound}
+          aria-label="提醒音效"
+          onCheckedChange={async (checked) => {
+            await saveConfig("isSound", checked);
+          }}
+        />
+      </div>
 
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs">
         <div>
