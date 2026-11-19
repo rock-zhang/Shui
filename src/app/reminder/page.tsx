@@ -22,7 +22,12 @@ import { usePlatform } from "@/hooks/use-platform";
 import { normalizeDrinkDay, type DrinkHistoryValue, type DrinkReceipt } from "@/lib/drink-day";
 
 async function hideWindowAction(outcome: "confirmed" | "skipped" = "confirmed", expectedSession?: string) {
-  await invoke("hide_reminder_windows", { outcome, expectedSession: expectedSession ?? null });
+  try {
+    await invoke("hide_reminder_windows", { outcome, expectedSession: expectedSession ?? null });
+  } finally {
+    // 关闭失败或 IPC 异常时也要释放全局 Esc，避免系统级按键被永久占用
+    await unregisterAll();
+  }
 }
 
 async function registerEscShortcut() {
@@ -117,19 +122,18 @@ export default function ReminderPage() {
     registerEscShortcut();
 
     const countdownListener = listen("countdown", (event) => {
-      setCountdown(event.payload as number);
+      const countdownValue = event.payload as number;
+      setCountdown(countdownValue);
+      // 提醒窗口会被复用，新一次提醒要靠倒计时事件重新注册 Esc。
+      // 不要监听 WINDOW_FOCUS：关闭提醒时窗口隐藏会让焦点转移到另一个提醒窗口，
+      // 可能在前端 unregisterAll() 之后重新注册 Esc，造成关闭后全局 Esc 失效。
+      if (countdownValue > 0) registerEscShortcut();
     });
 
     // TODO:被其他窗口隐藏时，注销快捷键
     // 待确认多屏场景下，是否需要注销快捷键
     listen("reminder_already_hidden", () => {
       unregisterAll();
-    });
-
-    // 监听窗口显示事件
-    listen(TauriEvent.WINDOW_FOCUS, () => {
-      console.log("TauriEvent.WINDOW_FOCUS");
-      registerEscShortcut();
     });
 
     currentMonitor().then((mo) => {
