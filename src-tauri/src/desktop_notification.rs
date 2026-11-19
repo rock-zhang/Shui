@@ -170,6 +170,9 @@ fn commit_drink(app: &AppHandle, amount: u64) {
                 "通知记水成功 +{amount}ml，今日累计 {}ml",
                 receipt.total
             ));
+            // 与 Android 通知 Action 的 scheduleNext 对齐：记水即视为这次提醒
+            // 已处理，倒计时从此刻重新开始，而不是接着上一条提醒的进度走。
+            crate::commands::reset_timer();
             match serde_json::to_value(&receipt) {
                 Ok(payload) => {
                     if let Err(error) = app.emit(DRINK_RECORDED_EVENT, payload) {
