@@ -577,7 +577,7 @@ pub fn open_notification_channel_settings(app: tauri::AppHandle) -> Result<(), S
     native::<Value>(&app, "openNotificationChannelSettings", json!({})).map(|_| ())
 }
 
-/// 直达厂商的自启动 / 后台运行管理页；无该页时原生侧回退到应用详情。
+/// 直达系统设置 →「应用」页；打不开时原生侧回退到应用详情。
 #[tauri::command]
 pub fn open_autostart_settings(app: tauri::AppHandle) -> Result<(), String> {
     native::<Value>(&app, "openAutoStartSettings", json!({})).map(|_| ())

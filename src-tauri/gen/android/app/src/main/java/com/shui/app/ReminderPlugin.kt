@@ -6,7 +6,6 @@ import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
-import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -430,70 +429,38 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     /**
-     * 自启动 / 后台运行管理页。各厂商是私有页面，没有统一规范，按品牌逐个
-     * 试探；全部不存在时落到应用详情页（所有 ROM 都有）。
+     * 「允许自启动」的入口：直接进系统设置 →「应用」页。
      *
-     * 不用 resolveActivity 预判：Android 11+ 的包可见性限制会让它在没声明
-     * <queries> 时一律返回 null，误判成「不存在」。直接 startActivity 并捕获
-     * ActivityNotFoundException 更可靠（manifest 里也补了 queries 声明）。
+     * 曾经这里按品牌逐个试探厂商私有的自启动管理页，但这些 Activity 在不同
+     * ROM / 版本上经常改名或迁移到别的包，命中率低，还会落在与本机不符的
+     * 页面上。厂商开关本来就无法读写，统一落到系统「设置 > 应用」列表，
+     * 用户按卡片里的路径自己找到 Shui 更稳。系统页打不开时退回应用详情。
+     *
+     * 不用 resolveActivity 预判：Android 11+ 的包可见性限制会让它误判成
+     * 「不存在」。直接 startActivity 并捕获异常更可靠。
      */
     @Suppress("UNUSED_PARAMETER")
     @Command
     fun openAutoStartSettings(invoke: Invoke) {
-        for (intent in autoStartIntents()) {
+        val intents = listOf(
+            Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS),
+            Intent(Settings.ACTION_APPLICATION_SETTINGS)
+        )
+        for (intent in intents) {
             try {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 activity.startActivity(intent)
                 invoke.resolve()
                 return
             } catch (_: Exception) {
-                // 该机型没有这个页面，继续试下一个。
+                // 该机型没有这个系统页，继续试下一个。
             }
         }
         if (!startApplicationDetails()) {
-            invoke.reject("无法打开后台管理设置，请到系统设置中手动开启自启动")
+            invoke.reject("无法打开系统应用设置页，请手动进入系统设置 → 应用")
             return
         }
         invoke.resolve()
-    }
-
-    private fun component(pkg: String, cls: String) =
-        Intent().setComponent(ComponentName(pkg, cls))
-
-    private fun autoStartIntents(): List<Intent> {
-        val manufacturer = (Build.MANUFACTURER ?: "").lowercase()
-        val brand = (Build.BRAND ?: "").lowercase()
-        fun isOneOf(vararg keys: String) =
-            keys.any { manufacturer.contains(it) || brand.contains(it) }
-
-        return buildList {
-            when {
-                isOneOf("xiaomi", "redmi", "poco") -> {
-                    add(component("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"))
-                }
-                isOneOf("huawei", "honor") -> {
-                    add(component("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"))
-                    add(component("com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity"))
-                }
-                isOneOf("oppo", "realme", "oneplus") -> {
-                    add(component("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"))
-                    add(component("com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity"))
-                    add(component("com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity"))
-                }
-                isOneOf("vivo", "iqoo") -> {
-                    add(component("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"))
-                    add(component("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.BgStartUpManager"))
-                }
-                isOneOf("meizu") ->
-                    add(component("com.meizu.safe", "com.meizu.safe.security.SecureMainActivity"))
-                isOneOf("samsung") ->
-                    add(component("com.samsung.android.lool", "com.samsung.android.sm.ui.battery.BatteryActivity"))
-            }
-            // 通用候选：部分 ROM 的自启动管理挂在安全中心里，与品牌无关。
-            add(component("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"))
-            add(component("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"))
-            add(component("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"))
-        }
     }
 
     private fun startApplicationDetails(): Boolean {
