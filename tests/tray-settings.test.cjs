@@ -27,7 +27,7 @@ async function settingsAction({ minimized = false, missing = false } = {}) {
       Menu: { new: async () => ({ append: async item => { items.push(item); } }) },
       MenuItem: { new: async options => options },
       PredefinedMenuItem: { new: async options => options },
-      Submenu: { new: async options => options },
+      Submenu: { new: async options => ({ ...options, append: async item => { items.push(item); } }) },
     },
     '@tauri-apps/api/core': { invoke: async () => {} },
     '@tauri-apps/api/webviewWindow': {
@@ -38,6 +38,10 @@ async function settingsAction({ minimized = false, missing = false } = {}) {
     },
     '@tauri-apps/api/app': { getVersion: async () => '0.2.32' },
     '@tauri-apps/plugin-os': { platform: () => 'macos' },
+    'sonner': { toast: { error: () => {} } },
+    '@/lib/mobile': { emitRefresh: () => {} },
+    '@/lib/analytics': { trackDrinkRecorded: () => {} },
+    '@/utils/sound': { playConfirmSound: async () => {} },
     '@/lib/i18n': {
       useI18n: () => ({
         locale: 'zh-CN',
@@ -45,6 +49,7 @@ async function settingsAction({ minimized = false, missing = false } = {}) {
         t: key => ({
           'tray.preferences': '偏好设置',
           'tray.restNow': '立即休息',
+          'tray.recordDrink': '记录喝水',
           'tray.timerControl': '计时控制',
           'tray.pause': '暂停计时',
           'tray.restart': '重新计时',

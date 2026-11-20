@@ -14,6 +14,7 @@ import { load } from "@tauri-apps/plugin-store";
 import { useTray } from "@/hooks/use-tray";
 import { invoke } from "@tauri-apps/api/core";
 import { STORE_NAME } from "@/lib/constants";
+import { emitRefresh } from "@/lib/mobile";
 import {
   Command,
   CommandEmpty,
@@ -132,6 +133,8 @@ export default function Home() {
 
     // 重置计时器
     invoke("reset_timer");
+    // 目标等配置落盘后广播刷新，让喝水历史、统计等已挂载页面立即重读。
+    emitRefresh();
   };
 
   const selectedApp = config.whitelist_apps.filter((app) =>

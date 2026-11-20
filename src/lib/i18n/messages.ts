@@ -103,6 +103,10 @@ export const zhCN = {
   "settings.history.title": "饮水记录",
   "settings.history.error": "暂时无法读取记录，请刷新重试。",
   "settings.history.loading": "正在读取饮水记录…",
+  "settings.history.todayProgress": "今日进度",
+  "settings.history.todayAmount": "已喝 {total} ml / 目标 {goal} ml",
+  "settings.history.goalReached": "已达标",
+  "settings.history.noGoal": "尚未设置喝水目标，可在「提醒」页设置。",
 
   "settings.shortcut.title": "快捷键",
   "settings.shortcut.quit.label": "退出",
@@ -237,6 +241,7 @@ export const zhCN = {
   "mobile.today.details.emptyTitle": "今天还没有记录",
   "mobile.today.details.emptyDescription": "喝第一杯水后，这里会显示时间和水量",
   "mobile.today.details.undoAria": "撤销这笔记录",
+  "mobile.today.details.viewAll": "查看全部 {count} 条",
   "mobile.today.goalToast": "🎉 今日目标已完成",
   "mobile.today.saveUnconfirmed": "保存未确认，请再点一次原按钮（不会重复累加）",
   "mobile.today.undoSuccess": "已撤销这笔记录",
@@ -510,6 +515,7 @@ export const zhCN = {
   "updater.badgeNew": "有新版本",
   "tray.preferences": "偏好设置",
   "tray.restNow": "立即休息",
+  "tray.recordDrink": "记录喝水",
   "tray.timerControl": "计时控制",
   "tray.pause": "暂停计时",
   "tray.restart": "重新计时",
@@ -803,6 +809,11 @@ export const enUS = {
   "settings.history.error":
     "Unable to read records right now. Please refresh and try again.",
   "settings.history.loading": "Loading drink records...",
+  "settings.history.todayProgress": "Today's progress",
+  "settings.history.todayAmount": "{total} ml of {goal} ml",
+  "settings.history.goalReached": "Goal reached",
+  "settings.history.noGoal":
+    "No water goal set yet. You can set one on the Reminder page.",
 
   "settings.shortcut.title": "Shortcuts",
   "settings.shortcut.quit.label": "Quit",
@@ -951,6 +962,7 @@ export const enUS = {
   "mobile.today.details.emptyDescription":
     "After your first glass, the time and amount will show here",
   "mobile.today.details.undoAria": "Undo this entry",
+  "mobile.today.details.viewAll": "View all {count}",
   "mobile.today.goalToast": "🎉 Daily goal reached",
   "mobile.today.saveUnconfirmed":
     "Save not confirmed. Tap the same button again (it will not double count).",
@@ -1247,6 +1259,7 @@ export const enUS = {
   "updater.badgeNew": "Update available",
   "tray.preferences": "Preferences",
   "tray.restNow": "Take a break",
+  "tray.recordDrink": "Add a drink",
   "tray.timerControl": "Timer control",
   "tray.pause": "Pause timer",
   "tray.restart": "Restart timer",

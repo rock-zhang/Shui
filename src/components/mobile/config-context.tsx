@@ -15,6 +15,7 @@ import { syncAnalyticsProperties, track } from "@/lib/analytics";
 import {
   DEFAULT_ALERT,
   DEFAULT_GENERAL,
+  emitRefresh,
   GAP_OPTIONS,
   readConfig,
   rescheduleReminders,
@@ -186,6 +187,9 @@ export function MobileConfigProvider({ children }: { children: ReactNode }) {
 
   const patchAlert = useCallback(
     (patch: Partial<AlertConfig>) => {
+      const goalChanged =
+        patch.gold !== undefined &&
+        String(patch.gold) !== String(alertRef.current.gold);
       const next = { ...alertRef.current, ...patch };
       const reschedule = scheduleChanged(
         alertRef.current,
@@ -195,7 +199,13 @@ export function MobileConfigProvider({ children }: { children: ReactNode }) {
       trackSettingChanges(alertRef.current, next, ALERT_ANALYTICS_KEYS, reschedule);
       alertRef.current = next;
       setAlert(next);
-      void persist("alert", next, reschedule);
+      if (goalChanged) {
+        // 目标变了要让「今日」页的进度区重新读取：写盘成功后再广播，
+        // 否则监听方可能读到旧值。
+        void persist("alert", next, reschedule).then(() => emitRefresh());
+      } else {
+        void persist("alert", next, reschedule);
+      }
     },
     [persist]
   );

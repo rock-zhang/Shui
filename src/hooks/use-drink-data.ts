@@ -150,7 +150,7 @@ export function useDrinkData(period: 7 | 30 = 7) {
       if (!cancelled) {
         setSnapshot({
           goal,
-          today: normalizeDrinkDay(todayValue, goal),
+          today: normalizeDrinkDay(todayValue, goal, { preferFallbackGoal: true }),
           days: summarizeDrinkDays(dates, values, goal),
           entries: dates.map(
             (date, index) =>

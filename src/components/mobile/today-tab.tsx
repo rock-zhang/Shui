@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Check,
+  ChevronDown,
   Clock3,
   CupSoda,
   Droplet,
@@ -17,12 +18,13 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDrinkData } from "@/hooks/use-drink-data";
 import { usePlatform } from "@/hooks/use-platform";
 import { track, trackDrinkRecorded } from "@/lib/analytics";
 import { getLocalDateKey } from "@/lib/drink-history";
-import type { DrinkReceipt } from "@/lib/drink-day";
+import type { DrinkEntry, DrinkReceipt } from "@/lib/drink-day";
 import {
   emitNextReminder,
   emitRefresh,
@@ -58,6 +60,8 @@ const QUICK_AMOUNTS: Array<{
 const QUICK_DEDUPE_MS = 1200;
 /** 按钮「水位上涨 + ✓」就地反馈的持续时间。 */
 const CELEBRATE_MS = 1400;
+/** 主页面内联展示的明细条数，更早的记录收进底部抽屉。 */
+const DETAIL_INLINE_COUNT = 3;
 
 type Celebration = { amount: number; token: number };
 
@@ -233,6 +237,7 @@ export function TodayTab() {
   const { alert, hydrated } = useMobileConfig();
   const [confirmUndo, setConfirmUndo] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<Celebration | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const busy = useRef(false);
   const celebrationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const celebrationToken = useRef(0);
@@ -261,6 +266,8 @@ export function TodayTab() {
 
   const goalValue = goal || today.goal;
   const goalReached = goalValue > 0 && today.total >= goalValue;
+  // 新→旧的展示顺序；原始 entries 顺序保持不动，避免影响其它消费方。
+  const latestEntries = [...today.entries].reverse();
 
   async function submit(amount: number) {
     // `busy` is a ref: repeated taps are dropped without disabling (and hence
@@ -372,7 +379,7 @@ export function TodayTab() {
               >
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute -right-5 -top-6 h-20 w-20 rounded-full bg-primary/5 transition-colors group-hover:bg-primary/10"
+                  className="pointer-events-none absolute -right-5 -top-6 h-20 w-20 rounded-full bg-primary/10 transition-colors group-hover:bg-primary/15"
                 />
                 {celebrating && (
                   <span
@@ -396,10 +403,10 @@ export function TodayTab() {
                 ) : (
                   <>
                     <span className="relative flex items-start justify-between">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
                         <Icon className="h-4 w-4" strokeWidth={1.8} />
                       </span>
-                      <Plus className="h-3.5 w-3.5 text-muted-foreground/50 transition-colors group-hover:text-primary" />
+                      <Plus className="h-4.5 w-4.5 text-muted-foreground/50 transition-colors group-hover:text-primary" />
                     </span>
                     <span className="relative block">
                       <span className="block text-[22px] font-semibold leading-none tabular-nums tracking-tight">
@@ -477,61 +484,134 @@ export function TodayTab() {
             description={t("mobile.today.details.emptyDescription")}
           />
         ) : (
-          <ul className="space-y-2">
-            {[...today.entries].reverse().map((entry, index) => (
-              <li
-                key={entry.requestId ?? index}
-                className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-muted/50 px-3 py-2.5"
+          <>
+            <TodayDetailList
+              entries={latestEntries.slice(0, DETAIL_INLINE_COUNT)}
+              confirmUndo={confirmUndo}
+              onRequestUndo={setConfirmUndo}
+              onCancelUndo={() => setConfirmUndo(null)}
+              onUndo={undo}
+              t={t}
+              locale={locale}
+            />
+            {latestEntries.length > DETAIL_INLINE_COUNT && (
+              <Button
+                variant="ghost"
+                className="mt-1 w-full min-h-10"
+                onClick={() => setDetailsOpen(true)}
               >
-                <span className="min-w-0 flex-1 text-sm tabular-nums">
-                  {formatTimeLabel(
-                    entry.timestamp,
-                    t("common.details.unknownTime"),
-                    locale
-                  )}
-                </span>
-                <span className="text-sm font-medium tabular-nums">
-                  {entry.amount} ml
-                </span>
-                {entry.requestId &&
-                  (confirmUndo === entry.requestId ? (
-                    <span className="flex w-full items-center justify-end gap-1 pt-1">
-                      <span className="mr-auto text-xs text-muted-foreground">
-                        {t("common.details.confirmUndo")}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="min-h-9"
-                        onClick={() => undo(entry.requestId!)}
-                      >
-                        {t("common.details.confirm")}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="min-h-9"
-                        onClick={() => setConfirmUndo(null)}
-                      >
-                        {t("common.cancel")}
-                      </Button>
-                    </span>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      aria-label={t("mobile.today.details.undoAria")}
-                      className="h-9 w-9 p-0"
-                      onClick={() => setConfirmUndo(entry.requestId!)}
-                    >
-                      <Undo2 className="h-4 w-4" />
-                    </Button>
-                  ))}
-              </li>
-            ))}
-          </ul>
+                <ChevronDown className="mr-1 h-3.5 w-3.5" />
+                {t("mobile.today.details.viewAll", { count: latestEntries.length })}
+              </Button>
+            )}
+          </>
         )}
       </MobileSection>
+
+      <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <SheetContent side="bottom" className="mx-auto max-h-[80dvh] rounded-t-2xl">
+          <div aria-hidden className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/40" />
+          <SheetHeader className="pr-10">
+            <SheetTitle>{t("mobile.today.details.title")}</SheetTitle>
+            <SheetDescription>{t("mobile.today.details.description")}</SheetDescription>
+          </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
+            <TodayDetailList
+              entries={latestEntries}
+              confirmUndo={confirmUndo}
+              onRequestUndo={setConfirmUndo}
+              onCancelUndo={() => setConfirmUndo(null)}
+              onUndo={undo}
+              t={t}
+              locale={locale}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
+  );
+}
+
+/** 与今日 tab 快捷卡片对齐的水量图标体系，明细里复用同一套视觉语义。 */
+const AMOUNT_ICONS: Array<{ max: number; Icon: LucideIcon }> = [
+  { max: 50, Icon: Droplet },
+  { max: 100, Icon: Droplets },
+  { max: 200, Icon: GlassWater },
+  { max: Number.POSITIVE_INFINITY, Icon: CupSoda },
+];
+
+function amountIcon(amount: number): LucideIcon {
+  return AMOUNT_ICONS.find((item) => amount <= item.max)!.Icon;
+}
+
+/** 明细条目列表（新→旧顺序），主页内联与抽屉共用。 */
+function TodayDetailList({
+  entries,
+  confirmUndo,
+  onRequestUndo,
+  onCancelUndo,
+  onUndo,
+  t,
+  locale,
+}: {
+  entries: DrinkEntry[];
+  confirmUndo: string | null;
+  onRequestUndo: (requestId: string) => void;
+  onCancelUndo: () => void;
+  onUndo: (requestId: string) => void;
+  t: Translate;
+  locale: ReturnType<typeof useI18n>["locale"];
+}) {
+  return (
+    <ul className="space-y-2">
+      {entries.map((entry, index) => {
+        const Icon = amountIcon(entry.amount);
+        return (
+          <li
+            key={entry.requestId ?? `${entry.timestamp}-${index}`}
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-border/60 bg-card px-3 py-2.5 shadow-sm"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <Icon className="h-4 w-4 text-primary" aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm tabular-nums">
+              {formatTimeLabel(entry.timestamp, t("common.details.unknownTime"), locale)}
+            </span>
+            <span className="text-sm font-semibold tabular-nums text-primary">
+              {entry.amount} ml
+            </span>
+            {entry.requestId &&
+              (confirmUndo === entry.requestId ? (
+                <span className="flex w-full items-center justify-end gap-1 pt-1">
+                  <span className="mr-auto text-xs text-muted-foreground">
+                    {t("common.details.confirmUndo")}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="min-h-9"
+                    onClick={() => onUndo(entry.requestId!)}
+                  >
+                    {t("common.details.confirm")}
+                  </Button>
+                  <Button size="sm" variant="ghost" className="min-h-9" onClick={onCancelUndo}>
+                    {t("common.cancel")}
+                  </Button>
+                </span>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={t("mobile.today.details.undoAria")}
+                  className="h-9 w-9 p-0"
+                  onClick={() => onRequestUndo(entry.requestId!)}
+                >
+                  <Undo2 className="h-4 w-4" />
+                </Button>
+              ))}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

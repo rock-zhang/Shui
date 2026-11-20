@@ -33,6 +33,9 @@ use crate::reminder_session::{ClosedSession, Outcome};
 /// 前端收到后刷新饮水明细并播放确认音。payload 是 `Receipt` 的 JSON。
 pub const DRINK_RECORDED_EVENT: &str = "shui:drink-recorded";
 
+/// 点通知主体唤回窗口后直达「饮水记录」页，前端 setting layout 负责路由跳转。
+pub const OPEN_DRINK_HISTORY_EVENT: &str = "shui:open-drink-history";
+
 const SKIP_ACTION_ID: &str = "skip";
 // Windows / Linux 的第四个按钮文案由 localization::t("notification.skip_action") 提供；
 // macOS 走单按钮方案，多一个动作就会被折叠成下拉，所以不发。
@@ -379,7 +382,7 @@ fn handle_custom_action(app: &AppHandle, action: &str, was_visible: bool) -> boo
     confirmed
 }
 
-/// 点通知主体：用户想回到 App，与「点了记水按钮」区别对待。
+/// 点通知主体：用户想回到 App 看饮水情况，与「点了记水按钮」区别对待。
 fn open_from_notification(app: &AppHandle) {
     crate::desktop_analytics::log_event(
         app,
@@ -388,6 +391,11 @@ fn open_from_notification(app: &AppHandle) {
     );
     if let Err(error) = crate::startup::show_main_window(app) {
         report(&format!("唤回设置窗口失败：{error}"));
+    }
+    // 唤回后直达「饮水记录」页。窗口隐藏时 WebView 仍在运行（背景节流已关），
+    // 事件由前端 setting layout 接收并做路由跳转。
+    if let Err(error) = app.emit(OPEN_DRINK_HISTORY_EVENT, ()) {
+        report(&format!("打开饮水记录页事件广播失败：{error}"));
     }
 }
 

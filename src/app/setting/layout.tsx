@@ -2,7 +2,7 @@
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { Toaster } from "@/components/ui/sonner";
@@ -32,6 +32,7 @@ export default function RootLayout({
   // 否则移动端会先误报一条桌面启动。
   const [ready, setReady] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     const kind = detectPlatform();
@@ -42,6 +43,12 @@ export default function RootLayout({
 
     // 通知里的「+Xml」由 Rust 记进库，这里只订阅它的广播来刷新明细 + 播确认音。
     void setupDesktopNotificationBridge();
+
+    // 点通知主体唤回窗口后直达「饮水记录」页：Rust 只发事件，路由跳转留在前端，
+    // 避免在 Rust 里改窗口 URL 导致整页重载、丢掉 WebView 里的运行时状态。
+    const unlistenOpenHistory = listen("shui:open-drink-history", () => {
+      router.push("/setting/history/");
+    });
 
     const unlisten = listen("timer-complete", async (event) => {
       console.log("Timer completed", event);
@@ -59,6 +66,7 @@ export default function RootLayout({
 
     return () => {
       unlisten.then((unsubscribe) => unsubscribe());
+      unlistenOpenHistory.then((unsubscribe) => unsubscribe());
     };
   }, []);
 

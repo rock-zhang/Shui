@@ -31,12 +31,26 @@ export function getRecentDates(dayCount: number, endDate = new Date()) {
   });
 }
 
-export function normalizeDrinkDay(value: DrinkHistoryValue, fallbackGoal: number): DrinkDayRecord {
+export interface NormalizeDrinkDayOptions {
+  /**
+   * 「今天」的进度应跟随最新设置的目标，而不是记水时写进记录的旧快照；
+   * 历史日期仍优先用当天保存的快照，保证「是否达标」按当时目标判断。
+   */
+  preferFallbackGoal?: boolean;
+}
+
+export function normalizeDrinkDay(
+  value: DrinkHistoryValue,
+  fallbackGoal: number,
+  options?: NormalizeDrinkDayOptions
+): DrinkDayRecord {
   const savedGoal = typeof value === "object" && value ? nonNegative(value.goal) : 0;
+  const currentGoal = nonNegative(fallbackGoal);
+  const preferFallback = options?.preferFallbackGoal === true && currentGoal > 0;
   return {
     schemaVersion: 1,
     total: nonNegative(typeof value === "number" ? value : value?.total),
-    goal: savedGoal > 0 ? savedGoal : nonNegative(fallbackGoal),
+    goal: preferFallback || savedGoal <= 0 ? currentGoal : savedGoal,
     entries: typeof value === "object" && Array.isArray(value?.entries)
       ? value.entries.filter(entry => typeof entry?.timestamp === "string" && nonNegative(entry?.amount) > 0)
         .map(entry => ({

@@ -21,6 +21,19 @@ test('saved goals and request IDs survive normalization', () => {
   assert.equal(day.entries[1].requestId, undefined);
 });
 
+test('today prefers the latest setting goal over the saved snapshot', () => {
+  const day = api.normalizeDrinkDay({ total: 900, goal: 1000, entries: [] }, 2000,
+    { preferFallbackGoal: true });
+  assert.equal(day.goal, 2000);
+  // 历史日期不带该选项时仍沿用当天保存的目标快照。
+  const history = api.normalizeDrinkDay({ total: 900, goal: 1000, entries: [] }, 2000);
+  assert.equal(history.goal, 1000);
+  // 设置为 0（未配置）时不覆盖快照。
+  const noGoal = api.normalizeDrinkDay({ total: 900, goal: 1000, entries: [] }, 0,
+    { preferFallbackGoal: true });
+  assert.equal(noGoal.goal, 1000);
+});
+
 test('invalid totals and non-positive entries do not pollute views', () => {
   const day = api.normalizeDrinkDay({ total: -100, goal: -1, entries: [null,
     { amount: -50, timestamp: 'today' }, { amount: Infinity, timestamp: 'today' },

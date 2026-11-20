@@ -10,9 +10,17 @@ import { invoke } from "@tauri-apps/api/core";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getVersion } from "@tauri-apps/api/app";
 import { platform } from "@tauri-apps/plugin-os";
+import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
+import { emitRefresh } from "@/lib/mobile";
+import { trackDrinkRecorded } from "@/lib/analytics";
+import { playConfirmSound } from "@/utils/sound";
+import type { DrinkReceipt } from "@/lib/drink-day";
 
 const TRAY_ID = "main-tray";
+
+/** 托盘快捷记水档位。 */
+const TRAY_DRINK_AMOUNTS = [50, 100] as const;
 
 export function useTray() {
   const { t, locale } = useI18n();
@@ -60,6 +68,32 @@ export function useTray() {
         },
       })
     );
+
+    // 托盘快捷记水：与通知按钮同一条 `record_drink` 落盘链路（带幂等 requestId），
+    // 成功后广播刷新（饮水记录页、统计等监听者自行重读）并播确认音，对齐通知记水。
+    const drinkSubmenu = await Submenu.new({ text: t("tray.recordDrink") });
+    for (const amount of TRAY_DRINK_AMOUNTS) {
+      await drinkSubmenu.append(
+        await MenuItem.new({
+          text: `+${amount}ml`,
+          action: async () => {
+            try {
+              const receipt = await invoke<DrinkReceipt>("record_drink", {
+                amount,
+                requestId: crypto.randomUUID(),
+              });
+              trackDrinkRecorded(receipt, amount, "manual_today");
+              emitRefresh();
+              void playConfirmSound();
+            } catch (error) {
+              console.error("托盘记水失败:", error);
+              toast.error(t("common.manualDrink.uncertain"));
+            }
+          },
+        })
+      );
+    }
+    await menu.append(drinkSubmenu);
 
     // 创建子菜单
     const submenu = await Submenu.new({
