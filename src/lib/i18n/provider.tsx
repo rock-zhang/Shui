@@ -104,11 +104,22 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener("languagechange", onLanguageChange);
 
     void listen("store://change", (event) => {
-      const payload = event.payload as { key?: unknown } | null;
+      const payload = event.payload as {
+        key?: unknown;
+        path?: unknown;
+        value?: unknown;
+      } | null;
       if (payload?.key !== LANGUAGE_STORE_KEY) return;
-      void readStore().then((stored) => {
-        if (stored) applyExternal(stored);
-      });
+      // 只有 config store 的 `language` 才算语言偏好，其它 store 的同名键忽略。
+      if (
+        typeof payload.path !== "string" ||
+        !payload.path.endsWith(STORE_NAME.config)
+      ) {
+        return;
+      }
+      // 直接用负载里的值，不在事件处理里回读 store：Rust 侧是持有 store 锁同步
+      // 派发本事件的，回读会把计时线程和设置页一起堵死（见 localization::apply_preference）。
+      if (isLanguagePreference(payload.value)) applyExternal(payload.value);
     })
       .then((unlisten) => {
         if (cancelled) unlisten();

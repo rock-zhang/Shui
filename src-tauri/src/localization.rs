@@ -86,8 +86,28 @@ pub fn init(app: &AppHandle) {
     refresh_from_store(app);
 }
 
-/// 偏好变化时刷新缓存（由 `store://change` 监听器调用）。
-/// 未写入偏好时走 `resolve_preference(None)`，与前端 `system` 语义对齐。
+/// `store://change` 事件里的 store 文件路径是否就是 config store。
+/// 其它 store（drink_history 等）也可能带同名键，按文件名过滤一次。
+pub fn is_config_store_path(path: &str) -> bool {
+    path.ends_with(CONFIG_STORE)
+}
+
+/// 用事件负载里带的偏好值直接刷新缓存。
+///
+/// **不要改成回读 store**：`tauri-plugin-store` 在持有 store 互斥锁的情况下
+/// 同步派发 `store://change`（`Store::set` → `StoreInner::set` → `app.emit`），
+/// 监听器里再 `app.store(..).get(..)` 就是对同一把非重入锁自锁 —— 该线程永久挂起
+/// 并一直占着锁，随后计时线程的 `AppSettings::load_from_store`、设置页的
+/// `store.get` 全部堵死（表现为切语言后托盘倒计时冻住、设置页读不出数据）。
+/// 事件负载本身已带 `value`，直接用即可，全程不碰 store。
+pub fn apply_preference(preference: Option<&str>) {
+    set_current(resolve_preference(preference));
+}
+
+/// 从 store 读取偏好并刷新缓存，仅用于启动初始化。
+///
+/// 运行时（`store://change`）必须走 [`apply_preference`]：事件由插件持锁派发，
+/// 在这里回读 store 会自锁。
 pub fn refresh_from_store(app: &AppHandle) {
     let preference = read_preference(app);
     set_current(resolve_preference(preference.as_deref()));
@@ -388,6 +408,19 @@ mod tests {
             ),
             "250ml today"
         );
+    }
+
+    #[test]
+    fn config_store_path_matching() {
+        assert!(is_config_store_path(
+            "/Users/me/Library/Application Support/com.shui.app/config_store.json"
+        ));
+        assert!(is_config_store_path("config_store.json"));
+        // 其它 store 即使写了同名 language 键也不该触发刷新。
+        assert!(!is_config_store_path(
+            "/Users/me/Library/Application Support/com.shui.app/drink_history_store.json"
+        ));
+        assert!(!is_config_store_path(""));
     }
 
     #[test]

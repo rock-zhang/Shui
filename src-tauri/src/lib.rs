@@ -159,17 +159,27 @@ pub fn run() {
                 // 托盘 title/tooltip 由计时器循环每秒重设、通知在发送时取当前语言，
                 // 因此切换语言无需重启即可生效。
                 localization::init(&app_handle);
-                let locale_handle = app_handle.clone();
                 app_handle.listen("store://change", move |event| {
                     let Ok(payload) = serde_json::from_str::<serde_json::Value>(event.payload())
                     else {
                         return;
                     };
                     if payload.get("key").and_then(|key| key.as_str())
-                        == Some(localization::LANGUAGE_STORE_KEY)
+                        != Some(localization::LANGUAGE_STORE_KEY)
                     {
-                        localization::refresh_from_store(&locale_handle);
+                        return;
                     }
+                    let path = payload
+                        .get("path")
+                        .and_then(|path| path.as_str())
+                        .unwrap_or_default();
+                    if !localization::is_config_store_path(path) {
+                        return;
+                    }
+                    // 只认负载里的 value，绝不回读 store：插件是持锁同步派发本事件的，
+                    // 回读会自锁，把计时线程和设置页一起堵死（见 localization::apply_preference）。
+                    let preference = payload.get("value").and_then(|value| value.as_str());
+                    localization::apply_preference(preference);
                 });
 
                 // The main webview and tray load even when the window stays hidden.
