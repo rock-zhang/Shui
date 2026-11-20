@@ -17,7 +17,7 @@ import { useMobileConfig } from "./config-context";
 import { useNotificationPermission } from "./notification-permission-context";
 import { NotificationHealthCard } from "./notification-health-card";
 import { MobileRow, MobileSection, MobileTimeInput } from "./ui";
-import { useI18n, WEEKDAY_SHORT_KEYS } from "@/lib/i18n";
+import { useI18n, WEEKDAY_LONG_KEYS, WEEKDAY_SHORT_KEYS } from "@/lib/i18n";
 
 function Chip({
   selected,
@@ -162,6 +162,7 @@ export function ReminderTab() {
                 key={day}
                 type="button"
                 aria-pressed={selected}
+                aria-label={t(WEEKDAY_LONG_KEYS[day])}
                 onClick={() => toggleWeekday(day)}
                 className={cn(
                   "flex h-11 min-w-0 items-center justify-center rounded-xl text-sm font-medium transition-colors",
@@ -170,7 +171,7 @@ export function ReminderTab() {
                     : "bg-muted text-muted-foreground"
                 )}
               >
-                {t(WEEKDAY_SHORT_KEYS[day])}
+                <span aria-hidden="true">{t(WEEKDAY_SHORT_KEYS[day])}</span>
               </button>
             );
           })}

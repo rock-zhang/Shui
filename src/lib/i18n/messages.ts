@@ -1422,13 +1422,19 @@ export const enUS = {
   "mobile.missed.viewSteps": "See setup steps",
   "mobile.missed.gotIt": "Got it",
 
-  "weekday.short.0": "S",
-  "weekday.short.1": "M",
-  "weekday.short.2": "T",
-  "weekday.short.3": "W",
-  "weekday.short.4": "T",
-  "weekday.short.5": "F",
-  "weekday.short.6": "S",
+  /**
+   * 星期缩写。中文单字本身就唯一（日一二三四五六），英文不能用单字母：
+   * 「T」同时是 Tue/Thu，「S」同时是 Sun/Sat，只能靠格子位置猜。
+   * 两字母（Su Mo Tu We Th Fr Sa）是 Apple 日历与多数控件采用的形式。
+   * 若将来加其它语言，注意别退化成 CLDR 的 narrow（单字母）形式。
+   */
+  "weekday.short.0": "Su",
+  "weekday.short.1": "Mo",
+  "weekday.short.2": "Tu",
+  "weekday.short.3": "We",
+  "weekday.short.4": "Th",
+  "weekday.short.5": "Fr",
+  "weekday.short.6": "Sa",
   "weekday.long.0": "Sunday",
   "weekday.long.1": "Monday",
   "weekday.long.2": "Tuesday",

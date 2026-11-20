@@ -32,19 +32,17 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { usePlatform } from "@/hooks/use-platform";
 import { track } from "@/lib/analytics";
-import { useI18n, type Locale } from "@/lib/i18n";
+import {
+  useI18n,
+  WEEKDAY_LONG_KEYS,
+  WEEKDAY_SHORT_KEYS,
+  type Locale,
+} from "@/lib/i18n";
 
 const goldList = ["1000", "1500", "2000", "2500", "3000", "3500", "4000"];
 const gapList = ["10", "20", "30", "45", "60"];
-const weekdayKeys = [
-  "weekday.short.0",
-  "weekday.short.1",
-  "weekday.short.2",
-  "weekday.short.3",
-  "weekday.short.4",
-  "weekday.short.5",
-  "weekday.short.6",
-] as const;
+/** 星期缩写与全称共用一份映射，避免此处再手抄七行 key。 */
+const weekdayKeys = WEEKDAY_SHORT_KEYS;
 
 if (process.env.NODE_ENV === "development") {
   gapList.unshift("1");
@@ -228,7 +226,10 @@ export default function Home() {
           {weekdayKeys.map((key, index) => (
             <button
               key={key}
-              className={`h-8 w-8 rounded-full text-sm font-medium transition-colors cursor-pointer
+              type="button"
+              aria-pressed={Boolean(config.weekdays?.includes(index))}
+              aria-label={t(WEEKDAY_LONG_KEYS[index])}
+              className={`inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-sm font-medium transition-colors cursor-pointer
                 ${
                   config.weekdays?.includes(index)
                     ? "bg-primary text-primary-foreground"
@@ -243,7 +244,7 @@ export default function Home() {
                 saveConfig("weekdays", newWeekdays);
               }}
             >
-              {t(key)}
+              <span aria-hidden="true">{t(key)}</span>
             </button>
           ))}
         </div>
