@@ -46,6 +46,8 @@ export interface AlertConfig {
   timeStart: string;
   timeEnd: string;
   whitelist_apps: string[];
+  /** 今日页 4 个快捷杯量（ml）。属非节奏配置：只同步原生快照，不重排闹钟。 */
+  quickAmounts: number[];
 }
 
 export interface GeneralConfig {
@@ -62,6 +64,12 @@ export interface GeneralConfig {
   quietEnd: string;
 }
 
+/** 快捷杯量的合法范围与编辑步进（今日页长按卡片可自定义）。 */
+export const MIN_QUICK_AMOUNT = 10;
+export const MAX_QUICK_AMOUNT = 1000;
+export const STEP_QUICK_AMOUNT = 10;
+export const DEFAULT_QUICK_AMOUNTS = [50, 100, 200, 300];
+
 export const DEFAULT_ALERT: AlertConfig = {
   gold: "1500",
   // 必须与 Rust 侧的默认配置（store/settings.rs 的 init_store / unwrap_or）以及
@@ -71,7 +79,25 @@ export const DEFAULT_ALERT: AlertConfig = {
   timeStart: "09:00",
   timeEnd: "18:00",
   whitelist_apps: [],
+  quickAmounts: DEFAULT_QUICK_AMOUNTS,
 };
+
+/**
+ * 归一化快捷杯量：旧版本配置没有该字段、或历史数据含非法值时兜底。
+ * 数量不足 4 个用默认值整组替换，避免渲染时出现 undefined 槽位。
+ */
+export function normalizeQuickAmounts(value: unknown): number[] {
+  if (!Array.isArray(value)) return [...DEFAULT_QUICK_AMOUNTS];
+  const amounts = value
+    .map((item) => (typeof item === "number" ? Math.round(item) : NaN))
+    .filter((amount) => Number.isFinite(amount))
+    .map((amount) =>
+      Math.min(MAX_QUICK_AMOUNT, Math.max(MIN_QUICK_AMOUNT, amount))
+    );
+  return amounts.length === DEFAULT_QUICK_AMOUNTS.length
+    ? amounts
+    : [...DEFAULT_QUICK_AMOUNTS];
+}
 
 export const DEFAULT_GENERAL: GeneralConfig = {
   isAutoStart: false,

@@ -122,15 +122,34 @@ object ReminderScheduler {
     const val GOAL_NOTIFICATION_ID = 2002
 
     /**
-     * 与桌面 `DRINK_ACTION_AMOUNTS` 保持一致（见 utils/notification.ts）：
-     * 档位相同、顺序相同（升序）、按钮文案相同。
-     * Android 的闹钟通知与「测试通知」共用这一份配置，只有一套档位。
-     *
+     * 通知快捷按钮的兜底杯量。用户在今日页长按卡片自定义 quickAmounts 后，
+     * [drinkActions] 会取其中最小的三档；配置缺失/非法时回退到这里。
      * 升序不是随便定的：macOS 会把多个动作折叠进下拉菜单，直接点下拉按钮会被
-     * 系统上报成第一个动作，50ml 排首位时误点代价最小；三端顺序统一也省得
-     * 用户换端后重新找按钮。
+     * 系统上报成第一个动作，最小档排首位时误点代价最小。
      */
     val DRINK_ACTIONS = listOf(50, 100, 200)
+
+    /**
+     * 通知快捷按钮实际使用的杯量：读前端同步的 alert.quickAmounts（今日页
+     * 长按卡片可自定义，经 saveConfig 写进配置快照），升序取最小三档。
+     * 只影响通知按钮文案，不影响提醒节奏，因此随 saveConfig 同步即可。
+     */
+    fun drinkActions(context: Context): List<Int> {
+        val amounts = config(context)?.optJSONObject("alert")
+            ?.optJSONArray("quickAmounts")
+            ?.let { arr ->
+                (0 until arr.length()).mapNotNull { index ->
+                    when (val value = arr.opt(index)) {
+                        is Number -> value.toDouble().toInt()
+                        is String -> value.toIntOrNull()
+                        else -> null
+                    }?.coerceIn(10, 1000)
+                }
+            }
+            ?: emptyList()
+        if (amounts.size < 3) return DRINK_ACTIONS
+        return amounts.sorted().take(3)
+    }
 
     private fun config(context: Context): JSONObject? {
         val raw = context.getSharedPreferences(ReminderPlugin.PREFS, Context.MODE_PRIVATE)
@@ -1121,7 +1140,7 @@ class ReminderReceiver : BroadcastReceiver() {
 
         // Android 一条通知最多显示 3 个操作按钮，多出来的会被系统直接丢弃。
         // 三档水量已占满名额，所以不放「稍后再说」——划掉通知本身就是忽略这一次。
-        ReminderScheduler.DRINK_ACTIONS.forEachIndexed { index, amount ->
+        ReminderScheduler.drinkActions(context).forEachIndexed { index, amount ->
             // 收起态空间有限，动作一律用「+50ml」这种最省字的写法，
             // 一眼就能看出是「加记这么多水」。
             builder.addAction(

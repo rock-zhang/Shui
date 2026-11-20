@@ -18,11 +18,6 @@ export const zhCN = {
   "common.manualDrink.saving": "正在保存…",
   "common.manualDrink.uncertain":
     "未能确认保存结果，请点击重试；同一笔记录不会重复累加。",
-  "common.manualDrink.recordedTotal": "已记录，累计 {total}ml",
-  "common.manualDrink.alreadyTotal": "该笔饮水已记录，累计 {total}ml",
-  "common.manualDrink.recordedTotalGoal": "已记录，累计 {total}ml，今日目标已完成！",
-  "common.manualDrink.alreadyTotalGoal":
-    "该笔饮水已记录，累计 {total}ml，今日目标已完成！",
 
   "common.details.title": "饮水明细",
   "common.details.description":
@@ -226,8 +221,17 @@ export const zhCN = {
   "mobile.today.next.tomorrow": "今天不提醒 · 下次明天 {time}",
   "mobile.today.next.weekday": "今天不提醒 · 下次{weekday} {time}",
   "mobile.today.tip": "建议每天 1500~1700ml，少量多次，每次不超过 200ml",
-  "mobile.today.record.aria": "记录 {amount} 毫升饮水",
+  "mobile.today.record.aria": "记录 {amount} 毫升饮水，长按可自定义杯量",
   "mobile.today.record.done": "已记录 +{amount} ml",
+  "mobile.today.cup.editTitle": "自定义杯量",
+  "mobile.today.cup.replaceHint": "将替换「+{amount} {name}」卡片",
+  "mobile.today.cup.decAria": "减少 10 毫升",
+  "mobile.today.cup.incAria": "增加 10 毫升",
+  "mobile.today.cup.save": "保存",
+  "mobile.today.cup.updated": "杯量已更新为 {amount} ml",
+  "mobile.today.cup.hintBubble": "长按卡片可自定义杯量",
+  "mobile.today.cup.hintBubbleDismiss": "知道了",
+  "mobile.today.cup.range": "10–1000 ml，按 10 ml 调整",
   "mobile.today.hint.50": "小口",
   "mobile.today.hint.100": "几口",
   "mobile.today.hint.200": "一杯",
@@ -713,12 +717,6 @@ export const enUS = {
   "common.manualDrink.saving": "Saving...",
   "common.manualDrink.uncertain":
     "Could not confirm the save. Tap retry; the same drink will not be counted twice.",
-  "common.manualDrink.recordedTotal": "Logged, {total} ml total",
-  "common.manualDrink.alreadyTotal": "This drink is already logged, {total} ml total",
-  "common.manualDrink.recordedTotalGoal":
-    "Logged, {total} ml total. Daily goal reached!",
-  "common.manualDrink.alreadyTotalGoal":
-    "This drink is already logged, {total} ml total. Daily goal reached!",
 
   "common.details.title": "Drink details",
   "common.details.description":
@@ -942,8 +940,17 @@ export const enUS = {
     "No more reminders today · next {weekday} at {time}",
   "mobile.today.tip":
     "Aim for 1500–1700 ml a day, in small servings of no more than 200 ml.",
-  "mobile.today.record.aria": "Log {amount} ml of water",
+  "mobile.today.record.aria": "Log {amount} ml of water. Press and hold to customize.",
   "mobile.today.record.done": "Logged +{amount} ml",
+  "mobile.today.cup.editTitle": "Custom cup size",
+  "mobile.today.cup.replaceHint": "Replaces the +{amount} {name} card",
+  "mobile.today.cup.decAria": "Decrease by 10 ml",
+  "mobile.today.cup.incAria": "Increase by 10 ml",
+  "mobile.today.cup.save": "Save",
+  "mobile.today.cup.updated": "Cup size updated to {amount} ml",
+  "mobile.today.cup.hintBubble": "Press and hold a card to customize",
+  "mobile.today.cup.hintBubbleDismiss": "Got it",
+  "mobile.today.cup.range": "10–1000 ml, adjusted in 10 ml steps",
   "mobile.today.hint.50": "Sip",
   "mobile.today.hint.100": "Few sips",
   "mobile.today.hint.200": "A glass",

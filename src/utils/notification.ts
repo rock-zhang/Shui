@@ -14,7 +14,9 @@ export const DRINK_RECORDED_EVENT = "shui:drink-recorded";
  * - macOS 只取其中**最小**的一档（50ml）做成单按钮。macOS 把两个以上动作折叠成
  *   下拉，点下拉按钮本身还会被上报成第一个动作；单按钮一次点击就完成，没有误点空间；
  * - Windows / Linux 三个按钮 + 「稍后再说」并列展示；
- * - Android 的 `ReminderScheduler.DRINK_ACTIONS` 与这里同序、同文案（`+Xml`）。
+ * - Android 的 `ReminderScheduler.drinkActions` 按钮文案格式相同（`+Xml`）；
+ *   Android 允许用户在今日页长按卡片自定义杯量（取最小三档），桌面保持这组
+ *   静态档位不变，因此两端在自定义后允许不同。
  */
 export const DRINK_ACTION_AMOUNTS = [50, 100, 200] as const;
 

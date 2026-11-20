@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Check,
@@ -10,8 +10,10 @@ import {
   Droplet,
   Droplets,
   GlassWater,
+  Minus,
   Plus,
   Undo2,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -29,6 +31,9 @@ import {
   emitNextReminder,
   emitRefresh,
   formatTimeLabel,
+  MAX_QUICK_AMOUNT,
+  MIN_QUICK_AMOUNT,
+  STEP_QUICK_AMOUNT,
   notifyGoalReached,
   onNextReminder,
   onRefresh,
@@ -45,16 +50,27 @@ import { useI18n, WEEKDAY_LONG_KEYS, type MessageKey } from "@/lib/i18n";
 
 type Translate = ReturnType<typeof useI18n>["t"];
 
-const QUICK_AMOUNTS: Array<{
-  amount: number;
-  hintKey: MessageKey;
-  Icon: LucideIcon;
-}> = [
-  { amount: 50, hintKey: "mobile.today.hint.50", Icon: Droplet },
-  { amount: 100, hintKey: "mobile.today.hint.100", Icon: Droplets },
-  { amount: 200, hintKey: "mobile.today.hint.200", Icon: GlassWater },
-  { amount: 300, hintKey: "mobile.today.hint.300", Icon: CupSoda },
-];
+/** 长按卡片进入自定义杯量的按压时长；手指位移超过该像素视为滑动而非长按。 */
+const CUP_HOLD_MS = 2000;
+const CUP_MOVE_TOLERANCE_PX = 8;
+/** 编辑抽屉里的快捷档位（ml）。 */
+const CUP_CHIPS = [50, 100, 150, 250, 500, 750];
+/** 杯量自定义引导的本地记忆：气泡是否已关、是否已自定义过、记录后 toast 是否已提示。 */
+const CUP_HINT_BUBBLE_KEY = "shui.cupHint.bubbleDismissed";
+const CUP_HINT_CUSTOMIZED_KEY = "shui.cupHint.customized";
+const CUP_HINT_TOAST_KEY = "shui.cupHint.toastShown";
+
+/** 杯名按档位自动映射，与 AMOUNT_ICONS 的图标分档保持一致。 */
+function cupHintKey(amount: number): MessageKey {
+  if (amount <= 50) return "mobile.today.hint.50";
+  if (amount <= 100) return "mobile.today.hint.100";
+  if (amount <= 200) return "mobile.today.hint.200";
+  return "mobile.today.hint.300";
+}
+
+function clampAmount(amount: number): number {
+  return Math.min(MAX_QUICK_AMOUNT, Math.max(MIN_QUICK_AMOUNT, amount));
+}
 
 /** 同一金额在该窗口内的重复点击复用同一 requestId，交给 Rust 幂等去重。 */
 const QUICK_DEDUPE_MS = 1200;
@@ -234,19 +250,51 @@ function NextReminderLine({
 export function TodayTab() {
   const { t, locale } = useI18n();
   const { today, goal, error } = useDrinkData(7);
-  const { alert, hydrated } = useMobileConfig();
+  const { alert, hydrated, patchAlert } = useMobileConfig();
+  const quickAmounts = alert.quickAmounts;
   const [confirmUndo, setConfirmUndo] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<Celebration | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // 自定义杯量：editIdx 是被编辑的卡片槽位，draft 是抽屉里的草稿值。
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [draftAmount, setDraftAmount] = useState(0);
+  // 长按进行中的卡片：展示缩放 + 进度条，超时或位移过大即取消。
+  const [holdingIdx, setHoldingIdx] = useState<number | null>(null);
+  // 引导：卡片角上的气泡 + 首次记录后的 toast，各提示一次。
+  const [cupHint, setCupHint] = useState({ bubble: false, toastPending: false });
+  const editOpen = editIdx !== null;
   // Android 返回键先关今日明细弹层，而不是退到桌面。
   useBackToClose(detailsOpen, () => setDetailsOpen(false));
+  useBackToClose(editOpen, () => setEditIdx(null));
   const busy = useRef(false);
   const celebrationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const celebrationToken = useRef(0);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdStart = useRef({ x: 0, y: 0 });
+  // 长按触发后抬起手指会再派发一次 click，用它抑制那一次「误记录」。
+  const longPressFired = useRef(false);
+
+  useEffect(() => {
+    try {
+      const customized =
+        localStorage.getItem(CUP_HINT_CUSTOMIZED_KEY) === "1";
+      const dismissed =
+        localStorage.getItem(CUP_HINT_BUBBLE_KEY) === "1";
+      const toastShown =
+        localStorage.getItem(CUP_HINT_TOAST_KEY) === "1";
+      setCupHint({
+        bubble: !customized && !dismissed,
+        toastPending: !customized && !toastShown,
+      });
+    } catch {
+      // localStorage 不可用（隐私模式等）时静默放弃引导。
+    }
+  }, []);
 
   useEffect(
     () => () => {
       if (celebrationTimer.current) clearTimeout(celebrationTimer.current);
+      if (holdTimer.current) clearTimeout(holdTimer.current);
     },
     []
   );
@@ -260,6 +308,89 @@ export function TodayTab() {
       setCelebration(null);
       celebrationTimer.current = null;
     }, CELEBRATE_MS);
+  }
+
+  /** 首次成功记录后提示一次「长按可自定义」，之后不再打扰。 */
+  function maybeHintAfterRecord() {
+    if (!cupHint.toastPending) return;
+    setCupHint((state) => ({ ...state, toastPending: false }));
+    try {
+      localStorage.setItem(CUP_HINT_TOAST_KEY, "1");
+    } catch {
+      // 忽略：下次启动会再提示一次，可接受。
+    }
+    toast.message(t("mobile.today.cup.hintBubble"));
+  }
+
+  function dismissCupHint() {
+    setCupHint((state) => ({ ...state, bubble: false }));
+    try {
+      localStorage.setItem(CUP_HINT_BUBBLE_KEY, "1");
+    } catch {
+      // 忽略。
+    }
+  }
+
+  /** 长按进入编辑：按住 CUP_HOLD_MS 且位移不超限才触发，触发时轻震一下。 */
+  function startCupHold(idx: number, event: ReactPointerEvent<HTMLButtonElement>) {
+    if (editOpen || busy.current) return;
+    holdStart.current = { x: event.clientX, y: event.clientY };
+    longPressFired.current = false;
+    setHoldingIdx(idx);
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    holdTimer.current = setTimeout(() => {
+      holdTimer.current = null;
+      longPressFired.current = true;
+      setHoldingIdx(null);
+      navigator.vibrate?.(10);
+      setDraftAmount(quickAmounts[idx]);
+      setEditIdx(idx);
+    }, CUP_HOLD_MS);
+  }
+
+  /** 取消长按；手指移远、提前抬起、移出卡片都走这里，不影响正常点击。 */
+  function cancelCupHold() {
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+    setHoldingIdx(null);
+  }
+
+  function onCardPointerMove(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (!holdTimer.current) return;
+    const { x, y } = holdStart.current;
+    if (
+      Math.abs(event.clientX - x) > CUP_MOVE_TOLERANCE_PX ||
+      Math.abs(event.clientY - y) > CUP_MOVE_TOLERANCE_PX
+    ) {
+      cancelCupHold();
+    }
+  }
+
+  function onCardClick(amount: number) {
+    // 长按结束后的那次 click 不记录，避免「改个杯量却多记了一笔」。
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      return;
+    }
+    void submit(amount);
+  }
+
+  function saveCupAmount() {
+    if (editIdx === null) return;
+    const next = [...quickAmounts];
+    next[editIdx] = draftAmount;
+    setCupHint((state) => ({ ...state, bubble: false, toastPending: false }));
+    try {
+      localStorage.setItem(CUP_HINT_CUSTOMIZED_KEY, "1");
+    } catch {
+      // 忽略。
+    }
+    // 杯量属非节奏配置：写盘 + 同步原生快照（saveConfig），不重排闹钟。
+    patchAlert({ quickAmounts: next });
+    toast.success(t("mobile.today.cup.updated", { amount: draftAmount }));
+    setEditIdx(null);
   }
   const pending = useRef<{ amount: number; requestId: string } | null>(null);
   const lastQuick = useRef<{ amount: number; requestId: string; expiresAt: number } | null>(
@@ -305,6 +436,7 @@ export function TodayTab() {
       // 仅真正新增时播放就地庆祝；幂等命中的重复点击不重复播放动画。
       if (receipt.added) {
         celebrate(draft.amount);
+        maybeHintAfterRecord();
         // 原生重锚后把新排期随 Receipt 带回，立刻刷新「预计下一杯」，
         // 不等 emitRefresh 触发的那次往返读取。
         if (receipt.nextAt) emitNextReminder(receipt.nextAt);
@@ -359,25 +491,61 @@ export function TodayTab() {
         </p>
       </MobileSection>
 
-      <div className="mb-3 grid grid-cols-2 gap-2.5">
-        {QUICK_AMOUNTS.map(({ amount, hintKey, Icon }) => {
+      <div className="relative mb-3">
+        {cupHint.bubble && (
+          <div className="absolute -top-3 right-2 z-10 flex items-center gap-1.5 rounded-full border border-border/70 bg-card py-1.5 pl-3 pr-2 shadow-md">
+            <span className="text-[11px] leading-none text-muted-foreground">
+              {t("mobile.today.cup.hintBubble")}
+            </span>
+            <button
+              type="button"
+              onClick={dismissCupHint}
+              aria-label={t("mobile.today.cup.hintBubbleDismiss")}
+              className="flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground/60 transition-colors hover:text-foreground"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-2.5">
+          {quickAmounts.map((amount, idx) => {
+            const Icon = amountIcon(amount);
+            const hintKey = cupHintKey(amount);
             const celebrating = celebration?.amount === amount ? celebration : null;
+            const holding = holdingIdx === idx;
             return (
               <button
-                key={amount}
+                key={idx}
                 type="button"
-                onClick={() => submit(amount)}
+                onClick={() => onCardClick(amount)}
+                onPointerDown={(event) => startCupHold(idx, event)}
+                onPointerMove={onCardPointerMove}
+                onPointerUp={cancelCupHold}
+                onPointerLeave={cancelCupHold}
+                onContextMenu={(event) => event.preventDefault()}
                 aria-label={t("mobile.today.record.aria", { amount })}
                 className={cn(
                   "group relative flex min-h-[108px] flex-col justify-between overflow-hidden rounded-2xl border bg-card p-3.5 text-left shadow-sm transition-all duration-150 hover:shadow-md active:scale-[0.97]",
                   celebrating
                     ? "border-sky-400/60"
-                    : "border-border/70 hover:border-primary/40"
+                    : holding
+                      ? "scale-[0.98] border-primary/60"
+                      : "border-border/70 hover:border-primary/40"
                 )}
               >
                 <span
                   aria-hidden="true"
                   className="pointer-events-none absolute -right-5 -top-6 h-20 w-20 rounded-full bg-sky-500/10 transition-colors group-hover:bg-sky-500/20"
+                />
+                {/* 长按进度条：按住期间 2s 匀速充满，充满即进入编辑。 */}
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "absolute inset-x-0 bottom-0 h-0.5 origin-left bg-primary",
+                    holding
+                      ? "scale-x-100 ease-linear duration-[2000ms]"
+                      : "scale-x-0 duration-0"
+                  )}
                 />
                 {celebrating && (
                   <span
@@ -422,6 +590,7 @@ export function TodayTab() {
               </button>
             );
           })}
+        </div>
       </div>
 
       <MobileSection title={t("mobile.today.rhythm.title")}>
@@ -510,6 +679,84 @@ export function TodayTab() {
               t={t}
               locale={locale}
             />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet
+        open={editOpen}
+        onOpenChange={(open) => {
+          if (!open) setEditIdx(null);
+        }}
+      >
+        <SheetContent side="bottom" className="mx-auto rounded-t-2xl">
+          <div aria-hidden className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/40" />
+          <SheetHeader className="pr-10">
+            <SheetTitle>{t("mobile.today.cup.editTitle")}</SheetTitle>
+            <SheetDescription>
+              {t("mobile.today.cup.replaceHint", {
+                amount: draftAmount,
+                name: t(cupHintKey(draftAmount)),
+              })}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="px-4 pb-6">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-3xl font-semibold tabular-nums tracking-tight">
+                {draftAmount}
+                <span className="ml-1 text-xs font-medium text-muted-foreground">ml</span>
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-11 w-11"
+                  disabled={draftAmount <= MIN_QUICK_AMOUNT}
+                  aria-label={t("mobile.today.cup.decAria")}
+                  onClick={() => setDraftAmount((value) => clampAmount(value - STEP_QUICK_AMOUNT))}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-11 w-11"
+                  disabled={draftAmount >= MAX_QUICK_AMOUNT}
+                  aria-label={t("mobile.today.cup.incAria")}
+                  onClick={() => setDraftAmount((value) => clampAmount(value + STEP_QUICK_AMOUNT))}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {CUP_CHIPS.map((chip) => (
+                <Button
+                  key={chip}
+                  variant={draftAmount === chip ? "default" : "outline"}
+                  size="sm"
+                  className="min-h-9 rounded-full tabular-nums"
+                  onClick={() => setDraftAmount(chip)}
+                >
+                  {chip}
+                </Button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {t("mobile.today.cup.range")}
+            </p>
+            <div className="mt-4 flex gap-2">
+              <Button
+                variant="ghost"
+                className="min-h-11 flex-1"
+                onClick={() => setEditIdx(null)}
+              >
+                {t("common.cancel")}
+              </Button>
+              <Button className="min-h-11 flex-1" onClick={saveCupAmount}>
+                {t("mobile.today.cup.save")}
+              </Button>
+            </div>
           </div>
         </SheetContent>
       </Sheet>
