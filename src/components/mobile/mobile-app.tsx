@@ -24,6 +24,7 @@ import {
 } from "@/lib/analytics";
 import { MOBILE_TABS, MobileTabBar } from "./mobile-tab-bar";
 import { useI18n, type MessageKey } from "@/lib/i18n";
+import { useUpdate } from "@/components/update-provider";
 import { MobileConfigProvider, useMobileConfig } from "./config-context";
 import { NotificationPermissionProvider } from "./notification-permission-context";
 import { TodayTab } from "./today-tab";
@@ -59,6 +60,13 @@ const HEADERS: Record<
 
 const TAB_STORAGE_KEY = "shui:mobile-tab";
 const TAB_IDS = MOBILE_TABS.map(({ id }) => id);
+
+/** 顶栏日期格式：跨天后要跟着刷新，抽成常量避免两处写法不一致。 */
+const DATE_LABEL_FORMAT: Intl.DateTimeFormatOptions = {
+  month: "long",
+  day: "numeric",
+  weekday: "long",
+};
 
 /** 全屏提醒的触发来源：定时到点、点通知主体、提醒页预览。 */
 export type ReminderTrigger = "alarm" | "notification_click" | "preview";
@@ -165,6 +173,15 @@ export function MobileApp() {
   const [onboardingCleared, setOnboardingCleared] = useState(false);
   const [notificationGuideReady, setNotificationGuideReady] = useState(false);
   const tabRef = useRef<MobileTabId>("today");
+  const { markSeen, latestVersion } = useUpdate();
+  // 进「我」tab 就算看过：灭掉 tab 红点，但版本行的「新版本 x.y.z」
+  // 标记保留到真正装上，避免红点常驻变成噪音。
+  //
+  // 依赖 latestVersion 同理：结果落定前 markSeen 会因「还没数据」空转，
+  // 之后检查出更新又会在用户正看着的 tab 上亮红点。
+  useEffect(() => {
+    if (tab === "me" && latestVersion) markSeen();
+  }, [tab, markSeen, latestVersion]);
   // 系统栏底色 / 图标明暗跟随 App 内主题，避免亮色系统下出现紫色状态栏。
   useSystemBars();
   const scrollNodes = useRef<Partial<Record<MobileTabId, HTMLDivElement | null>>>(
@@ -248,11 +265,31 @@ export function MobileApp() {
   useEffect(() => onShowReminder(() => openReminder("preview")), [openReminder]);
 
   const header = HEADERS[tab];
-  const dateLabel = new Date().toLocaleDateString(locale, {
-    month: "long",
-    day: "numeric",
-    weekday: "long",
-  });
+  /**
+   * 顶栏日期不能只在 render 时现算：跨天后如果没有其他状态变化，
+   * 组件不会重新渲染，日期就停在昨天。这里用轮询 + 回前台补查，
+   * setState 传函数并在同值时返回旧引用，React 会跳过重渲染。
+   */
+  const [dateLabel, setDateLabel] = useState(() =>
+    new Date().toLocaleDateString(locale, DATE_LABEL_FORMAT)
+  );
+  useEffect(() => {
+    const update = () => {
+      const next = new Date().toLocaleDateString(locale, DATE_LABEL_FORMAT);
+      setDateLabel((previous) => (previous === next ? previous : next));
+    };
+    const timer = window.setInterval(update, 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") update();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("shui:foreground", update);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("shui:foreground", update);
+    };
+  }, [locale]);
 
   return (
     <MobileConfigProvider>

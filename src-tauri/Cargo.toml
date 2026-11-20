@@ -102,6 +102,14 @@ notify-rust = "4.9"
 x11-dl = "2.21.0"
 gtk = "0.18.1"
 
+# ---------------------------------------------------------------------------
+# Android 侧载包不引入 Rust 网络栈：HTTPS 下载 / SHA-256 校验全部走 Kotlin
+# 的 HttpURLConnection + MessageDigest（系统证书库、无 aws-lc-sys 交叉编译问题）。
+# Play 包（默认 feature）也不受影响。
+# ---------------------------------------------------------------------------
 [features]
 cargo-clippy = []
 native-smoke = []
+# 侧载自更新：仅在 SHUI_VARIANT=sideload 的构建里由 CLI -f 打开。
+# 控制 Rust 侧插件注册、command 暴露与下载逻辑；Play 包永不启用。
+sideload = []

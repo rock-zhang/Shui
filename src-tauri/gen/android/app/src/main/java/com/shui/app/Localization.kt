@@ -18,12 +18,14 @@ internal object AppLocale {
     const val ZH = "zh-CN"
     const val EN = "en-US"
 
-    /** 读取并归一化语言偏好；"system" 用 Locale.getDefault() 按同样规则归一。 */
+    /** 读取并归一化语言偏好；未写入或 "system" 都跟随 Locale.getDefault()。 */
     fun current(context: Context): String {
         val pref = readPreference(context)
         val tag = when {
-            pref.isNullOrBlank() -> "system"
-            pref.equals("system", ignoreCase = true) ->
+            // 未写入偏好时前端就是「跟随系统」（I18nProvider 默认 system），
+            // 这里必须直接取系统语言。曾把未写入归一成字符串 "system" 再判断，
+            // 它不以 zh 开头，结果中文系统上原生通知全是英文。
+            pref.isNullOrBlank() || pref.equals("system", ignoreCase = true) ->
                 Locale.getDefault().language.ifBlank { "en" }
             else -> pref
         }

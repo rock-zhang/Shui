@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 自更新安装权限：Play 变体由 Gradle 占位为 VIBRATE（已声明，合并去重），
+         侧载变体才解析为真正的安装权限。切勿在此写死权限名。 -->
+    <uses-permission android:name="${installPermission}" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />

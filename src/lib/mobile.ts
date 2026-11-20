@@ -114,6 +114,42 @@ export function isDebugBuild(): boolean {
   return process.env.NODE_ENV === "development";
 }
 
+/**
+ * 当前包是否带自更新能力。
+ *
+ * - 桌面端：恒为 true，沿用 tauri-plugin-updater。
+ * - Android 侧载包：Rust 在页面脚本前注入 `__SHUI_SIDELOAD__ = true`。
+ * - Android Play 包：注入 false，且原生产物里没有安装权限与更新代码。
+ *
+ * 前端只有一份 dist 同时供 Play / 侧载使用，无法靠构建期常量区分，
+ * 所以必须读运行时注入的 flag。
+ */
+export function isSideloadBuild(): boolean {
+  if (typeof window === "undefined") {
+    return true;
+  }
+  const host = window as unknown as {
+    __TAURI_INTERNALS__?: unknown;
+    __TAURI__?: unknown;
+    __SHUI_SIDELOAD__?: boolean;
+  };
+  // 浏览器预览：当作桌面语义，方便本地调 UI。
+  if (!host.__TAURI_INTERNALS__ && !host.__TAURI__) {
+    return true;
+  }
+  // 只有 Android 存在「Play / 侧载」两种包；桌面恒有自更新。
+  // 注意 Rust 在桌面也会注入该 flag（值为 false），不能直接采信。
+  try {
+    if (platform() !== "android") {
+      return true;
+    }
+  } catch {
+    return true;
+  }
+  const flag = host.__SHUI_SIDELOAD__;
+  return typeof flag === "boolean" ? flag : false;
+}
+
 const BASE_GAP_OPTIONS = ["10", "20", "30", "45", "60"];
 // "1" 分钟是测试档：原生侧（Rust 前台 timer 与 Kotlin 闹钟）会识别 gap==1
 // 并绕过提醒时段/工作日限制，方便随时验证通知链路，不必等到工作时段。

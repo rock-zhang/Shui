@@ -7,18 +7,33 @@ import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { toast } from "sonner";
 import { useUpdaterCheck, useUpdaterDownload } from "@/hooks/use-updater";
+import { useUpdate } from "@/components/update-provider";
 import { useI18n } from "@/lib/i18n";
+import { isSideloadBuild } from "@/lib/mobile";
 
 export default function About() {
   const { t } = useI18n();
   const [version, setVersion] = useState("");
-  const { checking, updateAvailable, updateInfo, checkForUpdate } =
-    useUpdaterCheck();
+  // Play 包没有自更新能力（原生产物里也不含安装权限），隐藏更新按钮，
+  // 只展示版本号；桌面端与 Android 侧载包保留入口。
+  const canSelfUpdate = isSideloadBuild();
+  const { checking, updateAvailable, checkForUpdate } = useUpdaterCheck();
   const { installing, progress, downloadAndInstall } = useUpdaterDownload();
+  const { latestVersion, markSeen } = useUpdate();
 
   useEffect(() => {
     getVersion().then(setVersion);
   }, []);
+
+  // 进到关于页就算看过版本号：灭掉侧边栏红点；版本号旁的徽标继续留着，
+  // 那是「有新版本」的常驻事实，不该因为看过就消失。
+  //
+  // 依赖 latestVersion 是必要的：冷启动的缓存读取和首次定时检查都是异步的，
+  // 挂载那一刻 latestVersion 往往还是 null，markSeen 会因「还没数据」直接返回，
+  // 结果用户明明站在关于页，侧边栏红点却在几秒后亮起来。等它落定再标记一次。
+  useEffect(() => {
+    if (latestVersion) markSeen();
+  }, [markSeen, latestVersion]);
 
   const openGithub = async () => {
     await openUrl("https://github.com/rock-zhang/Shui");
@@ -31,11 +46,9 @@ export default function About() {
   };
 
   const handleCheck = async () => {
+    // checkForUpdate 内部已经负责「发现新版本 / 已是最新 / 检查失败」三种
+    // 提示，这里再补一条就是连续两条重复 toast。
     await checkForUpdate();
-
-    if (updateAvailable && updateInfo) {
-      toast.success(t("settings.about.updateFound", { version: updateInfo.version }));
-    }
   };
 
   return (
@@ -76,17 +89,29 @@ export default function About() {
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             {t("settings.about.version")}
           </label>
-          <p className="text-[0.8rem] text-muted-foreground">{version}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <p className="text-[0.8rem] text-muted-foreground">{version}</p>
+            {/* 有新版本时在版本号旁挂一个红点徽标：这是「版本号更新那里」
+                的常驻提醒，不受已读状态影响，安装完才消失。 */}
+            {canSelfUpdate && updateAvailable && latestVersion && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[11px] font-medium leading-none text-red-600 dark:text-red-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                {latestVersion}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={handleCheck}
-            disabled={checking || installing}
-          >
-            {checking ? t("settings.about.checking") : t("settings.about.check")}
-          </Button>
-          {updateAvailable && (
+          {canSelfUpdate && (
+            <Button
+              variant="outline"
+              onClick={handleCheck}
+              disabled={checking || installing}
+            >
+              {checking ? t("settings.about.checking") : t("settings.about.check")}
+            </Button>
+          )}
+          {canSelfUpdate && updateAvailable && (
             <Button onClick={downloadAndInstall} disabled={installing}>
               {installing
                 ? t("settings.about.installing", { progress })

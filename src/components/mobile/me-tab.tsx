@@ -14,6 +14,7 @@ import {
   Info,
   Mail,
   MessageCircle,
+  RefreshCw,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -33,7 +34,9 @@ import {
   track,
   trackNow,
 } from "@/lib/analytics";
-import { emitRefresh } from "@/lib/mobile";
+import { emitRefresh, isSideloadBuild } from "@/lib/mobile";
+import { useUpdate } from "@/components/update-provider";
+import { UpdateDot } from "@/components/ui/update-dot";
 import {
   useI18n,
   type LanguagePreference,
@@ -62,6 +65,18 @@ export function MeTab() {
   const [error, setError] = useState("");
   const [analyticsOn, setAnalyticsOn] = useState(true);
   const locked = useRef(false);
+  const {
+    available: updateAvailable,
+    latestVersion,
+    installing,
+    progress,
+    checking,
+    checkNow,
+    install,
+  } = useUpdate();
+  // 侧载包能自己装（原生下载 + 系统安装器）；Play 包原生产物里没有安装
+  // 权限，只能引导去商店——这条分流和原生能力必须一致，否则按钮点了必然失败。
+  const canSelfUpdate = isSideloadBuild();
 
   useEffect(() => {
     setMounted(true);
@@ -376,23 +391,78 @@ export function MeTab() {
         </div>
         <MobileRow
           title={t("mobile.me.about.version")}
-          description={version || "—"}
-        />
-        <MobileRow
-          title={t("mobile.me.about.updateTitle")}
-          description={t("mobile.me.about.updateDescription")}
+          description={
+            updateAvailable && latestVersion ? (
+              <span className="inline-flex flex-wrap items-center gap-1.5">
+                <span>{version || "—"}</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[11px] font-medium leading-none text-red-600 dark:text-red-400">
+                  <span className="h-1 w-1 rounded-full bg-red-500" />
+                  {latestVersion}
+                </span>
+              </span>
+            ) : (
+              version || "—"
+            )
+          }
+          // 侧载包把更新入口收进版本行：不再单独占一行「检查更新」，
+          // 有更新时直接给「立即更新」，否则给手动检查。
           control={
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-10"
-              onClick={() => openExternal(STORE_URL, "store")}
-            >
-              <ExternalLink className="mr-1 h-3.5 w-3.5" />
-              {t("mobile.me.about.store")}
-            </Button>
+            canSelfUpdate ? (
+              <div className="relative">
+                {updateAvailable ? (
+                  <Button
+                    size="sm"
+                    className="min-h-10"
+                    disabled={installing}
+                    onClick={() => void install()}
+                  >
+                    <Download className="mr-1 h-3.5 w-3.5" />
+                    {installing
+                      ? t("settings.about.installing", { progress })
+                      : t("mobile.me.about.updateNow")}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="min-h-10"
+                    disabled={checking}
+                    onClick={() => void checkNow()}
+                  >
+                    <RefreshCw
+                      className={`mr-1 h-3.5 w-3.5 ${checking ? "animate-spin" : ""}`}
+                    />
+                    {checking
+                      ? t("settings.about.checking")
+                      : t("mobile.me.about.checkNow")}
+                  </Button>
+                )}
+                {/* 红点挂在按钮上：进入「我」tab 后 tab 红点会灭，这里继续
+                    提示「有东西可点」，直到真正装上。 */}
+                {updateAvailable && <UpdateDot className="-right-1 -top-1" />}
+              </div>
+            ) : undefined
           }
         />
+        {/* 只有 Google Play 包才引导去商店；侧载包的原生产物里没有商店
+            渠道可言，跳过去只会让用户装到另一个签名的包。 */}
+        {!canSelfUpdate && (
+          <MobileRow
+            title={t("mobile.me.about.updateTitle")}
+            description={t("mobile.me.about.updateDescription")}
+            control={
+              <Button
+                variant="outline"
+                size="sm"
+                className="min-h-10"
+                onClick={() => openExternal(STORE_URL, "store")}
+              >
+                <ExternalLink className="mr-1 h-3.5 w-3.5" />
+                {t("mobile.me.about.store")}
+              </Button>
+            }
+          />
+        )}
         <MobileRow
           title={t("mobile.me.about.appInfoTitle")}
           description={t("mobile.me.about.appInfoDescription")}

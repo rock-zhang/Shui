@@ -246,6 +246,9 @@ export function OnboardingTour({
       // 点时间输入只是打开原生选择器，真正完成以 change 事件为准。
       if (control instanceof HTMLInputElement && control.type === "time") return;
       if (!inCurrentStep(target)) return;
+      // 重复日是多选：用户可能连着点好几天，单击就跳步会让后面的日期来不及选。
+      // 这一步不自动前进，由下方「下一步」按钮确认。
+      if (current === "weekdays") return;
       advance(420);
     };
 

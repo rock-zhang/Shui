@@ -2,6 +2,7 @@ import { Metadata, type Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { UpdateProvider } from "@/components/update-provider";
 import { I18nProvider } from "@/lib/i18n";
 
 const geistSans = Geist({
@@ -48,7 +49,13 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ThemeProvider>
-          <I18nProvider>{children}</I18nProvider>
+          {/* UpdateProvider 必须挂在根布局：移动端的真实入口是 `/`（由
+              app/page.tsx 渲染 MobileApp），不走 /setting 的 layout，
+              只在那边挂会导致安卓端整个更新状态为空、红点永远不亮。
+              也必须放在 I18nProvider 内部——它要用 t 做提示文案。 */}
+          <I18nProvider>
+            <UpdateProvider>{children}</UpdateProvider>
+          </I18nProvider>
         </ThemeProvider>
       </body>
     </html>

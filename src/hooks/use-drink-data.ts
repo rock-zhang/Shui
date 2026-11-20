@@ -14,6 +14,7 @@ import {
 import { summarizeReminders, type ReminderSummary } from "@/lib/reminder-history";
 import type { DrinkDayRecord, DrinkHistoryValue } from "@/lib/drink-day";
 import { isDemoPreview, isMobilePreview, onRefresh } from "@/lib/mobile";
+import { useDayChange } from "@/hooks/use-day-change";
 
 interface Snapshot {
   goal: number;
@@ -99,6 +100,10 @@ export function useDrinkData(period: 7 | 30 = 7) {
   // Notification actions record water on the native side while the WebView is
   // frozen; a refresh bus keeps every tab in sync when it comes back.
   useEffect(() => onRefresh(reload), [reload]);
+
+  // 跨天重读：「今日」按日期 key 取值，但 tab 常驻、桌面窗口常开，组件不会
+  // 在零点重新挂载，不主动检测就会一直显示昨天的进度和明细。
+  useDayChange(reload);
 
   useEffect(() => {
     if (isDemoPreview()) {

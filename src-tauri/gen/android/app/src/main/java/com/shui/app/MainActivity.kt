@@ -1,14 +1,10 @@
 package com.shui.app
 
-import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 
 class MainActivity : TauriActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,20 +43,11 @@ class MainActivity : TauriActivity() {
         }
         AnalyticsTracker.logPermissionSnapshot(this, this, "startup")
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            // 首启的自动申请没有 UI 入口，单独标出来，便于和引导/提示卡的
-            // 主动申请区分开。结果在 onRequestPermissionsResult 里上报。
-            ReminderPlugin.permissionRequestSource = "startup_auto"
-            AnalyticsTracker.logPermissionRequest(this, "startup_auto", canRequest = true)
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                REQUEST_NOTIFICATION_PERMISSION
-            )
-        }
+        // 首次打开不主动弹系统通知权限框：用户刚进 App 还没理解提醒的用途就被
+        // 追问一项系统权限，拒绝率很高，而 Android 13+ 拒绝两次后系统会永久
+        // 静默拒绝，只能靠系统设置页救回来。授权入口交给「三步引导」第 1 步与
+        // 今日页的提示卡——那里先讲清楚为什么需要通知，再由用户点「允许」。
+        // 权限请求链路（onRequestPermissionsResult 埋点）保持不变。
 
         // 清理历史通知渠道：渠道 id 换了新版本后，旧 id 建过的渠道不会自动消失，
         // 会一直挂在系统通知设置里让用户看到两个同名「喝水提醒」。

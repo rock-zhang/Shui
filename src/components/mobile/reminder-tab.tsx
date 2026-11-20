@@ -318,23 +318,26 @@ export function ReminderTab() {
 
       <NotificationHealthCard />
 
-      <div className="mb-3 flex gap-2">
+      {/* 两列等宽网格 + 允许换行：英文文案比中文长得多，flex-1 搭配
+          Button 自带的 whitespace-nowrap/shrink-0 会把整行撑出屏幕，
+          导致页面可以左右滑动。这里锁定列宽并让文字折行。 */}
+      <div className="mb-3 grid grid-cols-2 gap-2">
         <Button
-          className="min-h-12 flex-1"
+          className="h-auto min-h-12 min-w-0 whitespace-normal px-2.5 py-2 text-center text-[13px] leading-tight"
           onClick={() => {
             track("preview_reminder_click");
             emitShowReminder();
           }}
         >
-          <BellRing className="mr-1.5 h-4 w-4" />
-          {t("mobile.reminder.preview")}
+          <BellRing className="h-4 w-4 shrink-0" />
+          <span className="min-w-0">{t("mobile.reminder.preview")}</span>
         </Button>
         <Button
           variant="outline"
-          className="min-h-12 flex-1"
+          className="h-auto min-h-12 min-w-0 whitespace-normal px-2.5 py-2 text-center text-[13px] leading-tight"
           onClick={sendTestNotification}
         >
-          {t("mobile.reminder.testNotification")}
+          <span className="min-w-0">{t("mobile.reminder.testNotification")}</span>
         </Button>
       </div>
     </>

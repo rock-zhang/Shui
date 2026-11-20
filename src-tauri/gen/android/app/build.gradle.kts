@@ -16,6 +16,14 @@ if (hasFirebaseConfig) {
     apply(plugin = "com.google.firebase.crashlytics")
 }
 
+// 侧载 / Play 双构建隔离（总开关）。
+// 默认 play：不声明 REQUEST_INSTALL_PACKAGES、不编译侧载专用 Kotlin 源码，
+// 保证提交到 Play 的包连自更新的影子都没有。只有 CI 显式注入
+// SHUI_VARIANT=sideload 才会带上完整自更新链路。
+// 注意：这里不能用 productFlavor——Tauri CLI 固定调 assembleRelease /
+// bundleRelease，加 flavor 后 task 名会变，CLI 找不到任务直接失败。
+val isSideload = System.getenv("SHUI_VARIANT")?.equals("sideload", ignoreCase = true) == true
+
 val tauriProperties = Properties().apply {
     val propFile = file("tauri.properties")
     if (propFile.exists()) {
@@ -49,6 +57,12 @@ android {
     compileSdk = 37
     namespace = "com.shui.app"
     defaultConfig {
+        // Play 包把权限名占成一个无需授权的普通权限（VIBRATE），merged manifest
+        // 里不会出现 REQUEST_INSTALL_PACKAGES；侧载包才换成真正的安装权限。
+        // 用 placeholder 而不是两套 AndroidManifest，避免长期维护两份清单漂移。
+        manifestPlaceholders["installPermission"] =
+            if (isSideload) "android.permission.REQUEST_INSTALL_PACKAGES"
+            else "android.permission.VIBRATE"
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         applicationId = "com.shui.app"
         minSdk = 24
@@ -95,6 +109,15 @@ android {
     }
     buildFeatures {
         buildConfig = true
+    }
+    // 侧载专用 Kotlin 源码（SideloadUpdaterPlugin）只在 sideload 变体编译。
+    // Play 变体连类都不存在，从产物层面杜绝自更新代码被扫出来。
+    sourceSets {
+        getByName("main") {
+            if (isSideload) {
+                java.srcDir("src/sideload/java")
+            }
+        }
     }
     // AGP 9 把 Java 默认 target 抬到 11，Kotlin 必须跟着对齐，否则
     // compileUniversalDebugKotlin 会因 JVM-target 不一致直接失败。

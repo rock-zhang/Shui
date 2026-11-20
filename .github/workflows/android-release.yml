@@ -1,23 +1,22 @@
 name: Android package
 
 # tag v* 与桌面 publish.yaml 并行触发：推一次 tag，桌面 7 个产物 + Android
-# APK/AAB 全部产出。两个流程彼此独立，Android 构建失败不会拖垮桌面发布。
+# Play AAB + 侧载 APK 全部产出。两个流程彼此独立，任一失败不拖垮桌面发布。
 # 手动触发保留，用于补跑或本地自测（产物只进 Actions artifact，不上 Release）。
+#
+# 关键：Play 包与侧载包必须从**独立 runner** 构建。
+#  - Play 包：不声明 REQUEST_INSTALL_PACKAGES、不编译自更新 Kotlin、
+#    不启用 sideload feature，直接用于上架。
+#  - 侧载包：SHUI_VARIANT=sideload + -f sideload，带完整自更新链路。
+# 不共用同一个 job 顺序构建两次的原因：Gradle 对同一 task 的 up-to-date
+# 判定可能复用上一轮产物，导致 manifest placeholder / Kotlin sourceSet
+# 的切换没生效——把 Play 包误带上安装权限是上架级事故，不能赌缓存行为。
 on:
   push:
     tags:
       - "v*"
   workflow_dispatch:
     inputs:
-      artifacts:
-        description: "产物类型"
-        required: true
-        default: both
-        type: choice
-        options:
-          - both
-          - aab
-          - apk
       targets:
         description: "ABI 目标，空格分隔（aarch64 armv7 x86_64 i686）"
         required: true
@@ -49,9 +48,20 @@ jobs:
     # secrets。secrets 放到该环境下（同名）时优先于仓库级 secrets。
     environment: production
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: play
+            artifact_kind: aab
+            cargo_features: ""
+          - variant: sideload
+            artifact_kind: apk
+            cargo_features: sideload
     # push.tags 触发时 inputs 全为空，这里补默认值；手动触发时沿用输入。
+    # 手动触发选了单一产物类型时，跳掉不匹配的变体。
     env:
-      ANDROID_ARTIFACTS: ${{ github.event_name == 'push' && 'both' || inputs.artifacts }}
+      SHUI_VARIANT: ${{ matrix.variant }}
       ANDROID_TARGETS: ${{ github.event_name == 'push' && 'aarch64' || inputs.targets }}
       ANDROID_SIGNED: ${{ github.event_name == 'push' || inputs.signed }}
     steps:
@@ -70,6 +80,8 @@ jobs:
         with:
           workspaces: '. -> target'
           cache-on-failure: true
+          # 两个变体的 Rust 产物（feature 不同）分开缓存，避免互相覆盖。
+          key: ${{ matrix.variant }}
 
       - uses: actions/setup-java@v4
         with:
@@ -118,36 +130,59 @@ jobs:
           } >> "$GITHUB_ENV"
 
       # 前端只构建一次：tauri.conf.json 的 beforeBuildCommand 是 yarn build，
-      # 而 APK / AAB 必须拆成两次 tauri 调用（见下），若各自触发一次 next build，
-      # 第二次撞 webpack 缓存会崩 WasmHash._updateWithBuffer / undefined.length。
+      # 这里用内联 config 关掉它，直接复用本步生成的 dist。
       - name: Build frontend once
         run: corepack yarn build
 
-      - name: Build Android artifacts
+      - name: Build Android artifact
         run: |
           set -euo pipefail
           TARGETS="${{ env.ANDROID_TARGETS }}"
-          # 用内联 config 关掉 beforeBuildCommand，直接复用上一步生成的 dist。
           SKIP_BUILD='{"build":{"beforeBuildCommand":""}}'
-          case "${{ env.ANDROID_ARTIFACTS }}" in
-            aab)
-              corepack yarn tauri android build --aab -t $TARGETS --ci -c "$SKIP_BUILD"
-              ;;
-            apk)
-              corepack yarn tauri android build --apk -t $TARGETS --ci -c "$SKIP_BUILD"
-              ;;
-            *)
-              # Tauri CLI 2.4.0 同时传 --apk --aab 时，第二次 Gradle 调用会
-              # 等一个不会建立的 CLI socket 并永久挂起。必须拆成两次调用。
-              corepack yarn tauri android build --apk -t $TARGETS --ci -c "$SKIP_BUILD"
-              corepack yarn tauri android build --aab -t $TARGETS --ci -c "$SKIP_BUILD"
-              ;;
-          esac
+          FEATURE_ARGS=""
+          if [ -n "${{ matrix.cargo_features }}" ]; then
+            FEATURE_ARGS="-f ${{ matrix.cargo_features }}"
+          fi
+          if [ "${{ matrix.artifact_kind }}" = "aab" ]; then
+            corepack yarn tauri android build --aab -t $TARGETS --ci -c "$SKIP_BUILD" $FEATURE_ARGS
+          else
+            corepack yarn tauri android build --apk -t $TARGETS --ci -c "$SKIP_BUILD" $FEATURE_ARGS
+          fi
+
+      # Play 包必须自查不含安装权限——上架红线，宁可构建失败也不能发出去。
+      # 校验对象是 Gradle 合并后的 manifest（纯文本，AAB/APK 都从它打包），
+      # 比对 AAB 内部的二进制 AXML 更简单可靠。
+      - name: Guard Play manifest has no install-packages permission
+        if: ${{ matrix.variant == 'play' }}
+        run: |
+          set -euo pipefail
+          MF=$(find src-tauri/gen/android/app/build/intermediates -path '*merged_manifest/*Release/*' -name 'AndroidManifest.xml' | head -1)
+          test -n "$MF" || { echo "::error::找不到合并后的 AndroidManifest.xml"; exit 1; }
+          echo "检查: $MF"
+          if grep -qE 'android:name="android\.permission\.REQUEST_INSTALL_PACKAGES"' "$MF"; then
+            echo "::error::Play 包含 REQUEST_INSTALL_PACKAGES，上架会被拒；检查 SHUI_VARIANT 是否被误设为 sideload"
+            exit 1
+          fi
+          echo "Play merged manifest 未发现 REQUEST_INSTALL_PACKAGES ✓"
+
+      # 反向校验：侧载包必须确实带上了安装权限，否则自更新会静默失效。
+      - name: Guard sideload manifest has install-packages permission
+        if: ${{ matrix.variant == 'sideload' }}
+        run: |
+          set -euo pipefail
+          MF=$(find src-tauri/gen/android/app/build/intermediates -path '*merged_manifest/*Release/*' -name 'AndroidManifest.xml' | head -1)
+          test -n "$MF" || { echo "::error::找不到合并后的 AndroidManifest.xml"; exit 1; }
+          echo "检查: $MF"
+          if ! grep -qE 'android:name="android\.permission\.REQUEST_INSTALL_PACKAGES"' "$MF"; then
+            echo "::error::侧载包缺少 REQUEST_INSTALL_PACKAGES，自更新无法安装；检查 SHUI_VARIANT=sideload 是否生效"
+            exit 1
+          fi
+          echo "侧载 merged manifest 已包含 REQUEST_INSTALL_PACKAGES ✓"
 
       # jarsigner / keytool 对未签名 AAB 也会返回 0，只靠文字描述区分，
       # 因此直接查 META-INF 里的 v1 签名块 + 证书 DN，跨 locale 才可靠。
       - name: Verify AAB is signed with the release key
-        if: ${{ env.ANDROID_SIGNED == 'true' && env.ANDROID_ARTIFACTS != 'apk' }}
+        if: ${{ matrix.variant == 'play' && env.ANDROID_SIGNED == 'true' }}
         run: |
           AAB=$(find src-tauri/gen/android/app/build/outputs -name '*.aab' | head -1)
           if [ -z "$AAB" ]; then echo "::error::未生成 AAB"; exit 1; fi
@@ -165,9 +200,37 @@ jobs:
       - name: Collect artifacts
         run: |
           mkdir -p android-artifacts
-          find src-tauri/gen/android/app/build/outputs -type f \
-            \( -name '*.apk' -o -name '*.aab' \) -exec cp {} android-artifacts/ \;
+          if [ "${{ matrix.artifact_kind }}" = "aab" ]; then
+            find src-tauri/gen/android/app/build/outputs -type f -name '*.aab' -exec cp {} android-artifacts/ \;
+          else
+            find src-tauri/gen/android/app/build/outputs -type f -name '*.apk' -exec cp {} android-artifacts/ \;
+          fi
           ls -lh android-artifacts
+
+      # 侧载包生成版本清单供客户端自更新：{ version, notes, apkUrl, sha256 }，
+      # 与 Rust sideload_update::MANIFEST_URL 的 JSON 结构对齐。
+      - name: Generate sideload update manifest
+        if: ${{ matrix.variant == 'sideload' }}
+        run: |
+          set -euo pipefail
+          APK=$(find android-artifacts -name '*.apk' | head -1)
+          test -n "$APK" || { echo "::error::未生成 APK"; exit 1; }
+          SHA=$(sha256sum "$APK" | awk '{print $1}')
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          TAG="${{ inputs.release_tag || github.ref_name }}"
+          APK_NAME=$(basename "$APK")
+          node -e '
+            const fs = require("fs");
+            const [version, sha, tag, name] = process.argv.slice(1);
+            const json = {
+              version,
+              notes: "",
+              apkUrl: `https://github.com/${process.env.GITHUB_REPOSITORY}/releases/download/${tag}/${name}`,
+              sha256: sha,
+            };
+            fs.writeFileSync("android-artifacts/android-latest.json", JSON.stringify(json, null, 2));
+            console.log(json);
+          ' "$VERSION" "$SHA" "$TAG" "$APK_NAME"
 
       - name: Remove keystore
         if: always()
@@ -175,7 +238,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: android-${{ github.run_id }}
+          name: android-${{ matrix.variant }}-${{ github.run_id }}
           path: android-artifacts/
           if-no-files-found: error
           retention-days: 14

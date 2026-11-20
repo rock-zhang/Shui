@@ -8,6 +8,7 @@ import { DrinkDetails } from "@/components/drink-details";
 import { getLocalDateKey, getRecentDates, type DrinkHistoryValue } from "@/lib/drink-day";
 import { STORE_NAME } from "@/lib/constants";
 import { onRefresh } from "@/lib/mobile";
+import { useDayChange } from "@/hooks/use-day-change";
 import { useI18n } from "@/lib/i18n";
 
 export default function DrinkHistoryPage() {
@@ -49,6 +50,8 @@ export default function DrinkHistoryPage() {
   // 前端桥接层转成 emitRefresh。桌面端此前没有监听者，通知记账后本页仍显示
   // 旧数据，要手动点刷新或切路由才更新。
   useEffect(() => onRefresh(refresh), []);
+  // 同理：跨过零点后「今天」换了一天，不重读会一直停在昨天。
+  useDayChange(refresh);
   return <div>
     <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
       <h3 className="text-lg font-medium">{t("settings.history.title")}</h3>

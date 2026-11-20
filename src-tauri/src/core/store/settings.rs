@@ -228,6 +228,9 @@ impl AppSettings {
             && self.today_drink_amount < self.gold
     }
 
+    // 仅桌面端使用（托盘状态文案）；Android 上 localization 模块不存在，
+    // 不加 cfg 会让 Android 目标编译失败。
+    #[cfg(not(target_os = "android"))]
     pub fn get_status_message(&self) -> (&'static str, &'static str) {
         use crate::localization::t;
         if self.today_drink_amount >= self.gold {

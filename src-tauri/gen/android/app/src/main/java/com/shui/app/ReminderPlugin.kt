@@ -442,14 +442,18 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
     @Suppress("UNUSED_PARAMETER")
     @Command
     fun openAutoStartSettings(invoke: Invoke) {
+        // 两个动作都指向系统的「应用」页（含应用列表），不同 ROM 支持的入口
+        // 不完全一致：MANAGE_APPLICATIONS_SETTINGS 最标准，个别 ROM 只认
+        // MANAGE_ALL_APPLICATIONS_SETTINGS。都不行才退回应用详情。
         val intents = listOf(
             Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS),
-            Intent(Settings.ACTION_APPLICATION_SETTINGS)
+            Intent(Settings.ACTION_MANAGE_ALL_APPLICATIONS_SETTINGS)
         )
         for (intent in intents) {
             try {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 activity.startActivity(intent)
+                Log.i(ReminderScheduler.TAG, "已打开系统应用设置页：${intent.action}")
                 invoke.resolve()
                 return
             } catch (_: Exception) {
@@ -460,6 +464,7 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
             invoke.reject("无法打开系统应用设置页，请手动进入系统设置 → 应用")
             return
         }
+        Log.i(ReminderScheduler.TAG, "系统应用设置页不可用，已退回应用详情页")
         invoke.resolve()
     }
 

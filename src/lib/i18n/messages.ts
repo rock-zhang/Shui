@@ -319,6 +319,10 @@ export const zhCN = {
   "mobile.me.about.version": "当前版本",
   "mobile.me.about.updateTitle": "检查更新",
   "mobile.me.about.updateDescription": "前往应用商店查看最新版本",
+  "mobile.me.about.updateAvailable": "新版本 {version} 可安装",
+  "mobile.me.about.upToDate": "当前已是最新版本",
+  "mobile.me.about.updateNow": "立即更新",
+  "mobile.me.about.checkNow": "检查更新",
   "mobile.me.about.store": "前往商店",
   "mobile.me.about.appInfoTitle": "软件信息",
   "mobile.me.about.appInfoDescription": "复制运行环境信息用于反馈问题",
@@ -356,7 +360,7 @@ export const zhCN = {
     "点一个间隔确认；建议 20–30 分钟，太频繁容易烦。",
   "mobile.onboarding.step.weekdays.title": "哪些天需要提醒",
   "mobile.onboarding.step.weekdays.body":
-    "点任意一天确认。默认周一至周五，点亮的日期才会提醒。",
+    "点亮需要提醒的日期，可多选；默认周一至周五。选好后点「下一步」。",
   "mobile.onboarding.step.timeStart.title": "选择开始时间",
   "mobile.onboarding.step.timeStart.body":
     "点开始时间，选择每天从几点开始提醒；默认 09:00。",
@@ -502,6 +506,8 @@ export const zhCN = {
   "updater.checkFailed": "检查更新失败",
   "updater.noUpdate": "没有可用的更新",
   "updater.installFailed": "更新安装失败",
+  "updater.needInstallPermission": "需要先允许「安装未知应用」才能更新",
+  "updater.badgeNew": "有新版本",
   "tray.preferences": "偏好设置",
   "tray.restNow": "立即休息",
   "tray.timerControl": "计时控制",
@@ -1036,6 +1042,10 @@ export const enUS = {
   "mobile.me.about.updateTitle": "Check for updates",
   "mobile.me.about.updateDescription":
     "Open the app store to see the latest version",
+  "mobile.me.about.updateAvailable": "Version {version} is ready to install",
+  "mobile.me.about.upToDate": "You're on the latest version",
+  "mobile.me.about.updateNow": "Update now",
+  "mobile.me.about.checkNow": "Check for updates",
   "mobile.me.about.store": "Open store",
   "mobile.me.about.appInfoTitle": "App info",
   "mobile.me.about.appInfoDescription":
@@ -1078,7 +1088,7 @@ export const enUS = {
     "Tap an interval to confirm; 20–30 minutes is recommended, since more often gets annoying.",
   "mobile.onboarding.step.weekdays.title": "Which days to remind you",
   "mobile.onboarding.step.weekdays.body":
-    "Tap any day to confirm. Monday to Friday are on by default; only highlighted days remind you.",
+    "Tap the days you want reminders on — you can pick several. Monday to Friday are on by default; tap Next when done.",
   "mobile.onboarding.step.timeStart.title": "Choose a start time",
   "mobile.onboarding.step.timeStart.body":
     "Tap the start time to choose when reminders begin each day; the default is 09:00.",
@@ -1232,6 +1242,9 @@ export const enUS = {
   "updater.checkFailed": "Update check failed",
   "updater.noUpdate": "No update available",
   "updater.installFailed": "Update installation failed",
+  "updater.needInstallPermission":
+    "Allow installing unknown apps before updating",
+  "updater.badgeNew": "Update available",
   "tray.preferences": "Preferences",
   "tray.restNow": "Take a break",
   "tray.timerControl": "Timer control",

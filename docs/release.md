@@ -54,3 +54,50 @@ git tag -d v0.3.0
 
 - **已经是 `0.3.0`**（之前跑过 `yarn release`）：提交并推送修复代码后重新打 tag：`git push origin HEAD && git tag v0.3.0 && git push origin v0.3.0`。不要再跑 `yarn release 0.3.0`，它会以「版本号没变」拒绝。
 - **还是旧版本号**（当初手工打 tag、忘了升版本）：重新跑 `yarn release 0.3.0`，再按第 1 步依次 push commit 和 tag。
+
+## 6. Android 双产物：Play 包 vs 侧载包
+
+同一个 tag 会由 [android-release.yml](../.github/workflows/android-release.yml) 的 matrix 并行产出两个包，**必须严格区分**：
+
+| | Play 包 | 侧载包 |
+| --- | --- | --- |
+| 产物 | `.aab` | `.apk` |
+| 构建开关 | `SHUI_VARIANT=play`（默认） | `SHUI_VARIANT=sideload` + `-f sideload` |
+| `REQUEST_INSTALL_PACKAGES` | **不含** | 含 |
+| 自更新代码（Kotlin / Rust） | **不编译** | 编译 |
+| 客户端更新方式 | Google Play 商店 | 应用内自更新 |
+
+隔离由三层共同保证，任何一层失效都会导致 Play 拒审或侧载更新失效：
+
+1. **Gradle**：`build.gradle.kts` 读 `SHUI_VARIANT`，控制 manifest placeholder（Play 占位成 `VIBRATE`）与 sideload 源码集是否编译。
+2. **Rust**：`sideload` cargo feature 控制插件注册与 `sideload_update` 模块编译。
+3. **前端**：Rust 注入 `window.__SHUI_SIDELOAD__`，「关于」页据此决定是否显示「检查更新」。
+
+CI 内置两道门禁，任一不满足直接 fail：
+
+- Play 包构建后 grep merged manifest，**发现** `REQUEST_INSTALL_PACKAGES` → 失败；
+- 侧载包构建后 grep merged manifest，**缺失** `REQUEST_INSTALL_PACKAGES` → 失败。
+
+侧载包会额外生成 `android-latest.json`（版本 / `apkUrl` / `sha256`）并随 APK 上传到同一个 Release。客户端固定从
+`https://github.com/rock-zhang/Shui/releases/latest/download/android-latest.json` 拉清单，下载后强制校验 SHA-256。
+
+**本地验证两个变体**（改隔离逻辑后务必各跑一次）：
+
+```shell
+# Play 变体（不应带安装权限）
+yarn tauri android build --aab -t aarch64 --ci -c '{"build":{"beforeBuildCommand":""}}'
+# 侧载变体（应带安装权限，并编译 SideloadUpdaterPlugin）
+SHUI_VARIANT=sideload yarn tauri android build --apk -t aarch64 --ci \
+  -c '{"build":{"beforeBuildCommand":""}}' -f sideload
+```
+
+检查合并后的 manifest：`src-tauri/gen/android/app/build/intermediates/merged_manifest*/**/AndroidManifest.xml`。
+
+### 签名与「跨渠道覆盖」限制
+
+两个包沿用同一个 `applicationId`（`com.shui.app`）与同一把 release keystore，因此：
+
+- **侧载包能自更新自己**：新旧 APK 都由上传密钥签名，`versionCode` 递增即可覆盖安装。
+- **若启用了 Play App Signing**，Google 会用另一把「应用签名密钥」重签下发的安装包。此时用侧载 APK 去覆盖「从 Play 装的应用」会因签名不一致报 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`，必须先卸载（会丢本地数据）。
+
+因此两个渠道应视为**互不迁移**的分发通道：Play 用户靠商店更新，侧载用户靠应用内更新。若确实需要用户跨渠道迁移，只能另行设计数据导出/导入，不要指望直接覆盖安装。

@@ -21,8 +21,22 @@ mod startup;
 mod statistics_export;
 #[cfg(target_os = "android")]
 mod mobile;
+#[cfg(all(target_os = "android", feature = "sideload"))]
+mod sideload_update;
 #[cfg(feature = "native-smoke")]
 mod native_smoke;
+
+/// 注入构建变体标记，供前端决定是否在「关于」页显示自更新入口。
+/// Play 包恒为 false；侧载包（sideload feature）为 true。
+/// 前端同一份 dist 同时供两个包使用，不能靠 NODE_ENV 区分，只能运行时注入。
+fn sideload_build_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    let enabled = cfg!(feature = "sideload");
+    tauri::plugin::Builder::new("shui-sideload-build")
+        .js_init_script(format!(
+            "if (typeof window.__SHUI_SIDELOAD__ === 'undefined') {{ window.__SHUI_SIDELOAD__ = {enabled}; }}"
+        ))
+        .build()
+}
 
 /// 在页面脚本执行前注入构建档位，供前端决定是否显示「1 分钟」测试档。
 ///
@@ -69,6 +83,7 @@ pub fn run() {
     // 桌面与移动端共用：数据存储、通知、对话框、外部打开、剪贴板、系统信息。
     builder = builder
         .plugin(debug_build_plugin())
+        .plugin(sideload_build_plugin())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -101,6 +116,22 @@ pub fn run() {
                 })
                 .build(),
         );
+
+        // 侧载自更新插件：仅 sideload feature 编译并注册。它依赖的 Kotlin 类
+        // 同样只在 sideload sourceSet 里存在，两者必须同时开关。
+        #[cfg(feature = "sideload")]
+        {
+            builder = builder.plugin(
+                tauri::plugin::Builder::<tauri::Wry, ()>::new("shui-sideload-updater")
+                    .setup(|app, api| {
+                        let handle =
+                            api.register_android_plugin("com.shui.app", "SideloadUpdaterPlugin")?;
+                        app.manage(sideload_update::SideloadBridge(handle));
+                        Ok(())
+                    })
+                    .build(),
+            );
+        }
     }
 
     #[cfg(target_os = "macos")]
@@ -241,7 +272,17 @@ pub fn run() {
         mobile::preview_drink_import,
         crate::data_backup::confirm_drink_import,
         mobile::save_drink_history_csv,
-        commands::get_app_runtime_info
+        commands::get_app_runtime_info,
+        #[cfg(feature = "sideload")]
+        sideload_update::sideload_check_update,
+        #[cfg(feature = "sideload")]
+        sideload_update::sideload_download_update,
+        #[cfg(feature = "sideload")]
+        sideload_update::sideload_can_install,
+        #[cfg(feature = "sideload")]
+        sideload_update::sideload_open_install_settings,
+        #[cfg(feature = "sideload")]
+        sideload_update::sideload_install_apk
     ]);
 
     builder

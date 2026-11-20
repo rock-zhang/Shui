@@ -53,6 +53,9 @@ function TrendChart({
   );
   const goalHeight = Math.min((goal / chartMax) * 100, 100);
   const width = Math.max(days.length * 20, 320);
+  // 横轴按日期倒序：最近的一天在最左边，越往右越早。数据源本身是
+  // 从旧到新的，这里只反转渲染顺序，汇总/分析仍使用原始顺序。
+  const orderedDays = [...days].reverse();
 
   return (
     <div className="mobile-scroll-x -mx-1 overflow-x-auto overflow-y-hidden px-1 pb-2">
@@ -66,10 +69,12 @@ function TrendChart({
           />
         )}
         <div className="absolute inset-x-0 top-0 bottom-6 flex items-end gap-1">
-          {days.map((day, index) => {
+          {orderedDays.map((day, index) => {
             const height = Math.min((day.total / chartMax) * 100, 100);
             const showLabel =
-              days.length <= 7 || index % 5 === 0 || index === days.length - 1;
+              orderedDays.length <= 7 ||
+              index % 5 === 0 ||
+              index === orderedDays.length - 1;
             return (
               <div
                 key={day.key}

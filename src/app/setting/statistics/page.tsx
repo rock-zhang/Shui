@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { STORE_NAME } from "@/lib/constants";
 import { onRefresh } from "@/lib/mobile";
+import { useDayChange } from "@/hooks/use-day-change";
 import { summarizeReminders } from "@/lib/reminder-history";
 import {
   DrinkDaySummary,
@@ -292,6 +293,8 @@ export default function StatisticsPage() {
   // 系统通知里点「+Xml」由 Rust 落盘后广播，桥接层转成 emitRefresh；
   // 桌面端订阅后统计才会跟着更新。
   useEffect(() => onRefresh(() => setRevision(value => value + 1)), []);
+  // 桌面窗口常开、跨过零点不会重新挂载，数字会停在昨天。
+  useDayChange(() => setRevision(value => value + 1));
 
   useEffect(() => {
     let cancelled = false;

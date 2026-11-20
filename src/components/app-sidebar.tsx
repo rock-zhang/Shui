@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/sidebar";
 import { usePlatform } from "@/hooks/use-platform";
 import { useI18n, type MessageKey } from "@/lib/i18n";
+import { useUpdate } from "@/components/update-provider";
+import { UpdateDot } from "@/components/ui/update-dot";
 
 const items: Array<{ titleKey: MessageKey; url: string; icon: typeof Settings }> = [
   {
@@ -59,9 +61,11 @@ const items: Array<{ titleKey: MessageKey; url: string; icon: typeof Settings }>
 export function AppSidebar() {
   const { isMacOS } = usePlatform();
   const { t } = useI18n();
+  const { available, seen } = useUpdate();
 
   const pathname = usePathname();
-  console.log("pathname", pathname);
+  // 「关于」是桌面端唯一的更新入口，红点挂在它上面；进过关于页就灭。
+  const showUpdateDot = available && !seen;
 
   return (
     <Sidebar collapsible="none" className={`${isMacOS ? "pt-8" : "pt-0"}`}>
@@ -78,9 +82,12 @@ export function AppSidebar() {
                         "bg-accent text-accent-foreground"
                     )}
                   >
-                    <Link href={item.url}>
+                    <Link href={item.url} className="relative">
                       <item.icon />
                       <span>{t(item.titleKey)}</span>
+                      {item.url === "/setting/about/" && showUpdateDot && (
+                        <UpdateDot className="right-2 top-1/2 -translate-y-1/2" />
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
