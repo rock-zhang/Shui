@@ -54,7 +54,11 @@ pub(crate) fn record<S: History>(
     now: DateTime<Local>,
 ) -> Result<Receipt, String> {
     let _guard = WRITER.lock().map_err(|_| "饮水写入暂不可用")?;
-    if ![50, 100, 200, 300].contains(&amount) {
+    // 单笔允许 10~1000ml 且为 10 的倍数，与前端 normalizeQuickAmounts 和
+    // Android ReminderScheduler.drinkActions 的档位规则一致。不能写死
+    // [50,100,200,300]：用户长按卡片自定义杯量（如 60/120ml）后，写死的
+    // 白名单会把整笔记录拒绝，前端表现为「保存未确认」。
+    if !(10..=1000).contains(&amount) || amount % 10 != 0 {
         return Err("不支持的饮水量".into());
     }
     if request_id.is_empty() || request_id.len() > 160 || !request_id.is_ascii() {
@@ -333,5 +337,24 @@ mod tests {
         store.set(&date, bad.clone());
         assert!(record(&store, 100, "id", 1000, now()).is_err());
         assert_eq!(store.get(&date), Some(bad));
+    }
+
+    #[test]
+    fn accepts_customized_quick_amounts_and_rejects_out_of_range() {
+        let store = Memory::default();
+        // 用户自定义的杯量（10~1000、10 的倍数）必须能记账，默认四档也照常。
+        for amount in [10, 50, 60, 120, 200, 300, 750, 1000] {
+            assert!(
+                record(&store, amount, &format!("custom-{amount}"), 1000, now()).is_ok(),
+                "自定义杯量 {amount} 应被接受"
+            );
+        }
+        // 出界或非 10 倍数的值拒绝且不动数据。
+        let date = now().format("%Y%m%d").to_string();
+        let before = store.get(&date);
+        for amount in [0u64, 5, 15, 1005, 1010] {
+            assert!(record(&store, amount, "bad", 1000, now()).is_err());
+        }
+        assert_eq!(store.get(&date), before);
     }
 }
