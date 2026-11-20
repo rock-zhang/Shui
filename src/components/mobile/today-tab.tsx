@@ -22,6 +22,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDrinkData } from "@/hooks/use-drink-data";
 import { usePlatform } from "@/hooks/use-platform";
+import { useBackToClose } from "@/hooks/use-back-to-close";
 import { track, trackDrinkRecorded } from "@/lib/analytics";
 import { getLocalDateKey } from "@/lib/drink-history";
 import type { DrinkEntry, DrinkReceipt } from "@/lib/drink-day";
@@ -238,6 +239,8 @@ export function TodayTab() {
   const [confirmUndo, setConfirmUndo] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<Celebration | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // Android 返回键先关今日明细弹层，而不是退到桌面。
+  useBackToClose(detailsOpen, () => setDetailsOpen(false));
   const busy = useRef(false);
   const celebrationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const celebrationToken = useRef(0);
@@ -359,7 +362,6 @@ export function TodayTab() {
 
       <MobileSection
         title={t("mobile.today.record.title")}
-        description={t("mobile.today.record.description")}
       >
         <div className="grid grid-cols-2 gap-2.5">
           {QUICK_AMOUNTS.map(({ amount, hintKey, Icon }) => {
@@ -379,7 +381,7 @@ export function TodayTab() {
               >
                 <span
                   aria-hidden="true"
-                  className="pointer-events-none absolute -right-5 -top-6 h-20 w-20 rounded-full bg-primary/10 transition-colors group-hover:bg-primary/15"
+                  className="pointer-events-none absolute -right-5 -top-6 h-20 w-20 rounded-full bg-sky-500/10 transition-colors group-hover:bg-sky-500/20"
                 />
                 {celebrating && (
                   <span

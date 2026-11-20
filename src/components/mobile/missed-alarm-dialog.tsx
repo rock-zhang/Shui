@@ -7,6 +7,7 @@ import { readDiagnostics } from "@/lib/mobile";
 import { minutesBucket, track } from "@/lib/analytics";
 import { localizeRomProfile, romProfile, type RomProfile } from "@/lib/rom";
 import { useI18n } from "@/lib/i18n";
+import { useBackToClose } from "@/hooks/use-back-to-close";
 import { useMobileConfig } from "./config-context";
 import { OPEN_GUIDE_EVENT } from "./notification-setup-guide";
 import { BackgroundGuideCards } from "./background-guide-cards";
@@ -147,6 +148,9 @@ export function MissedAlarmDialog() {
   // 用户自己暂停了提醒、或关掉了系统通知，就是明确表示不想被打断，
   // 这时再报「没送到」纯属添堵。
   const enabled = hydrated && general.isNotification && !general.isPaused;
+
+  // Android 返回键等同点 ×：走同一条 close 路径（记行为 + 清原生漏报账）。
+  useBackToClose(open && enabled, () => close("close"));
 
   useEffect(() => {
     if (!open || !enabled) return;

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight, X } from "lucide-react";
 import { toast } from "sonner";
 import { track } from "@/lib/analytics";
+import { useBackToClose } from "@/hooks/use-back-to-close";
 import {
   ONBOARDING_DISMISS_LIMIT,
   ONBOARDING_STEPS,
@@ -180,6 +181,9 @@ export function OnboardingTour({
     });
     onDone(limit ? "limit" : "dismissed");
   }, [onDone]);
+
+  // Android 返回键等同点右上角 ×（跳过），走同一条 dismiss 统计路径。
+  useBackToClose(open, dismiss);
 
   // 进入/换步：先滚动到目标，等滚动结束再量坐标。
   useEffect(() => {

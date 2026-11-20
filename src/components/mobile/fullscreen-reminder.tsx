@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { STORE_NAME } from "@/lib/constants";
 import { useI18n, type MessageKey } from "@/lib/i18n";
+import { useBackToClose } from "@/hooks/use-back-to-close";
 import {
   normalizeDrinkDay,
   type DrinkHistoryValue,
@@ -120,6 +121,10 @@ export function FullscreenReminder({
     },
     [onClose, session, trigger]
   );
+
+  // Android 返回键等同点「跳过」：走同一条 finish 流程结算会话，
+  // 而不是让 wry 结束 Activity 直接回桌面。
+  useBackToClose(true, () => void finish("skipped"));
 
   // 倒计时按绝对截止时间重算，而不是每秒累减。Android WebView 退到后台后
   // setInterval 会被系统节流甚至完全冻结，累减会停在原地，回到前台看起来

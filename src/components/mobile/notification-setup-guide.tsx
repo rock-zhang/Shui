@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { track } from "@/lib/analytics";
 import { useI18n, type MessageKey } from "@/lib/i18n";
+import { useBackToClose } from "@/hooks/use-back-to-close";
 import { emitRefresh, readNotificationHealth, type NotificationHealth } from "@/lib/mobile";
 import { localizeRomProfile, romFromHealth, romProfile, type RomProfile } from "@/lib/rom";
 import { useNotificationPermission } from "./notification-permission-context";
@@ -473,6 +474,9 @@ export function NotificationSetupGuide() {
       will_auto_show_again: next < DISMISS_LIMIT,
     });
   }, [step]);
+
+  // Android 返回键按「跳过」处理，走同一条 dismiss 统计路径。
+  useBackToClose(visible, dismiss);
 
   const finish = useCallback(() => {
     writeSeen();
