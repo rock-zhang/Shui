@@ -6,6 +6,7 @@ import { listen } from "@tauri-apps/api/event";
 import { Toaster } from "@/components/ui/sonner";
 import { usePlatform } from "@/hooks/use-platform";
 import { useSystemBars } from "@/hooks/use-system-bars";
+import { useDayChange } from "@/hooks/use-day-change";
 import {
   emitRefresh,
   onCheckReminder,
@@ -23,7 +24,7 @@ import {
   track,
 } from "@/lib/analytics";
 import { MOBILE_TABS, MobileTabBar } from "./mobile-tab-bar";
-import { useI18n, type MessageKey } from "@/lib/i18n";
+import { useI18n, type Locale, type MessageKey } from "@/lib/i18n";
 import { useUpdate } from "@/components/update-provider";
 import { MobileConfigProvider, useMobileConfig } from "./config-context";
 import { NotificationPermissionProvider } from "./notification-permission-context";
@@ -67,6 +68,11 @@ const DATE_LABEL_FORMAT: Intl.DateTimeFormatOptions = {
   day: "numeric",
   weekday: "long",
 };
+
+/** 顶栏日期文案。语言与日期都会变，只能由 locale 决定，不能进 state 缓存。 */
+function formatDateLabel(locale: Locale, day: Date): string {
+  return day.toLocaleDateString(locale, DATE_LABEL_FORMAT);
+}
 
 /** 全屏提醒的触发来源：定时到点、点通知主体、提醒页预览。 */
 export type ReminderTrigger = "alarm" | "notification_click" | "preview";
@@ -266,30 +272,16 @@ export function MobileApp() {
 
   const header = HEADERS[tab];
   /**
-   * 顶栏日期不能只在 render 时现算：跨天后如果没有其他状态变化，
-   * 组件不会重新渲染，日期就停在昨天。这里用轮询 + 回前台补查，
-   * setState 传函数并在同值时返回旧引用，React 会跳过重渲染。
+   * 顶栏日期只缓存「哪一天」，文案按 locale 在渲染时现算。
+   *
+   * 早先把格式化后的字符串存进 state：locale 一变，字符串还是上一门语言，
+   * 要等下一次轮询（最多 60 秒）才纠正。缓存日期对象则天然没有这个问题。
+   * 跨天由 `useDayChange` 负责（零点精确定时 + 回前台对表），不再手写轮询。
    */
-  const [dateLabel, setDateLabel] = useState(() =>
-    new Date().toLocaleDateString(locale, DATE_LABEL_FORMAT)
-  );
-  useEffect(() => {
-    const update = () => {
-      const next = new Date().toLocaleDateString(locale, DATE_LABEL_FORMAT);
-      setDateLabel((previous) => (previous === next ? previous : next));
-    };
-    const timer = window.setInterval(update, 60_000);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") update();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("shui:foreground", update);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("shui:foreground", update);
-    };
-  }, [locale]);
+  const [today, setToday] = useState(() => new Date());
+  useDayChange(() => setToday(new Date()));
+
+  const dateLabel = formatDateLabel(locale, today);
 
   return (
     <MobileConfigProvider>
