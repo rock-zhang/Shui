@@ -429,12 +429,13 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     /**
-     * 「允许自启动」的入口：直接进系统设置 →「应用」页。
+     * 「允许自启动」的入口：直接进系统设置 →「应用」主页。
      *
      * 曾经这里按品牌逐个试探厂商私有的自启动管理页，但这些 Activity 在不同
      * ROM / 版本上经常改名或迁移到别的包，命中率低，还会落在与本机不符的
-     * 页面上。厂商开关本来就无法读写，统一落到系统「设置 > 应用」列表，
-     * 用户按卡片里的路径自己找到 Shui 更稳。系统页打不开时退回应用详情。
+     * 页面上。厂商开关本来就无法读写，统一落到系统「设置 > 应用」主页，
+     * 用户按卡片里的路径自己找到 Shui 更稳。主页打不开时依次退到应用列表、
+     * 应用详情。
      *
      * 不用 resolveActivity 预判：Android 11+ 的包可见性限制会让它误判成
      * 「不存在」。直接 startActivity 并捕获异常更可靠。
@@ -442,10 +443,13 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
     @Suppress("UNUSED_PARAMETER")
     @Command
     fun openAutoStartSettings(invoke: Invoke) {
-        // 两个动作都指向系统的「应用」页（含应用列表），不同 ROM 支持的入口
-        // 不完全一致：MANAGE_APPLICATIONS_SETTINGS 最标准，个别 ROM 只认
-        // MANAGE_ALL_APPLICATIONS_SETTINGS。都不行才退回应用详情。
+        // ACTION_APPLICATION_SETTINGS 落在「设置 > 应用」主页：各 ROM 的自启动 /
+        // 应用管理入口都挂在这页下，与引导卡片面包屑的第一步一致。ColorOS 实测
+        // MANAGE_APPLICATIONS_SETTINGS 会直接落到「应用管理」应用列表，离自启动
+        // 入口反而远。主页打不开时依次退到应用列表（个别 ROM 只认
+        // MANAGE_ALL_APPLICATIONS_SETTINGS），都不行才退回应用详情。
         val intents = listOf(
+            Intent(Settings.ACTION_APPLICATION_SETTINGS),
             Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS),
             Intent(Settings.ACTION_MANAGE_ALL_APPLICATIONS_SETTINGS)
         )
