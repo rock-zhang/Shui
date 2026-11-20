@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Shui · 喝水提醒助手 — 让喝水变成一件自然的事</title>
+<meta name="description" content="Shui 是一款专注喝水提醒的跨平台桌面应用：自定义提醒间隔、全屏休息提醒、饮水记录与统计分析，帮你养成喝水好习惯。" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%92%A7%3C/text%3E%3C/svg%3E" />
+<style>
+  :root{
+    --bg:#f5faff;
+    --surface:#ffffff;
+    --ink:#0a1e30;
+    --muted:#5a7186;
+    --line:rgba(10,30,48,.08);
+    --brand:#0ea5e9;
+    --brand-deep:#0369a1;
+    --accent:#14b8a6;
+    --deep:#04182b;
+    --radius:22px;
+    --shadow-sm:0 2px 10px rgba(8,47,73,.06);
+    --shadow-md:0 18px 40px -18px rgba(3,105,161,.35);
+    --shadow-lg:0 40px 80px -30px rgba(3,105,161,.45);
+    --maxw:1160px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",Roboto,sans-serif;
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  img{max-width:100%;display:block}
+  a{color:inherit;text-decoration:none}
+  .wrap{width:min(100% - 48px,var(--maxw));margin:0 auto}
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:8px;
+    font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--brand-deep);
+  }
+  .eyebrow::before{content:"";width:22px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--brand),var(--accent))}
+
+  /* ---------- Nav ---------- */
+  .nav{
+    position:fixed;inset:0 0 auto 0;z-index:50;
+    transition:background .35s ease,box-shadow .35s ease,backdrop-filter .35s;
+    padding:16px 0;
+  }
+  .nav.scrolled{
+    background:rgba(255,255,255,.82);
+    backdrop-filter:blur(18px) saturate(1.4);
+    box-shadow:0 1px 0 rgba(10,30,48,.06),0 10px 30px -20px rgba(10,30,48,.4);
+    padding:10px 0;
+  }
+  .nav .wrap{display:flex;align-items:center;justify-content:space-between;gap:24px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;letter-spacing:.01em;color:#fff;transition:color .35s}
+  .nav.scrolled .brand{color:var(--ink)}
+  .brand-mark{
+    width:36px;height:36px;border-radius:12px;display:grid;place-items:center;
+    background:linear-gradient(140deg,#38bdf8,#0ea5e9 55%,#0284c7);
+    box-shadow:0 8px 20px -8px rgba(14,165,233,.9);
+    font-size:19px;
+  }
+  .nav-links{display:flex;align-items:center;gap:28px;font-size:14.5px;font-weight:500}
+  .nav-links a{color:rgba(255,255,255,.78);transition:color .25s}
+  .nav-links a:hover{color:#fff}
+  .nav.scrolled .nav-links a{color:var(--muted)}
+  .nav.scrolled .nav-links a:hover{color:var(--ink)}
+  .nav-cta{
+    padding:9px 18px;border-radius:999px;font-weight:600;font-size:14px;
+    background:#fff;color:var(--deep)!important;
+    box-shadow:0 10px 24px -12px rgba(2,132,199,.8);
+    transition:transform .25s,box-shadow .25s;
+  }
+  .nav-cta:hover{transform:translateY(-1px);box-shadow:0 14px 30px -12px rgba(2,132,199,.9)}
+  .nav.scrolled .nav-cta{background:linear-gradient(135deg,#0ea5e9,#0369a1);color:#fff!important}
+
+  /* ---------- Hero ---------- */
+  .hero{
+    position:relative;overflow:hidden;
+    padding:150px 0 110px;
+    background:
+      radial-gradient(1200px 600px at 85% -10%,rgba(20,184,166,.28),transparent 60%),
+      radial-gradient(900px 500px at 10% 10%,rgba(56,189,248,.30),transparent 60%),
+      linear-gradient(165deg,#031526 0%,#062a45 45%,#073b5c 100%);
+    color:#fff;
+  }
+  .hero::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);
+    background-size:64px 64px;
+    mask-image:radial-gradient(ellipse 90% 70% at 50% 25%,#000 20%,transparent 75%);
+  }
+  .hero .wrap{position:relative;z-index:2;display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
+  .hero-badge{
+    display:inline-flex;align-items:center;gap:9px;
+    padding:7px 14px 7px 8px;border-radius:999px;
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);
+    font-size:13px;color:rgba(255,255,255,.85);
+    backdrop-filter:blur(8px);
+  }
+  .hero-badge b{background:rgba(56,189,248,.22);color:#7dd3fc;padding:2px 9px;border-radius:999px;font-size:12px;letter-spacing:.04em}
+  .hero h1{
+    font-size:clamp(36px,4.6vw,58px);
+    line-height:1.14;letter-spacing:-.015em;font-weight:800;
+    margin:22px 0 18px;
+  }
+  .hero h1 .grad{
+    background:linear-gradient(100deg,#7dd3fc 0%,#38bdf8 35%,#2dd4bf 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .hero p.lede{font-size:17.5px;color:rgba(226,242,252,.78);max-width:520px;margin:0 0 34px}
+  .hero-actions{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+  .btn{
+    display:inline-flex;align-items:center;gap:9px;
+    padding:13px 24px;border-radius:999px;font-weight:650;font-size:15px;
+    transition:transform .25s,box-shadow .25s,background .25s;
+  }
+  .btn svg{width:17px;height:17px}
+  .btn-primary{
+    background:linear-gradient(135deg,#38bdf8,#0ea5e9 50%,#0284c7);
+    color:#fff;box-shadow:0 20px 40px -18px rgba(14,165,233,.95),inset 0 1px 0 rgba(255,255,255,.35);
+  }
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 26px 50px -18px rgba(14,165,233,1)}
+  .btn-ghost{
+    background:rgba(255,255,255,.07);color:rgba(255,255,255,.9);
+    border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(8px);
+  }
+  .btn-ghost:hover{background:rgba(255,255,255,.13);transform:translateY(-2px)}
+  .hero-meta{display:flex;gap:26px;margin-top:38px;flex-wrap:wrap}
+  .hero-meta div{font-size:13px;color:rgba(255,255,255,.55)}
+  .hero-meta b{display:block;font-size:22px;font-weight:750;color:#fff;letter-spacing:-.01em;line-height:1.3}
+
+  /* phone mockup */
+  .stage{position:relative;display:flex;justify-content:center}
+  .glow{
+    position:absolute;width:420px;height:420px;border-radius:50%;
+    background:radial-gradient(circle,rgba(56,189,248,.42),transparent 65%);
+    filter:blur(20px);z-index:0;top:50%;left:50%;transform:translate(-50%,-50%);
+  }
+  .phone{
+    position:relative;z-index:1;width:min(300px,80%);
+    padding:11px;border-radius:42px;
+    background:linear-gradient(160deg,rgba(255,255,255,.22),rgba(255,255,255,.05));
+    border:1px solid rgba(255,255,255,.22);
+    box-shadow:0 40px 90px -30px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.3);
+    backdrop-filter:blur(14px);
+  }
+  .phone img{border-radius:32px;width:100%;background:#071c2f}
+  .phone-notch{position:absolute;top:20px;left:50%;transform:translateX(-50%);width:84px;height:7px;border-radius:99px;background:rgba(255,255,255,.35)}
+  .float-card{
+    position:absolute;z-index:2;padding:13px 16px;border-radius:16px;
+    background:rgba(255,255,255,.94);color:var(--ink);
+    box-shadow:0 24px 50px -20px rgba(0,0,0,.55);
+    font-size:13px;line-height:1.45;
+    animation:floaty 6s ease-in-out infinite;
+  }
+  .float-card b{display:block;font-size:16px;letter-spacing:-.01em}
+  .float-card span{color:var(--muted);font-size:12px}
+  .float-a{top:16%;left:-4%}
+  .float-b{bottom:16%;right:-2%;animation-delay:-3s}
+  .float-card .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:6px;box-shadow:0 0 0 4px rgba(20,184,166,.18)}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-11px)}}
+
+  /* ---------- Sections ---------- */
+  section{padding:96px 0}
+  .section-head{max-width:640px;margin-bottom:52px}
+  .section-head h2{font-size:clamp(27px,3.2vw,40px);line-height:1.22;letter-spacing:-.02em;margin:14px 0 14px;font-weight:800}
+  .section-head p{color:var(--muted);font-size:16.5px;margin:0}
+
+  /* features */
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+  .card{
+    background:var(--surface);border-radius:var(--radius);
+    border:1px solid var(--line);padding:30px 26px;
+    box-shadow:var(--shadow-sm);
+    transition:transform .3s,box-shadow .3s,border-color .3s;
+    position:relative;overflow:hidden;
+  }
+  .card::after{
+    content:"";position:absolute;inset:auto auto -60% -20%;width:220px;height:220px;border-radius:50%;
+    background:radial-gradient(circle,rgba(56,189,248,.12),transparent 70%);
+    opacity:0;transition:opacity .35s;
+  }
+  .card:hover{transform:translateY(-5px);box-shadow:var(--shadow-md);border-color:rgba(14,165,233,.25)}
+  .card:hover::after{opacity:1}
+  .icon{
+    width:46px;height:46px;border-radius:14px;display:grid;place-items:center;margin-bottom:18px;
+    background:linear-gradient(140deg,rgba(56,189,248,.18),rgba(20,184,166,.14));
+    color:var(--brand-deep);border:1px solid rgba(14,165,233,.16);
+  }
+  .icon svg{width:22px;height:22px}
+  .card h3{font-size:17.5px;margin:0 0 8px;font-weight:700;letter-spacing:-.01em}
+  .card p{margin:0;color:var(--muted);font-size:14.5px}
+  .card ul{margin:12px 0 0;padding-left:18px;color:var(--muted);font-size:14px}
+  .card li{margin:3px 0}
+
+  /* screenshots */
+  .shots{
+    background:linear-gradient(180deg,#eef7ff 0%,#f7fcff 100%);
+    border-top:1px solid rgba(14,165,233,.10);
+    border-bottom:1px solid rgba(14,165,233,.10);
+  }
+  .shot-pair{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+  .shot{
+    background:#fff;border-radius:var(--radius);padding:12px;
+    border:1px solid var(--line);box-shadow:var(--shadow-md);
+    transition:transform .35s;
+  }
+  .shot:hover{transform:translateY(-4px)}
+  .shot img{border-radius:14px;border:1px solid rgba(10,30,48,.06)}
+  .shot figcaption{padding:14px 10px 6px;font-size:14px;color:var(--muted)}
+  .shot figcaption b{display:block;color:var(--ink);font-size:15px;margin-bottom:2px}
+
+  /* stats */
+  .stats{
+    background:var(--deep);color:#fff;position:relative;overflow:hidden;padding:76px 0;
+  }
+  .stats::before{
+    content:"";position:absolute;inset:0;
+    background:radial-gradient(700px 300px at 20% 0%,rgba(14,165,233,.28),transparent 65%),radial-gradient(700px 300px at 85% 100%,rgba(20,184,166,.24),transparent 65%);
+  }
+  .stats .wrap{position:relative;z-index:1;display:grid;grid-template-columns:repeat(4,1fr);gap:28px;text-align:center}
+  .stat b{display:block;font-size:clamp(30px,3.4vw,44px);font-weight:800;letter-spacing:-.02em;
+    background:linear-gradient(120deg,#7dd3fc,#38bdf8 45%,#2dd4bf);-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1.15}
+  .stat span{font-size:13.5px;color:rgba(226,242,252,.66)}
+
+  /* platform */
+  .platform-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+  .plat{
+    background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px;
+    display:flex;flex-direction:column;gap:6px;align-items:flex-start;
+    box-shadow:var(--shadow-sm);transition:transform .3s,box-shadow .3s;
+  }
+  .plat:hover{transform:translateY(-4px);box-shadow:var(--shadow-md)}
+  .plat .p-ico{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:rgba(14,165,233,.1);color:var(--brand-deep);margin-bottom:8px;font-size:18px}
+  .plat b{font-size:15.5px}
+  .plat span{font-size:13px;color:var(--muted)}
+
+  /* faq */
+  .faq{max-width:820px;margin:0 auto}
+  details{
+    background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px 24px;
+    margin-bottom:12px;box-shadow:var(--shadow-sm);transition:border-color .25s;
+  }
+  details[open]{border-color:rgba(14,165,233,.3)}
+  summary{cursor:pointer;font-weight:650;font-size:15.5px;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"+";font-size:20px;color:var(--brand);font-weight:400;transition:transform .25s;line-height:1}
+  details[open] summary::after{transform:rotate(45deg)}
+  details p{margin:12px 0 0;color:var(--muted);font-size:14.5px}
+
+  /* cta */
+  .cta-band{
+    position:relative;overflow:hidden;border-radius:30px;padding:64px 48px;text-align:center;color:#fff;
+    background:linear-gradient(135deg,#0b4a6f 0%,#0e6f9e 50%,#0f8a8a 100%);
+    box-shadow:var(--shadow-lg);
+  }
+  .cta-band::before{
+    content:"";position:absolute;inset:-40% -10% auto;height:150%;
+    background:radial-gradient(circle at 30% 20%,rgba(255,255,255,.22),transparent 55%);
+    pointer-events:none;
+  }
+  .cta-band h2{position:relative;font-size:clamp(26px,3.2vw,38px);letter-spacing:-.02em;margin:0 0 12px;font-weight:800}
+  .cta-band p{position:relative;margin:0 auto 30px;max-width:520px;color:rgba(255,255,255,.8)}
+  .cta-band .btn-primary{background:#fff;color:#0b4a6f;box-shadow:0 24px 50px -20px rgba(0,0,0,.55)}
+  .cta-band .btn-primary:hover{box-shadow:0 30px 60px -20px rgba(0,0,0,.65)}
+
+  /* footer */
+  footer{padding:54px 0 40px;color:var(--muted);font-size:13.5px}
+  footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;
+    border-top:1px solid var(--line);padding-top:28px}
+  footer .f-brand{display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:700}
+  footer .f-brand .brand-mark{width:30px;height:30px;border-radius:10px;font-size:16px}
+
+  /* reveal */
+  .reveal{opacity:0;transform:translateY(26px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .reveal.in{opacity:1;transform:none}
+  .reveal[data-delay="1"]{transition-delay:.08s}
+  .reveal[data-delay="2"]{transition-delay:.16s}
+  .reveal[data-delay="3"]{transition-delay:.24s}
+
+  @media (max-width:960px){
+    .hero{padding:130px 0 80px}
+    .hero .wrap{grid-template-columns:1fr;gap:52px;text-align:center}
+    .hero p.lede{margin-inline:auto}
+    .hero-actions,.hero-meta{justify-content:center}
+    .nav-links a:not(.nav-cta){display:none}
+    .grid-3{grid-template-columns:1fr 1fr}
+    .stats .wrap{grid-template-columns:1fr 1fr;row-gap:34px}
+    .platform-grid{grid-template-columns:1fr 1fr}
+    .shot-pair{grid-template-columns:1fr}
+    .float-a{left:0}
+    .float-b{right:0}
+  }
+  @media (max-width:620px){
+    .wrap{width:calc(100% - 32px)}
+    section{padding:70px 0}
+    .grid-3{grid-template-columns:1fr}
+    .stats .wrap{grid-template-columns:1fr 1fr;gap:22px}
+    .platform-grid{grid-template-columns:1fr 1fr}
+    .cta-band{padding:48px 24px;border-radius:24px}
+    .float-card{padding:10px 13px;font-size:12px;transform:scale(.92)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+    .reveal{opacity:1;transform:none}
+  }
+</style>
+</head>
+<body>
+
+<header class="nav" id="nav">
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <span class="brand-mark">💧</span>
+      <span>Shui</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#features">功能</a>
+      <a href="#screens">界面</a>
+      <a href="#platforms">支持平台</a>
+      <a href="#faq">常见问题</a>
+      <a class="nav-cta" href="#get">开始使用</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <span class="hero-badge"><b>v0.5.0</b> 跨平台 · 专注喝水提醒</span>
+        <h1>把喝水，<br />变成一件<span class="grad">自然发生</span>的事。</h1>
+        <p class="lede">
+          Shui 是一款为久坐办公人群打造的喝水提醒助手。优雅的全屏提醒、灵活的时间管理、完整的饮水记录与统计分析，让好习惯不需要靠意志力。
+        </p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#get">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg>
+            获取 Shui
+          </a>
+          <a class="btn btn-ghost" href="#features">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+            了解功能
+          </a>
+        </div>
+        <div class="hero-meta">
+          <div><b>4</b>平台支持</div>
+          <div><b>7 / 30</b>天趋势分析</div>
+          <div><b>0</b>干扰 · 息屏自动暂停</div>
+        </div>
+      </div>
+
+      <div class="stage">
+        <div class="glow"></div>
+        <div class="float-card float-a">
+          <b>今日 1,200 ml</b>
+          <span><i class="dot"></i>已达目标 80%</span>
+        </div>
+        <div class="phone">
+          <div class="phone-notch"></div>
+          <img src="assets/screenshot-0.png" alt="Shui 主界面" width="510" height="479" />
+        </div>
+        <div class="float-card float-b">
+          <b>下次提醒 09:45</b>
+          <span>工作日智能提醒</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow">Features</span>
+        <h2>该提醒的时候提醒，该安静的时候安静</h2>
+        <p>从目标设定到记录复盘，Shui 把喝水的每个环节都做得刚刚好。</p>
+      </div>
+
+      <div class="grid-3">
+        <article class="card reveal">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.7 6 9.5A6.5 6.5 0 0 0 18 9.5Z"/><path d="M9 13.5a3 3 0 0 0 3 3"/></svg></div>
+          <h3>每日饮水目标</h3>
+          <p>按你的体重与作息设定目标，进度随手可见，达成时用一声轻响给你正反馈。</p>
+        </article>
+
+        <article class="card reveal" data-delay="1">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2.5"/><path d="M8 21h8"/><path d="M12 18v3"/></svg></div>
+          <h3>全屏休息提醒</h3>
+          <p>优雅且不可忽视的全屏提示，帮你真正离开椅子；开会时自动避让，不打扰重要时刻。</p>
+        </article>
+
+        <article class="card reveal" data-delay="2">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></div>
+          <h3>智能时间管理</h3>
+          <p>自定义提醒间隔与生效时间段，自动识别工作日，午休和下班后不再被打扰。</p>
+        </article>
+
+        <article class="card reveal">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-2.5 8-2.5 8h17S18 15 18 8"/><path d="M10.3 20a2 2 0 0 0 3.4 0"/></svg></div>
+          <h3>多样化提醒方式</h3>
+          <p>全屏通知、系统原生通知、托盘实时倒计时，总有一种适合你当前的工作状态。</p>
+        </article>
+
+        <article class="card reveal" data-delay="1">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-6"/><path d="M22 19H2"/></svg></div>
+          <h3>统计与分析</h3>
+          <p>近 7 天或 30 天趋势、日均饮水量、达标天数、饮水时间分布，一眼看清习惯的变化。</p>
+        </article>
+
+        <article class="card reveal" data-delay="2">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/></svg></div>
+          <h3>记录 · 备份 · 导入</h3>
+          <p>一键记录 50 / 100 / 200 / 300 ml，JSON 备份与导入只在缺失时补全，数据始终留在本地。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Screenshots -->
+  <section class="shots" id="screens">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow">Interface</span>
+        <h2>克制的界面，刚好的存在感</h2>
+        <p>浅色、深色、跟随系统三套主题，设置与提醒都保持同一套视觉语言。</p>
+      </div>
+      <div class="shot-pair">
+        <figure class="shot reveal" style="margin:0">
+          <img src="assets/screenshot-2.png" alt="Shui 设置界面" width="680" height="460" />
+          <figcaption><b>精细化设置</b>提醒间隔、时间范围、应用白名单与开机自启，一处调整全部生效。</figcaption>
+        </figure>
+        <figure class="shot reveal" data-delay="1" style="margin:0">
+          <img src="assets/screenshot-3.png" alt="Shui 全屏提醒" width="666" height="460" />
+          <figcaption><b>全屏提醒</b>确认、跳过或等它超时，每一次提醒都有完整的结果记录。</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats -->
+  <section class="stats">
+    <div class="wrap">
+      <div class="stat"><b>7 / 30</b><span>天饮水趋势视图</span></div>
+      <div class="stat"><b>4 类</b><span>提醒记录结果</span></div>
+      <div class="stat"><b>3 套</b><span>外观主题</span></div>
+      <div class="stat"><b>100%</b><span>数据保存在本地</span></div>
+    </div>
+  </section>
+
+  <!-- Platforms -->
+  <section id="platforms">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow">Platforms</span>
+        <h2>在你的每一台设备上</h2>
+        <p>同一套提醒逻辑，覆盖桌面与移动端，习惯不因换设备而中断。</p>
+      </div>
+      <div class="platform-grid">
+        <div class="plat reveal"><div class="p-ico">🍎</div><b>macOS</b><span>含静默开机自启</span></div>
+        <div class="plat reveal" data-delay="1"><div class="p-ico">🪟</div><b>Windows</b><span>托盘倒计时</span></div>
+        <div class="plat reveal" data-delay="2"><div class="p-ico">🐧</div><b>Linux</b><span>原生通知支持</span></div>
+        <div class="plat reveal" data-delay="3"><div class="p-ico">🤖</div><b>Android</b><span>移动端提醒</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" style="padding-top:20px">
+    <div class="wrap">
+      <div class="section-head reveal" style="margin-inline:auto;text-align:center">
+        <span class="eyebrow">FAQ</span>
+        <h2>常见问题</h2>
+      </div>
+      <div class="faq">
+        <details class="reveal">
+          <summary>提醒会不会打断开会或演示？</summary>
+          <p>应用白名单默认包含腾讯会议、Zoom、Google Meet 与 Microsoft Teams，检测到这些应用在前台时会自动延后提醒。你也可以自行添加需要专注的应用。</p>
+        </details>
+        <details class="reveal" data-delay="1">
+          <summary>离开电脑时还会一直提醒吗？</summary>
+          <p>息屏、锁屏或系统休眠时会自动暂停计时，回到电脑前再继续，不会产生成串的补发提醒。</p>
+        </details>
+        <details class="reveal" data-delay="2">
+          <summary>饮水数据会上传到云端吗？</summary>
+          <p>不会。饮水记录、设置与统计数据都保存在本地，可通过 JSON 备份文件自行导出与导入。</p>
+        </details>
+        <details class="reveal" data-delay="3">
+          <summary>可以只在工作日提醒吗？</summary>
+          <p>可以。提醒规则支持自定义时间范围与工作日自动识别，周末与节假日默认保持安静。</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section id="get" style="padding-top:10px">
+    <div class="wrap">
+      <div class="cta-band reveal">
+        <h2>今天，从第一杯水开始</h2>
+        <p>不用改变作息，只需要让 Shui 在合适的时间轻轻提醒你一次。</p>
+        <a class="btn btn-primary" href="#features">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+          查看全部功能
+        </a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="f-brand"><span class="brand-mark">💧</span> Shui · 喝水提醒助手</div>
+    <div>跨平台桌面应用 · 数据保存在本地 · v0.5.0</div>
+  </div>
+</footer>
+
+<script>
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 24);
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive: true });
+
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (e.isIntersecting) {
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+</script>
+
+</body>
+</html>
