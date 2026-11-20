@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Check,
@@ -10,7 +18,6 @@ import {
   Droplet,
   Droplets,
   GlassWater,
-  Minus,
   Plus,
   Undo2,
   X,
@@ -55,6 +62,18 @@ const CUP_HOLD_MS = 2000;
 const CUP_MOVE_TOLERANCE_PX = 8;
 /** 编辑抽屉里的快捷档位（ml）。 */
 const CUP_CHIPS = [50, 100, 150, 250, 500, 750];
+/** 刻度尺上每一档（10ml）占的宽度，指针固定在正中。 */
+const CUP_TICK_GAP = 14;
+/** 刻度尺覆盖的完整档位序列，索引 i 对应的杯量是 MIN + i × STEP。 */
+const CUP_SCALE_VALUES = Array.from(
+  { length: (MAX_QUICK_AMOUNT - MIN_QUICK_AMOUNT) / STEP_QUICK_AMOUNT + 1 },
+  (_, i) => MIN_QUICK_AMOUNT + i * STEP_QUICK_AMOUNT
+);
+
+/** 杯量换算成刻度索引，用于把指针定位到对应档位。 */
+function amountToTick(amount: number): number {
+  return (clampAmount(amount) - MIN_QUICK_AMOUNT) / STEP_QUICK_AMOUNT;
+}
 /** 杯量自定义引导的本地记忆：气泡是否已关、是否已自定义过、记录后 toast 是否已提示。 */
 const CUP_HINT_BUBBLE_KEY = "shui.cupHint.bubbleDismissed";
 const CUP_HINT_CUSTOMIZED_KEY = "shui.cupHint.customized";
@@ -377,10 +396,10 @@ export function TodayTab() {
     void submit(amount);
   }
 
-  function saveCupAmount() {
+  function saveCupAmount(amount: number) {
     if (editIdx === null) return;
     const next = [...quickAmounts];
-    next[editIdx] = draftAmount;
+    next[editIdx] = amount;
     setCupHint((state) => ({ ...state, bubble: false, toastPending: false }));
     try {
       localStorage.setItem(CUP_HINT_CUSTOMIZED_KEY, "1");
@@ -389,7 +408,7 @@ export function TodayTab() {
     }
     // 杯量属非节奏配置：写盘 + 同步原生快照（saveConfig），不重排闹钟。
     patchAlert({ quickAmounts: next });
-    toast.success(t("mobile.today.cup.updated", { amount: draftAmount }));
+    toast.success(t("mobile.today.cup.updated", { amount }));
     setEditIdx(null);
   }
   const pending = useRef<{ amount: number; requestId: string } | null>(null);
@@ -693,74 +712,231 @@ export function TodayTab() {
           <div aria-hidden className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted-foreground/40" />
           <SheetHeader className="pr-10">
             <SheetTitle>{t("mobile.today.cup.editTitle")}</SheetTitle>
-            <SheetDescription>
-              {t("mobile.today.cup.replaceHint", {
-                amount: draftAmount,
-                name: t(cupHintKey(draftAmount)),
-              })}
-            </SheetDescription>
+            <SheetDescription>{t("mobile.today.cup.range")}</SheetDescription>
           </SheetHeader>
-          <div className="px-4 pb-6">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-3xl font-semibold tabular-nums tracking-tight">
-                {draftAmount}
-                <span className="ml-1 text-xs font-medium text-muted-foreground">ml</span>
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-11 w-11"
-                  disabled={draftAmount <= MIN_QUICK_AMOUNT}
-                  aria-label={t("mobile.today.cup.decAria")}
-                  onClick={() => setDraftAmount((value) => clampAmount(value - STEP_QUICK_AMOUNT))}
-                >
-                  <Minus className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-11 w-11"
-                  disabled={draftAmount >= MAX_QUICK_AMOUNT}
-                  aria-label={t("mobile.today.cup.incAria")}
-                  onClick={() => setDraftAmount((value) => clampAmount(value + STEP_QUICK_AMOUNT))}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {CUP_CHIPS.map((chip) => (
-                <Button
-                  key={chip}
-                  variant={draftAmount === chip ? "default" : "outline"}
-                  size="sm"
-                  className="min-h-9 rounded-full tabular-nums"
-                  onClick={() => setDraftAmount(chip)}
-                >
-                  {chip}
-                </Button>
-              ))}
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {t("mobile.today.cup.range")}
-            </p>
-            <div className="mt-4 flex gap-2">
-              <Button
-                variant="ghost"
-                className="min-h-11 flex-1"
-                onClick={() => setEditIdx(null)}
-              >
-                {t("common.cancel")}
-              </Button>
-              <Button className="min-h-11 flex-1" onClick={saveCupAmount}>
-                {t("mobile.today.cup.save")}
-              </Button>
-            </div>
-          </div>
+          {editIdx !== null && (
+            <CupAmountEditor
+              key={editIdx}
+              initialAmount={draftAmount}
+              onSave={saveCupAmount}
+              onCancel={() => setEditIdx(null)}
+              t={t}
+            />
+          )}
         </SheetContent>
       </Sheet>
     </>
+  );
+}
+
+/**
+ * 刻度层：拖动时只改 transform，不重建刻度节点。
+ * 每 100ml 一根长刻度，其余为短刻度。
+ */
+const CupScale = memo(function CupScale({
+  offset,
+  animate,
+}: {
+  offset: number;
+  animate: boolean;
+}) {
+  return (
+    <div
+      aria-hidden
+      className="absolute inset-y-0 left-0 flex items-end will-change-transform"
+      style={{
+        transform: `translateX(${offset}px)`,
+        transition: animate
+          ? "transform 160ms cubic-bezier(0.22, 1, 0.36, 1)"
+          : "none",
+      }}
+    >
+      {CUP_SCALE_VALUES.map((value) => (
+        <div
+          key={value}
+          className="flex shrink-0 items-end justify-center"
+          style={{ width: CUP_TICK_GAP }}
+        >
+          <span
+            className={cn(
+              "w-px rounded-full",
+              value % 100 === 0 ? "h-5 bg-muted-foreground/40" : "h-3 bg-border"
+            )}
+          />
+        </div>
+      ))}
+    </div>
+  );
+});
+
+/**
+ * 自定义杯量的编辑面板：中间固定指针，左右拖动刻度尺改数值，松手吸附到 10ml。
+ * 拖动状态完全封装在这里，避免每次 pointermove 都重渲染整个今日页。
+ */
+function CupAmountEditor({
+  initialAmount,
+  onSave,
+  onCancel,
+  t,
+}: {
+  initialAmount: number;
+  onSave: (amount: number) => void;
+  onCancel: () => void;
+  t: Translate;
+}) {
+  const [pos, setPos] = useState(() => amountToTick(initialAmount));
+  const [width, setWidth] = useState(0);
+  // 松手/点档位时开启过渡，让刻度回弹到整数格；拖动过程中必须关闭，否则跟手会滞后。
+  const [snapping, setSnapping] = useState(false);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ startX: number; startPos: number } | null>(null);
+  const snapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const maxPos = CUP_SCALE_VALUES.length - 1;
+  const amount = clampAmount(
+    MIN_QUICK_AMOUNT + Math.round(pos) * STEP_QUICK_AMOUNT
+  );
+
+  useEffect(() => {
+    const node = trackRef.current;
+    if (!node) return;
+    const sync = () => setWidth(node.clientWidth);
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (snapTimer.current) clearTimeout(snapTimer.current);
+    },
+    []
+  );
+
+  function animateTo(next: number | ((current: number) => number)) {
+    setSnapping(true);
+    setPos(next);
+    if (snapTimer.current) clearTimeout(snapTimer.current);
+    snapTimer.current = setTimeout(() => {
+      setSnapping(false);
+      snapTimer.current = null;
+    }, 180);
+  }
+
+  function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    drag.current = { startX: event.clientX, startPos: pos };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setSnapping(false);
+  }
+
+  function onPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const state = drag.current;
+    if (!state) return;
+    // 手指右移露出左边更小的刻度，因此索引反向变化。
+    const delta = (event.clientX - state.startX) / CUP_TICK_GAP;
+    setPos(Math.min(maxPos, Math.max(0, state.startPos - delta)));
+  }
+
+  function onPointerEnd(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!drag.current) return;
+    drag.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    animateTo((current) => Math.round(current));
+    navigator.vibrate?.(8);
+  }
+
+  function onKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const step =
+      event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
+    if (step === 0) return;
+    event.preventDefault();
+    animateTo((current) =>
+      Math.min(maxPos, Math.max(0, Math.round(current) + step))
+    );
+  }
+
+  const offset = width / 2 - (pos * CUP_TICK_GAP + CUP_TICK_GAP / 2);
+  // 指针两侧各 50ml 的刻度标签，跟着当前值走；越界的一侧留空。
+  const labels = [-5, 0, 5].map((step) => {
+    const value = amount + step * STEP_QUICK_AMOUNT;
+    return value < MIN_QUICK_AMOUNT || value > MAX_QUICK_AMOUNT ? null : value;
+  });
+
+  return (
+    <div className="px-4 pb-6">
+      <div className="flex flex-col items-center">
+        <p className="text-4xl leading-none font-semibold tracking-tight tabular-nums">
+          {amount}
+          <span className="ml-1 text-xs font-medium text-muted-foreground">
+            ml
+          </span>
+        </p>
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {t(cupHintKey(amount))}
+        </p>
+      </div>
+
+      <div
+        ref={trackRef}
+        role="slider"
+        tabIndex={0}
+        aria-label={t("mobile.today.cup.editTitle")}
+        aria-valuemin={MIN_QUICK_AMOUNT}
+        aria-valuemax={MAX_QUICK_AMOUNT}
+        aria-valuenow={amount}
+        aria-valuetext={`${amount} ml`}
+        className="relative mt-5 h-12 touch-none overflow-hidden select-none focus-visible:outline-none"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerEnd}
+        onPointerCancel={onPointerEnd}
+        onKeyDown={onKeyDown}
+      >
+        {width > 0 && <CupScale offset={offset} animate={snapping} />}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-0 left-1/2 size-1.5 -translate-x-1/2 rounded-full bg-primary"
+        />
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-0 left-1/2 h-8 w-0.5 -translate-x-1/2 rounded-full bg-primary"
+        />
+      </div>
+
+      <div className="mt-1 grid grid-cols-3 px-1 text-[11px] tabular-nums text-muted-foreground">
+        <span className="text-left">{labels[0]}</span>
+        <span className="text-center font-medium text-foreground">
+          {labels[1]}
+        </span>
+        <span className="text-right">{labels[2]}</span>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {CUP_CHIPS.map((chip) => (
+          <Button
+            key={chip}
+            variant={amount === chip ? "default" : "outline"}
+            size="sm"
+            className="min-h-9 rounded-full tabular-nums"
+            onClick={() => animateTo(amountToTick(chip))}
+          >
+            {chip}
+          </Button>
+        ))}
+      </div>
+
+      <div className="mt-5 flex gap-2">
+        <Button variant="ghost" className="min-h-11 flex-1" onClick={onCancel}>
+          {t("common.cancel")}
+        </Button>
+        <Button className="min-h-11 flex-1" onClick={() => onSave(amount)}>
+          {t("mobile.today.cup.save")}
+        </Button>
+      </div>
+    </div>
   );
 }
 
