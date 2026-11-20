@@ -11,7 +11,6 @@ import {
   Droplets,
   GlassWater,
   Plus,
-  RefreshCw,
   Undo2,
   type LucideIcon,
 } from "lucide-react";
@@ -234,7 +233,7 @@ function NextReminderLine({
 
 export function TodayTab() {
   const { t, locale } = useI18n();
-  const { today, goal, loading, error, reload } = useDrinkData(7);
+  const { today, goal, error } = useDrinkData(7);
   const { alert, hydrated } = useMobileConfig();
   const [confirmUndo, setConfirmUndo] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<Celebration | null>(null);
@@ -360,11 +359,8 @@ export function TodayTab() {
         </p>
       </MobileSection>
 
-      <MobileSection
-        title={t("mobile.today.record.title")}
-      >
-        <div className="grid grid-cols-2 gap-2.5">
-          {QUICK_AMOUNTS.map(({ amount, hintKey, Icon }) => {
+      <div className="mb-3 grid grid-cols-2 gap-2.5">
+        {QUICK_AMOUNTS.map(({ amount, hintKey, Icon }) => {
             const celebrating = celebration?.amount === amount ? celebration : null;
             return (
               <button
@@ -426,8 +422,7 @@ export function TodayTab() {
               </button>
             );
           })}
-        </div>
-      </MobileSection>
+      </div>
 
       <MobileSection title={t("mobile.today.rhythm.title")}>
         <div className="flex items-center gap-3">
@@ -464,18 +459,6 @@ export function TodayTab() {
         title={t("mobile.today.details.title")}
         description={t("mobile.today.details.description")}
       >
-        <div className="mb-2 flex justify-end">
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={loading}
-            onClick={reload}
-            className="min-h-10"
-          >
-            <RefreshCw className="mr-1 h-3.5 w-3.5" />
-            {t("common.refresh")}
-          </Button>
-        </div>
         {error ? (
           <p role="alert" className="text-sm text-destructive">
             {t("mobile.data.error")}

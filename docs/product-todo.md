@@ -1,6 +1,7 @@
 # 产品 TODO（按模块分类）
 
 > 最近更新：2026-11-20。补充官网优化（P1）；2026-11-19 整合原有产品评估结论与当日补充的 Android 端 6 条待办。
+> 2026-11-20 已对照代码库逐项复查：未勾选项除第 9 节 `gradle.properties` 外均确认尚未实现（快捷水量仍硬编码 50/100/200/300、通知无「稍后」Action、无 streak/同步/备份提示/反馈 mailto 等），优先级排序不变。
 > 相关文档：[安卓桌面小组件设计](./android-widget-todo.md)、[Google Play 上架材料](./play-store/listing.md)、[发布流程](./release.md)
 > 使用方式：完成一项勾一项；P0 未清空前不发版。
 
@@ -172,7 +173,7 @@
 
 - [ ] **数据页的「提醒记录」折叠或移到「我的」**。触发 / 确认 / 跳过 / 超时 / 展示时长是开发者视角的数据，对普通用户是负价值，占了注意力（`src/components/mobile/data-tab.tsx`）。
 - [ ] **30 天趋势加「本周 vs 上周」对比**。现在必须横滑，纵轴按目标取整，跨周对比很弱。
-- [ ] **达标动效**。现在只有 toast + 通知，进度环应有一次完整的完成动画。
+- [ ] **达标动效**。进度环已有数值 count-up、增长时的 `ring-pulse` 与「已达标」徽标（`ui.tsx` 的 `ProgressRing`），但达标瞬间仍缺一次完整的完成动画；toast + 通知不变。
 - [ ] **撤销改为 toast 内撤销**。现在二次确认弹窗打断了高频操作（`today-tab.tsx` 的 undo 流程）。
 - [ ] **全屏提醒加「稍后」**。现在只有记录 / 跳过（`src/components/mobile/fullscreen-reminder.tsx`）。
 - [ ] **通知按钮折叠问题**。部分 ROM 会把 3 个按钮收进展开态，首次使用时在引导里说明，避免用户以为没有记录入口。
@@ -250,4 +251,4 @@
 ## 9. 代码内零散 TODO
 
 - [ ] `src/app/reminder/page.tsx`：提醒窗口被其他窗口隐藏时注销快捷键。
-- [ ] `src-tauri/gen/android/gradle.properties`：迁移到 AGP 9 新 DSL 后删掉三行兼容配置。
+- [x] `src-tauri/gen/android/gradle.properties`：已迁移到 AGP 9（`build.gradle.kts` classpath 9.3.1），三行兼容配置已删除。

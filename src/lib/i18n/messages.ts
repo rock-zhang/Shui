@@ -226,7 +226,6 @@ export const zhCN = {
   "mobile.today.next.tomorrow": "今天不提醒 · 下次明天 {time}",
   "mobile.today.next.weekday": "今天不提醒 · 下次{weekday} {time}",
   "mobile.today.tip": "建议每天 1500~1700ml，少量多次，每次不超过 200ml",
-  "mobile.today.record.title": "记录刚喝的水",
   "mobile.today.record.aria": "记录 {amount} 毫升饮水",
   "mobile.today.record.done": "已记录 +{amount} ml",
   "mobile.today.hint.50": "小口",
@@ -943,7 +942,6 @@ export const enUS = {
     "No more reminders today · next {weekday} at {time}",
   "mobile.today.tip":
     "Aim for 1500–1700 ml a day, in small servings of no more than 200 ml.",
-  "mobile.today.record.title": "Log what you just drank",
   "mobile.today.record.aria": "Log {amount} ml of water",
   "mobile.today.record.done": "Logged +{amount} ml",
   "mobile.today.hint.50": "Sip",
