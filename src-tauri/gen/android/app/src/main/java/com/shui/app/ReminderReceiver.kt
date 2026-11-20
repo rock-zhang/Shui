@@ -807,7 +807,23 @@ object ReminderScheduler {
                 found = true
                 break
             }
-            candidate.add(Calendar.MINUTE, gap)
+            if (inWorkTime) {
+                candidate.add(Calendar.MINUTE, gap)
+            } else {
+                // 时段外的候选点直接对齐到下一个时段起点，而不是继续沿 gap 网格
+                // 硬走。网格锚在「上次提醒」上，一旦偏移出时段起点（如最后一杯
+                // 落在 18:55、网格在 :05），整夜步进后次日第一个可提醒点会是
+                // 08:05 而非时段起点 08:00，且这个偏移永远不自愈。对齐只发生在
+                // 跨出时段时，当天时段内的提醒节奏不受影响。
+                if (minute < start) {
+                    candidate.set(Calendar.HOUR_OF_DAY, start / 60)
+                    candidate.set(Calendar.MINUTE, start % 60)
+                } else {
+                    candidate.add(Calendar.DAY_OF_MONTH, 1)
+                    candidate.set(Calendar.HOUR_OF_DAY, start / 60)
+                    candidate.set(Calendar.MINUTE, start % 60)
+                }
+            }
             attempts += gap
         }
         if (!found) {

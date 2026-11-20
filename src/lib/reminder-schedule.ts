@@ -111,8 +111,20 @@ export function findNextReminder(
     if (weekdays.has(candidate.getDay()) && inWorkTime && !inQuiet) {
       return { kind: "time", date: candidate };
     }
-    // Calendar.add(MINUTE, gap) on the native side.
-    candidate.setMinutes(candidate.getMinutes() + gap);
+    if (inWorkTime) {
+      // Calendar.add(MINUTE, gap) on the native side.
+      candidate.setMinutes(candidate.getMinutes() + gap);
+    } else {
+      // 时段外直接对齐到下一个时段起点，与原生 scheduleNext 同口径：网格锚在
+      // 「上次提醒」上，跨夜后偏移不自愈，次日首提醒会落在 08:05 这类网格点
+      // 而不是时段起点。对齐只发生在跨出时段时，当天节奏不受影响。
+      if (minute < start) {
+        candidate.setHours(Math.floor(start / 60), start % 60);
+      } else {
+        candidate.setDate(candidate.getDate() + 1);
+        candidate.setHours(Math.floor(start / 60), start % 60);
+      }
+    }
   }
   return { kind: "none" };
 }

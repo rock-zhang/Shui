@@ -26,12 +26,12 @@ test('Sunday is not selected: next reminder is Monday, not today', () => {
   assert.equal(result.date.getDay(), 1);
   assert.equal(
     `${String(result.date.getHours()).padStart(2, '0')}:${String(result.date.getMinutes()).padStart(2, '0')}`,
-    '09:08'
+    '09:00'
   );
   assert.deepEqual(describeNextReminder(result, sunday), {
     kind: 'later',
     weekday: null,
-    time: '09:08',
+    time: '09:00',
   });
 });
 
@@ -57,6 +57,20 @@ test('time window already over: rolls to tomorrow', () => {
     weekday: null,
     time: '09:00',
   });
+});
+
+test('grid offset from window start is realigned: next day starts at window start, not on the grid', () => {
+  // 复现线上问题：时段 08:00–19:00、间隔 10 分钟，最后一杯落在 :55 网格上。
+  // 旧行为沿网格整夜步进，次日首提醒会落在 08:05；修复后应对齐到 08:00。
+  const now = new Date(2026, 10, 15, 18, 55);
+  const result = findNextReminder(
+    base({ gap: '10', timeStart: '08:00', timeEnd: '19:00' }),
+    now
+  );
+  assert.equal(result.kind, 'time');
+  assert.equal(result.date.getDate(), 16);
+  assert.equal(result.date.getHours(), 8);
+  assert.equal(result.date.getMinutes(), 0);
 });
 
 test('paused and goal-reached never show a next-cup estimate', () => {
