@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "tauri": "tauri",
-    "dev": "next dev --turbo",
-    "dev:prod": "NODE_ENV=production next dev --turbo",
-    "build": "next build",
+    "dev": "NEXT_PRIVATE_LOCAL_WEBPACK=1 next dev --turbo",
+    "dev:prod": "NODE_ENV=production NEXT_PRIVATE_LOCAL_WEBPACK=1 next dev --turbo",
+    "build": "NEXT_PRIVATE_LOCAL_WEBPACK=1 next build",
     "build:dmg": "tauri build",
     "start": "next start",
     "lint": "next lint",
@@ -44,6 +44,9 @@
     "tailwind-merge": "^3.1.0",
     "tw-animate-css": "^1.2.5"
   },
+  "resolutions": {
+    "enhanced-resolve": "5.20.0"
+  },
   "devDependencies": {
     "@actions/github": "^6.0.0",
     "@eslint/eslintrc": "^3",
@@ -55,6 +58,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.2.4",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "webpack": "5.109.0"
   }
 }
