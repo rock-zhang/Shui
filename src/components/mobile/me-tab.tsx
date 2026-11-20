@@ -10,7 +10,6 @@ import {
   Copy,
   Download,
   ExternalLink,
-  Github,
   Info,
   Mail,
   MessageCircle,
@@ -44,7 +43,6 @@ import {
 } from "@/lib/i18n";
 import { MobileRow, MobileSection, MobileSegmented } from "./ui";
 
-const GITHUB_URL = "https://github.com/rock-zhang/Shui";
 const STORE_URL = "https://play.google.com/store/apps/details?id=com.shui.app";
 
 type Notice = { key: MessageKey; params?: Record<string, string | number> };
@@ -150,7 +148,7 @@ export function MeTab() {
       emitRefresh();
     });
 
-  const openExternal = async (url: string, target: "store" | "github") => {
+  const openExternal = async (url: string, target: "store") => {
     try {
       await openUrl(url);
       track("external_link_open", { target });
@@ -478,14 +476,6 @@ export function MeTab() {
             </Button>
           }
         />
-        <button
-          type="button"
-          onClick={() => openExternal(GITHUB_URL, "github")}
-          className="mt-1 flex min-h-12 w-full items-center gap-2 rounded-xl bg-muted/50 px-3 text-left text-sm"
-        >
-          <Github className="h-4 w-4 shrink-0" />
-          <span className="min-w-0 flex-1 truncate">{GITHUB_URL}</span>
-        </button>
       </MobileSection>
 
       <MobileSection
