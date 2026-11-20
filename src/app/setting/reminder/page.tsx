@@ -52,7 +52,7 @@ if (process.env.NODE_ENV === "development") {
 export default function Home() {
   const { t, locale } = useI18n();
   const [config, setConfig] = useState({
-    gold: goldList[0],
+    gold: "1500",
     gap: gapList[0],
     weekdays: [] as number[],
     timeStart: "09:00",

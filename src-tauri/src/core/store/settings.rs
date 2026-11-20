@@ -78,7 +78,7 @@ impl AppSettings {
             config_store_category::ALERT.to_string(),
             json!({
                 "gap": "20",
-                "gold": "1000",
+                "gold": "1500",
                 "weekdays": [1, 2, 3, 4, 5],
                 "timeStart": "09:00",
                 "timeEnd": "18:00",

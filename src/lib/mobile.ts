@@ -63,7 +63,7 @@ export interface GeneralConfig {
 }
 
 export const DEFAULT_ALERT: AlertConfig = {
-  gold: "1000",
+  gold: "1500",
   // 必须与 Rust 侧的默认配置（store/settings.rs 的 init_store / unwrap_or）以及
   // Kotlin 的兜底值保持一致，否则首次启动会出现「今日页 30 分钟、设置页 20 分钟」。
   gap: "20",
