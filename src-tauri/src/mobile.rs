@@ -583,6 +583,13 @@ pub fn open_autostart_settings(app: tauri::AppHandle) -> Result<(), String> {
     native::<Value>(&app, "openAutoStartSettings", json!({})).map(|_| ())
 }
 
+/// 【临时跳转验证 demo】按 target 打开某个「设置-应用」候选页面，
+/// 用于真机确认各入口实际落地页。验证完成后随 demo 一起移除。
+#[tauri::command]
+pub fn open_settings_probe(app: tauri::AppHandle, target: String) -> Result<(), String> {
+    native::<Value>(&app, "openSettingsProbe", json!({ "target": target })).map(|_| ())
+}
+
 /// 真机诊断快照：一次返回所有决定提醒能否准时到达的原生状态。
 /// 字段与 Kotlin getDiagnostics 命令一一对应；桌面无原生桥接时为 None。
 #[derive(Debug, Deserialize, Serialize)]

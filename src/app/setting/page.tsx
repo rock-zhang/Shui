@@ -43,6 +43,22 @@ const GENERAL_ANALYTICS_KEYS: Record<string, string> = {
   isSound: "is_sound",
 };
 
+/**
+ * 【临时跳转验证 demo】「设置-应用」相关的全部候选入口，逐一点击在真机上
+ * 确认实际落地页。验证完成后随 demo 区块一起删除。
+ */
+const PROBE_TARGETS: { target: string; label: string }[] = [
+  { target: "application_settings", label: "系统 action：应用主页" },
+  { target: "manage_applications", label: "系统 action：应用管理（列表）" },
+  { target: "manage_all_applications", label: "系统 action：全部应用（列表）" },
+  { target: "app_details", label: "系统 action：本应用详情页" },
+  { target: "default_apps", label: "系统 action：默认应用" },
+  { target: "coloros_safecenter", label: "ColorOS 私有：手机管家自启动 ①" },
+  { target: "coloros_startup", label: "ColorOS 私有：手机管家自启动 ②" },
+  { target: "oplus_safecenter", label: "ColorOS 私有：oplus 管家自启动" },
+  { target: "oppo_safe", label: "ColorOS 私有：旧版 safe 自启动" },
+];
+
 export default function Home() {
   const { t, preference, setPreference } = useI18n();
   const themeOptions = [
@@ -56,7 +72,7 @@ export default function Home() {
     isFullScreen: false, // 新增全屏提醒选项
     isSound: true,
   });
-  const { isWindows, isMacOS, isMobile, isTauri } = usePlatform();
+  const { isWindows, isMacOS, isAndroid, isMobile, isTauri } = usePlatform();
 
   // 全屏提醒关闭后能否收到提醒，取决于系统设置里有没有给 Shui 授权。
   // 桌面端由 Rust 读取真实状态（macOS 走 UserNotifications，Windows 读注册表，
@@ -92,6 +108,19 @@ export default function Home() {
       toast.error(t("settings.general.notification.testFailed"));
     } finally {
       setTestPending(false);
+    }
+  };
+
+  // 【临时跳转验证 demo】逐个入口发起跳转，成功/失败都 toast 出来，
+  // 用户在真机上对照每个 target 的实际落地页。
+  const runProbe = async (target: string) => {
+    try {
+      await invoke("open_settings_probe", { target });
+      toast.success(`已发起跳转：${target}，请回到 App 对照落地页`, {
+        duration: 6000,
+      });
+    } catch (error) {
+      toast.error(`跳转失败 ${target}：${String(error)}`, { duration: 8000 });
     }
   };
 
@@ -433,6 +462,32 @@ export default function Home() {
           onCheckedChange={(checked) => void toggleAnalytics(checked)}
         />
       </div>
+
+      {isAndroid && (
+        <div className="mt-6 rounded-lg border border-dashed border-amber-500/50 p-3">
+          <p className="text-sm font-medium">
+            跳转验证 demo（临时，验证后删除）
+          </p>
+          <p className="mt-1 text-[0.8rem] text-muted-foreground">
+            逐个点击，确认每个入口在你的 OPPO 上实际落在哪个页面。失败的会提示原因。
+          </p>
+          <div className="mt-2.5 grid gap-1.5">
+            {PROBE_TARGETS.map(({ target, label }) => (
+              <button
+                key={target}
+                type="button"
+                onClick={() => void runProbe(target)}
+                className="flex items-center justify-between rounded-md border px-2.5 py-2 text-left transition-colors hover:bg-muted/60 active:bg-muted"
+              >
+                <span className="text-xs text-muted-foreground">{label}</span>
+                <span className="ml-2 shrink-0 font-mono text-[11px] text-amber-600 dark:text-amber-400">
+                  {target}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
