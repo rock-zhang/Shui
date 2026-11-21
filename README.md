@@ -1,11 +1,15 @@
 # Shui - 喝水提醒助手
 
+**简体中文** | [English](README.en.md)
+
 <p align="center">
   <img src="public/screenshot-0.png" alt="Shui Screenshot" width="350"/>
   <br/>
 </p>
 
-一个专注喝水提醒的跨端桌面 App，关注打工人健康 💪 ，改善你的喝水习惯。
+一个专注喝水提醒的跨端应用（macOS / Windows / Linux / Android）：全屏饮水提醒、桌面托盘倒计时、手机通知快捷记水，饮水记录与统计跨端同步，帮你在工作间隙保持规律饮水。💧
+
+> Cross-platform hydration reminder for desktop and Android — fullscreen water breaks, tray countdown, one-tap logging from notifications, and synced hydration stats.
 
 ## ✨ 主要特性
 

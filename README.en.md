@@ -1,11 +1,13 @@
 # Shui - Water Reminder Assistant
 
+[简体中文](README.md) | **English**
+
 <p align="center">
   <img src="public/screenshot-0.png" alt="Shui Screenshot" width="350"/>
   <br/>
 </p>
 
-A cross-platform desktop app focused on water intake reminders, promoting office workers' health 💪 and improving your drinking habits.
+A cross-platform water reminder app for macOS / Windows / Linux / Android — fullscreen water breaks, tray countdown on desktop, one-tap logging from phone notifications, and synced intake history and stats to help you build a steady drinking habit during work. 💧
 
 ## ✨ Key Features
 
