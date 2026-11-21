@@ -242,6 +242,7 @@ function NextReminderLine({
     // 桌面浏览器预览 / 原生命令不可用：退回同一套纯函数推算。
     const result = findNextReminder(
       {
+        ...alert,
         gap: alert.gap,
         weekdays: alert.weekdays,
         timeStart: alert.timeStart,

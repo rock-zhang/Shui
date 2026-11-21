@@ -80,11 +80,10 @@ test('paused and goal-reached never show a next-cup estimate', () => {
   assert.deepEqual(describeNextReminder(reached, sunday), { kind: 'goalReached' });
 });
 
-test('empty weekday list means every day (native behaviour)', () => {
+test('empty weekday list turns weekly reminders off', () => {
   const now = new Date(2026, 10, 15, 10, 0);
   const result = findNextReminder(base({ weekdays: [] }), now);
-  assert.equal(result.kind, 'time');
-  assert.equal(result.date.getDay(), 0);
+  assert.equal(result.kind, 'none');
 });
 
 test('quiet hours are skipped', () => {

@@ -1,6 +1,7 @@
 import { platform } from "@tauri-apps/plugin-os";
 import { load } from "@tauri-apps/plugin-store";
 import { PLATFORM_OS, STORE_NAME } from "@/lib/constants";
+import type { WorkCalendarConfig } from "./work-calendar";
 
 export type PlatformKind =
   | "android"
@@ -39,7 +40,7 @@ export function detectPlatform(): PlatformKind {
   }
 }
 
-export interface AlertConfig {
+export interface AlertConfig extends WorkCalendarConfig {
   gold: string;
   gap: string;
   weekdays: number[];

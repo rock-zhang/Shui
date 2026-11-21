@@ -4,7 +4,9 @@
  * 那会忽略重复日、时间范围、勿扰和达标，和真实闹钟对不上。
  */
 
-export interface ReminderSchedule {
+import { calendarDay, localCalendarDate, type WorkCalendarConfig } from "./work-calendar";
+
+export interface ReminderSchedule extends WorkCalendarConfig {
   gap: string | number;
   weekdays: number[] | null | undefined;
   timeStart: string;
@@ -34,8 +36,6 @@ export type NextReminderText =
   | { kind: "imminent" }
   | { kind: "today"; time: string; minutes: number | null }
   | { kind: "later"; weekday: number | null; time: string };
-
-const EVERY_DAY = new Set([0, 1, 2, 3, 4, 5, 6]);
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -92,26 +92,27 @@ export function findNextReminder(
     1,
     720
   );
-  const weekdays =
-    schedule.weekdays && schedule.weekdays.length > 0
-      ? new Set(schedule.weekdays)
-      : EVERY_DAY;
   const start = parseTime(schedule.timeStart);
   const end = parseTime(schedule.timeEnd);
   const quietStart = parseTime(schedule.quietStart);
   const quietEnd = parseTime(schedule.quietEnd);
 
   const candidate = new Date(now.getTime() + gap * 60_000);
-  const maxMinutes = 8 * 24 * 60;
-  for (let elapsed = gap; elapsed < maxMinutes; elapsed += gap) {
+  const limit = new Date(now);
+  limit.setDate(limit.getDate() + 400);
+  while (candidate < limit) {
     const minute = minutesOfDay(candidate);
     const inWorkTime = inWindow(minute, start, end);
     const inQuiet =
       schedule.quietEnabled && inWindow(minute, quietStart, quietEnd);
-    if (weekdays.has(candidate.getDay()) && inWorkTime && !inQuiet) {
+    const workday = calendarDay(localCalendarDate(candidate), schedule).remind;
+    if (workday && inWorkTime && !inQuiet) {
       return { kind: "time", date: candidate };
     }
-    if (inWorkTime) {
+    if (!workday) {
+      candidate.setDate(candidate.getDate() + 1);
+      candidate.setHours(Math.floor(start / 60), start % 60, 0, 0);
+    } else if (inWorkTime) {
       // Calendar.add(MINUTE, gap) on the native side.
       candidate.setMinutes(candidate.getMinutes() + gap);
     } else {

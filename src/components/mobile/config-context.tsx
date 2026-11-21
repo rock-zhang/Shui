@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
+import { invoke } from "@tauri-apps/api/core";
 import { syncAnalyticsProperties, track } from "@/lib/analytics";
 import {
   DEFAULT_ALERT,
@@ -25,7 +26,7 @@ import {
   type AlertConfig,
   type GeneralConfig,
 } from "@/lib/mobile";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 
 interface MobileConfigValue {
   alert: AlertConfig;
@@ -35,7 +36,7 @@ interface MobileConfigValue {
   hydrated: boolean;
   /** 递增表示原生闹钟已按新配置重排，今日页据此重新读取下一次时间。 */
   scheduleRevision: number;
-  patchAlert: (patch: Partial<AlertConfig>) => void;
+  patchAlert: (patch: Partial<AlertConfig>) => Promise<boolean>;
   patchGeneral: (patch: Partial<GeneralConfig>) => void;
 }
 
@@ -47,6 +48,7 @@ const ALERT_SCHEDULE_FIELDS = [
   "weekdays",
   "timeStart",
   "timeEnd",
+  "scheduleMode", "alternatingWeeks", "dateOverrides", "holidayCalendars",
 ] as const;
 const GENERAL_SCHEDULE_FIELDS = [
   "isPaused",
@@ -123,6 +125,7 @@ export function MobileConfigProvider({ children }: { children: ReactNode }) {
   // Refs keep rapid successive taps from basing a patch on a stale render.
   const alertRef = useRef(alert);
   const generalRef = useRef(general);
+  const alertRevision = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -196,7 +199,9 @@ export function MobileConfigProvider({ children }: { children: ReactNode }) {
   );
 
   const patchAlert = useCallback(
-    (patch: Partial<AlertConfig>) => {
+    async (patch: Partial<AlertConfig>): Promise<boolean> => {
+      const revision = ++alertRevision.current;
+      const previous = alertRef.current;
       const goalChanged =
         patch.gold !== undefined &&
         String(patch.gold) !== String(alertRef.current.gold);
@@ -209,15 +214,34 @@ export function MobileConfigProvider({ children }: { children: ReactNode }) {
       trackSettingChanges(alertRef.current, next, ALERT_ANALYTICS_KEYS, reschedule);
       alertRef.current = next;
       setAlert(next);
-      if (goalChanged) {
-        // 目标变了要让「今日」页的进度区重新读取：写盘成功后再广播，
-        // 否则监听方可能读到旧值。
-        void persist("alert", next, reschedule).then(() => emitRefresh());
-      } else {
-        void persist("alert", next, reschedule);
+      // Preserve the existing ?mobile=1 browser preview without native IPC.
+      if (!(window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__) {
+        if (reschedule) setScheduleRevision((value) => value + 1);
+        return true;
+      }
+      try {
+        const response = await invoke<{ config: AlertConfig }>("update_reminder_settings", { patch });
+        if (revision === alertRevision.current) {
+          alertRef.current = { ...DEFAULT_ALERT, ...response.config };
+          setAlert(alertRef.current);
+        }
+        if (reschedule) setScheduleRevision((value) => value + 1);
+        if (goalChanged) emitRefresh();
+        syncAnalyticsProperties();
+        return true;
+      } catch (failure) {
+        const key = String(failure);
+        toast.error(key.startsWith("calendar.") ? t(key as MessageKey) : t("mobile.config.saveFailed"));
+        const response = await invoke<{ config: AlertConfig }>("get_calendar_settings")
+          .catch(() => ({ config: previous }));
+        if (revision === alertRevision.current) {
+          alertRef.current = { ...DEFAULT_ALERT, ...response.config };
+          setAlert(alertRef.current);
+        }
+        return false;
       }
     },
-    [persist]
+    [t]
   );
 
   const patchGeneral = useCallback(

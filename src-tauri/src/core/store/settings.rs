@@ -1,3 +1,4 @@
+use crate::work_calendar::{CalendarDay, WorkCalendar};
 use chrono::{Datelike, Local, NaiveTime};
 use serde::Serialize;
 use tauri_plugin_store::{Store, StoreExt}; // 添加这行到文件顶部
@@ -41,6 +42,7 @@ pub struct AppSettings {
     pub whitelist_apps: Vec<String>,
     pub today_drink_amount: u64,
     pub is_work_day: bool,
+    pub schedule: CalendarDay,
     pub is_in_time_range: bool,
     pub is_show_countdown: bool,
     /// 「暂停提醒」：前后台都要停，前台 timer 也必须遵守。
@@ -144,7 +146,8 @@ impl AppSettings {
             .and_then(|s| NaiveTime::parse_from_str(s, "%H:%M").ok())
             .unwrap_or(NaiveTime::from_hms_opt(18, 0, 0).unwrap());
 
-        let current_time = Local::now().time();
+        let now = Local::now();
+        let current_time = now.time();
         let is_in_time_range = if time_end == NaiveTime::from_hms_opt(0, 0, 0).unwrap() {
             // 如果结束时间是 00:00，表示次日 0 点
             current_time >= time_start || current_time <= time_end
@@ -159,11 +162,13 @@ impl AppSettings {
             .map(|arr| arr.iter().filter_map(|v| v.as_u64()).collect::<Vec<u64>>())
             .unwrap_or_else(|| vec![]); // 默认为空数组
                                         // 获取今天是星期几（0-6，0 表示星期天）
-        let today_weekday = Local::now().weekday().num_days_from_sunday() as u64;
-        let is_work_day = weekdays.contains(&today_weekday);
+        let today_weekday = now.weekday().num_days_from_sunday() as u64;
+        let schedule = WorkCalendar::read(&serde_json::Value::Object(alert_config.clone()))
+            .day(now.date_naive());
+        let is_work_day = schedule.remind;
 
         let drink_amount = drink_history_store
-            .get(&get_today_string())
+            .get(&now.format("%Y%m%d").to_string())
             .map(|value| drink_amount_from_value(&value))
             .unwrap_or(0);
 
@@ -206,6 +211,7 @@ impl AppSettings {
             whitelist_apps: whitelist_apps,
             today_drink_amount: drink_amount,
             is_work_day: is_work_day,
+            schedule,
             is_in_time_range: is_in_time_range,
             is_show_countdown: is_show_countdown,
             is_paused: is_paused,
@@ -242,7 +248,14 @@ impl AppSettings {
             // 手动暂停与「非工作日/非工作时间」要分开说，否则用户会以为是时段问题。
             (t("status.paused.title"), t("status.paused.tooltip"))
         } else if !self.is_work_day {
-            ("", t("status.not_workday.tooltip"))
+            (
+                "",
+                t(match self.schedule.reason {
+                    "custom_day_off" => "calendar.custom_day_off",
+                    "holiday_day_off" => "calendar.holiday_day_off",
+                    _ => "status.not_workday.tooltip",
+                }),
+            )
         } else {
             ("", t("status.out_of_range.tooltip"))
         }
@@ -264,6 +277,8 @@ mod tests {
             whitelist_apps: vec![],
             today_drink_amount: 200,
             is_work_day: true,
+            schedule: crate::work_calendar::WorkCalendar::read(&json!({"weekdays":[1]}))
+                .day(chrono::NaiveDate::from_ymd_opt(2026, 11, 16).unwrap()),
             is_in_time_range: true,
             is_show_countdown: true,
             is_paused: false,

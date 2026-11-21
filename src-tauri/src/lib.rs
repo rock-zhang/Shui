@@ -8,6 +8,7 @@ mod localization;
 mod drink_recording;
 mod drink_store;
 mod reminder_history;
+mod work_calendar;
 mod reminder_session;
 mod timer;
 
@@ -206,6 +207,8 @@ pub fn run() {
 
     #[cfg(not(target_os = "android"))]
     let builder = builder.invoke_handler(tauri::generate_handler![
+        crate::work_calendar::get_calendar_settings,
+        crate::work_calendar::update_reminder_settings,
         crate::autostart::enable_silent_autostart,
         crate::drink_recording::record_drink,
         crate::drink_recording::undo_drink,
@@ -240,6 +243,8 @@ pub fn run() {
     // 提醒调度走原生闹钟，统计仍复用同一套 Rust 业务代码。
     #[cfg(target_os = "android")]
     let builder = builder.invoke_handler(tauri::generate_handler![
+        crate::work_calendar::get_calendar_settings,
+        crate::work_calendar::update_reminder_settings,
         crate::drink_recording::record_drink,
         crate::drink_recording::undo_drink,
         mobile::call_reminder,

@@ -25,6 +25,7 @@ struct Probe {
     early_focus: AtomicBool,
     early_visible: AtomicBool,
     initial_window: Mutex<Option<Value>>,
+    calendar_checks: Mutex<Option<Value>>,
 }
 
 pub fn init() -> tauri::plugin::TauriPlugin<tauri::Wry> {
@@ -54,6 +55,9 @@ pub fn init() -> tauri::plugin::TauriPlugin<tauri::Wry> {
                     Some("timer-listener") => events.timer_listener.store(true, Ordering::SeqCst),
                     Some("tray-menu") => events.tray_menu.store(true, Ordering::SeqCst),
                     Some("reminder-loaded") => events.reminder_loaded.store(true, Ordering::SeqCst),
+                    Some("calendar-checks") => {
+                        *events.calendar_checks.lock().unwrap() = Some(value)
+                    }
                     _ => {}
                 }
             });
@@ -62,13 +66,15 @@ pub fn init() -> tauri::plugin::TauriPlugin<tauri::Wry> {
                 "general",
                 json!({"isCountDown": true, "isFullScreen": true}),
             );
-            store.set(
-                "alert",
-                json!({
-                    "gap": "20", "gold": "1000", "weekdays": [0,1,2,3,4,5,6],
-                    "timeStart": "00:00", "timeEnd": "00:00", "whitelist_apps": []
-                }),
-            );
+            if store.get("alert").is_none() {
+                store.set(
+                    "alert",
+                    json!({
+                        "gap": "20", "gold": "1000", "weekdays": [0,1,2,3,4,5,6],
+                        "timeStart": "00:00", "timeEnd": "00:00", "whitelist_apps": []
+                    }),
+                );
+            }
             store.save()?;
             let handle = app.clone();
             thread::spawn(move || observe(handle, probe, directory));
@@ -130,6 +136,8 @@ fn observe(app: tauri::AppHandle, probe: Arc<Probe>, directory: PathBuf) {
                 })
                 .map(|(label, _)| label)
                 .collect();
+            let settings =
+                crate::core::store::settings::AppSettings::load_from_store::<tauri::Wry>(&app);
             let state = json!({
                 "pid": std::process::id(), "acknowledged": acknowledged, "error": error,
                 "initial_window": *probe.initial_window.lock().unwrap(),
@@ -144,6 +152,10 @@ fn observe(app: tauri::AppHandle, probe: Arc<Probe>, directory: PathBuf) {
                 "visible_reminders": reminders,
                 "session": crate::reminder_session::current_id(),
                 "timer_running": crate::timer::IS_RUNNING.load(Ordering::SeqCst),
+                "schedule": settings.schedule,
+                "should_run_timer": settings.should_run_timer(),
+                "alert": app.store("config_store.json").unwrap().get("alert"),
+                "calendar_checks": *probe.calendar_checks.lock().unwrap(),
                 "autostart": app.autolaunch().is_enabled().unwrap_or(false),
                 "data_dir": app.path().app_data_dir().unwrap()
             });
@@ -168,6 +180,22 @@ fn perform(app: &tauri::AppHandle, probe: &Probe, action: &str) -> Result<(), St
         .get_webview_window("main")
         .ok_or("main window missing")?;
     match action {
+        "calendar-check" => {
+            let script = match std::env::var_os("SHUI_CALENDAR_SMOKE_SCRIPT") {
+                Some(path) => fs::read_to_string(path).map_err(|e| e.to_string())?,
+                None => include_str!("calendar_smoke.js").to_string(),
+            };
+            main.eval(script).map_err(|e| e.to_string())?;
+        }
+        "calendar-workday" => {
+            let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+            crate::work_calendar::update_reminder_settings(
+                app.clone(),
+                json!({
+                    "dateOverrides": [{"date":today,"remind":true}]
+                }),
+            )?;
+        }
         "interactive" => probe.interactive.store(true, Ordering::SeqCst),
         "close" => main.close().map_err(|e| e.to_string())?,
         "minimize" => main.minimize().map_err(|e| e.to_string())?,

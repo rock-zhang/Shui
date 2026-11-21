@@ -227,6 +227,31 @@ def main():
         application = start([str(binary)])
         application.wait(lambda s: s["main"]["visible"], "manual cold launch shows settings")
         check("manual cold launch displays settings", True)
+        application.action("calendar-check")
+        application.wait(lambda s: s["calendar_checks"] is not None, "calendar form and import E2E", timeout=120)
+        result = application.state["calendar_checks"]
+        assert result["passed"], result
+        for description in result["checks"]:
+            check(description, True)
+        application.action("close")
+        application.action("remind")
+        application.wait(lambda s: s["timer_running"] and not s["should_run_timer"], "day off blocks timer")
+        time.sleep(3)
+        application.wait(lambda s: True, "day off remains quiet")
+        check("custom day off suppresses the actual native reminder", not application.state["session"])
+        application.action("finish-reminder")
+        application.action("calendar-workday")
+        application.action("remind")
+        application.wait(lambda s: s["session"] and s["visible_reminders"], "makeup day triggers native reminder")
+        check("personal makeup day enables the actual native reminder", True)
+        application.action("finish-reminder")
+        application.wait(lambda s: not s["session"] and s["timer_running"], "calendar reminder cleanup")
+        application.stop()
+        application = start([str(binary), "--silent"])
+        check("calendar configuration survives a cold restart",
+              application.state["alert"]["scheduleMode"] == "alternating"
+              and len(application.state["alert"]["holidayCalendars"]) == 1
+              and application.state["schedule"]["reason"] == "custom_workday")
         application.stop()
         report["passed"] = True
     except Exception as error:

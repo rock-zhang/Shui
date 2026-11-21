@@ -17,7 +17,8 @@ import { useMobileConfig } from "./config-context";
 import { useNotificationPermission } from "./notification-permission-context";
 import { NotificationHealthCard } from "./notification-health-card";
 import { MobileRow, MobileSection, MobileTimeInput } from "./ui";
-import { useI18n, WEEKDAY_LONG_KEYS, WEEKDAY_SHORT_KEYS } from "@/lib/i18n";
+import { useI18n } from "@/lib/i18n";
+import { WorkCalendarSettings } from "@/components/work-calendar-settings";
 
 function Chip({
   selected,
@@ -81,15 +82,6 @@ export function ReminderTab() {
     request: requestNotification,
   } = useNotificationPermission();
 
-  const toggleWeekday = (day: number) => {
-    const weekdays = alert.weekdays ?? [];
-    patchAlert({
-      weekdays: weekdays.includes(day)
-        ? weekdays.filter((value) => value !== day)
-        : [...weekdays, day].sort((a, b) => a - b),
-    });
-  };
-
   async function sendTestNotification() {
     try {
       await sendReminderNotification();
@@ -149,34 +141,7 @@ export function ReminderTab() {
         </div>
       </MobileSection>
 
-      <MobileSection
-        title={t("mobile.reminder.weekdays.title")}
-        description={t("mobile.reminder.weekdays.description")}
-        tourId="weekdays"
-      >
-        <div className="grid grid-cols-7 gap-1.5">
-          {Array.from({ length: 7 }, (_, day) => {
-            const selected = (alert.weekdays ?? []).includes(day);
-            return (
-              <button
-                key={day}
-                type="button"
-                aria-pressed={selected}
-                aria-label={t(WEEKDAY_LONG_KEYS[day])}
-                onClick={() => toggleWeekday(day)}
-                className={cn(
-                  "flex h-11 min-w-0 items-center justify-center rounded-xl text-sm font-medium transition-colors",
-                  selected
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                )}
-              >
-                <span aria-hidden="true">{t(WEEKDAY_SHORT_KEYS[day])}</span>
-              </button>
-            );
-          })}
-        </div>
-      </MobileSection>
+      <div data-onboarding="weekdays"><WorkCalendarSettings config={alert} onSave={patchAlert} /></div>
 
       <MobileSection
         title={t("mobile.reminder.time.title")}
