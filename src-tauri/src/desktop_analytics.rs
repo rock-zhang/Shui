@@ -22,9 +22,13 @@ use serde_json::{json, Map, Value};
 use tauri::{AppHandle, Manager};
 
 const STATE_FILE: &str = "desktop-analytics.json";
+/// 安装渠道标记文件：由 Windows NSIS 安装钩子写入（见 installer-hooks.nsh），
+/// 与 GA4 的 `install_channel` 维度对应。
+const CHANNEL_FILE: &str = "install-channel";
 const COLLECT_URL: &str = "https://www.google-analytics.com/mp/collect";
 const MAX_PARAMS: usize = 25;
 const MAX_STRING: usize = 100;
+const MAX_CHANNEL: usize = 32;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -36,6 +40,7 @@ struct State {
     active_days: u64,
     goal_day: Option<String>,
     guide_status: String,
+    install_channel: Option<String>,
     counters: BTreeMap<String, i64>,
 }
 
@@ -49,6 +54,7 @@ impl Default for State {
             active_days: 0,
             goal_day: None,
             guide_status: "not_shown".to_string(),
+            install_channel: None,
             counters: BTreeMap::new(),
         }
     }
@@ -106,6 +112,66 @@ fn persist(app: &AppHandle, state: &State) {
 
 fn today() -> String {
     chrono::Local::now().format("%Y-%m-%d").to_string()
+}
+
+/// 渠道值只保留小写字母、数字、下划线和连字符，避免把安装参数原样带进上报。
+fn normalize_channel(raw: &str) -> Option<String> {
+    let cleaned: String = raw
+        .trim()
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || *ch == '_' || *ch == '-')
+        .take(MAX_CHANNEL)
+        .collect();
+    if cleaned.is_empty() {
+        None
+    } else {
+        Some(cleaned.to_ascii_lowercase())
+    }
+}
+
+/// 依次判定安装来源：
+/// 1. 环境变量（本地调试 / 特殊分发）；
+/// 2. 安装钩子写入的标记文件（winget 等带 `/CHANNEL=` 的静默安装）；
+/// 3. 可执行文件位于 `WindowsApps` 下，说明是 Microsoft Store 的 MSIX 包；
+/// 4. 其余都按 GitHub Release 直下处理。
+fn detect_install_channel(app: &AppHandle) -> String {
+    if let Ok(raw) = std::env::var("SHUI_INSTALL_CHANNEL") {
+        if let Some(channel) = normalize_channel(&raw) {
+            return channel;
+        }
+    }
+
+    let marker = state_path(app).with_file_name(CHANNEL_FILE);
+    if let Ok(raw) = fs::read_to_string(&marker) {
+        if let Some(channel) = normalize_channel(&raw) {
+            return channel;
+        }
+    }
+
+    #[cfg(windows)]
+    {
+        if let Ok(exe) = std::env::current_exe() {
+            if exe
+                .to_string_lossy()
+                .to_ascii_lowercase()
+                .contains("\\windowsapps\\")
+            {
+                return "store".to_string();
+            }
+        }
+    }
+
+    "release".to_string()
+}
+
+/// 渠道只在首次上报时判定一次，之后固定，避免用户换安装方式后历史数据漂移。
+fn ensure_install_channel(app: &AppHandle, state: &mut State) -> String {
+    if let Some(channel) = &state.install_channel {
+        return channel.clone();
+    }
+    let channel = detect_install_channel(app);
+    state.install_channel = Some(channel.clone());
+    channel
 }
 
 fn days_between(from: &str, to: &str) -> i64 {
@@ -275,6 +341,12 @@ fn user_properties(state: &State) -> Value {
         "guide_status".to_string(),
         json!({ "value": state.guide_status.clone() }),
     );
+    if let Some(channel) = &state.install_channel {
+        map.insert(
+            "install_channel".to_string(),
+            json!({ "value": channel.clone() }),
+        );
+    }
     Value::Object(map)
 }
 
@@ -335,6 +407,7 @@ pub fn log_event(app: &AppHandle, name: &str, params: Value) {
     let mut incoming = params.as_object().cloned().unwrap_or_default();
     if safe_name == "app_open" {
         let today = today();
+        let is_first_open = state.first_open_date.is_none();
         let first_open = state.first_open_date.clone().unwrap_or_else(|| {
             state.first_open_date = Some(today.clone());
             today.clone()
@@ -348,13 +421,17 @@ pub fn log_event(app: &AppHandle, name: &str, params: Value) {
             "install_days".to_string(),
             json!(days_between(&first_open, &today)),
         );
+        // 渠道 → 激活漏斗需要区分「首次启动」与后续启动。
+        incoming.insert("is_first_open".to_string(), json!(is_first_open));
     }
     apply_side_effects(&mut state, &safe_name, &incoming);
+    let install_channel = ensure_install_channel(app, &mut state);
     let properties = user_properties(&state);
     let client_id = state.client_id.clone();
     persist(app, &state);
 
     let mut event_params = base_params();
+    event_params.insert("install_channel".to_string(), json!(install_channel));
     for (key, value) in incoming {
         if event_params.len() >= MAX_PARAMS {
             break;

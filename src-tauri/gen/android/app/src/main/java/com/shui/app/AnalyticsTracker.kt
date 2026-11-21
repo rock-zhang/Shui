@@ -37,9 +37,15 @@ object AnalyticsTracker {
 
     private const val KEY_ENABLED = "enabled"
     private const val PLAY_STORE_PACKAGE = "com.android.vending"
+    private val SIDELOAD_INSTALLERS = setOf(
+        "com.android.packageinstaller",
+        "com.google.android.packageinstaller",
+        "com.google.android.packageinstall",
+    )
     private const val KEY_LAST_SNAPSHOT = "last_permission_snapshot"
     private const val KEY_LAST_PERMISSION_SOURCE = "last_permission_source"
     private const val KEY_LAST_NOTIF_SHOWN_AT = "last_notification_shown_at"
+    private const val KEY_INSTALL_CHANNEL = "install_channel"
     private const val KEY_GUIDE_STATUS = "guide_status"
     private const val KEY_GUIDE_DISMISS = "guide_dismiss_count"
     private const val KEY_LAST_ACTIVE_DATE = "last_active_date"
@@ -122,6 +128,46 @@ object AnalyticsTracker {
             true
         }
         return (!fromPlay).also { defaultEnabledCache = it }
+    }
+
+    /**
+     * 安装渠道只在首次判定后固定，避免用户换安装方式后历史数据漂移。
+     * 判定规则与桌面 `detect_install_channel` 一致：只取一次、只保留小写字母数字和 `_`/`-`。
+     * 取值：play（Google Play）/ apk（侧载）/ 安装器包名。
+     */
+    private fun installChannel(context: Context): String {
+        val p = prefs(context)
+        p.getString(KEY_INSTALL_CHANNEL, null)?.let { return it }
+        val channel = detectInstallChannel(context)
+        p.edit().putString(KEY_INSTALL_CHANNEL, channel).apply()
+        return channel
+    }
+
+    private fun detectInstallChannel(context: Context): String {
+        val installer = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                context.packageManager
+                    .getInstallSourceInfo(context.packageName)
+                    .installingPackageName
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getInstallerPackageName(context.packageName)
+            }
+        } catch (_: Throwable) {
+            null
+        } ?: return "apk"
+        if (installer == PLAY_STORE_PACKAGE) return "play"
+        // 文件管理器 / 系统安装器装包一律算侧载，避免出现一长串安装器包名。
+        if (installer in SIDELOAD_INSTALLERS) return "apk"
+        return sanitizeChannel(installer)
+    }
+
+    private fun sanitizeChannel(raw: String): String {
+        val cleaned = raw.lowercase(Locale.US)
+            .replace('.', '_')
+            .filter { it in 'a'..'z' || it in '0'..'9' || it == '_' || it == '-' }
+            .take(32)
+        return cleaned.ifEmpty { "apk" }
     }
 
     fun isEnabled(context: Context): Boolean =
@@ -521,6 +567,7 @@ object AnalyticsTracker {
         val snapshot = healthSnapshot(context)
         val properties = linkedMapOf<String, String>(
             "app_platform" to "android",
+            "install_channel" to installChannel(context),
             "notification_permission" to if (snapshot.notificationsEnabled) "granted" else "denied",
             "exact_alarm" to snapshot.exactAlarm.toString(),
             "battery_ignored" to snapshot.batteryIgnored.toString(),
@@ -569,6 +616,7 @@ object AnalyticsTracker {
         // 与桌面 GA4 Measurement Protocol 的 app_platform=desktop 对齐。
         // 不用 platform：GA4 自带同名维度（web/android/ios），自定义值会被覆盖。
         putString("app_platform", "android")
+        putString("install_channel", installChannel(context))
         putString("app_env", if (BuildConfig.DEBUG) "debug" else "release")
         putString("app_version", versionName(context))
         putInt("sdk_int", Build.VERSION.SDK_INT)
