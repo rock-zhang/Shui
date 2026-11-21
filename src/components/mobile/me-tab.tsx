@@ -526,30 +526,35 @@ export function MeTab() {
         description={t("mobile.me.contact.description")}
       >
         <div className="overflow-hidden rounded-xl border border-border/70">
-          <button
-            type="button"
-            onClick={() =>
-              copyContact("wechat", "mobile.me.contact.wechat", "slash__z")
-            }
-            className="flex min-h-14 w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/50 active:bg-muted"
-          >
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <MessageCircle className="h-4 w-4" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[11px] leading-4 text-muted-foreground">
-                {t("mobile.me.contact.wechat")}
-              </span>
-              <span className="block select-text truncate text-sm font-medium">
-                slash__z
-              </span>
-            </span>
-            <Copy className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <span className="shrink-0 text-[11px] text-muted-foreground">
-              {t("mobile.me.copy")}
-            </span>
-          </button>
-          <div className="mx-3 h-px bg-border/70" />
+          {/* Play 包（canSelfUpdate 为 false）隐藏微信号，只保留邮箱入口。 */}
+          {canSelfUpdate && (
+            <>
+              <button
+                type="button"
+                onClick={() =>
+                  copyContact("wechat", "mobile.me.contact.wechat", "slash__z")
+                }
+                className="flex min-h-14 w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/50 active:bg-muted"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <MessageCircle className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[11px] leading-4 text-muted-foreground">
+                    {t("mobile.me.contact.wechat")}
+                  </span>
+                  <span className="block select-text truncate text-sm font-medium">
+                    slash__z
+                  </span>
+                </span>
+                <Copy className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="shrink-0 text-[11px] text-muted-foreground">
+                  {t("mobile.me.copy")}
+                </span>
+              </button>
+              <div className="mx-3 h-px bg-border/70" />
+            </>
+          )}
           <button
             type="button"
             onClick={() =>
