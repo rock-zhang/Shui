@@ -10,11 +10,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useEffect, useState } from "react";
-import { load } from "@tauri-apps/plugin-store";
 import { useTray } from "@/hooks/use-tray";
 import { invoke } from "@tauri-apps/api/core";
-import { STORE_NAME } from "@/lib/constants";
-import { emitRefresh } from "@/lib/mobile";
 import {
   Command,
   CommandEmpty,
@@ -33,32 +30,19 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { usePlatform } from "@/hooks/use-platform";
 import { track } from "@/lib/analytics";
-import {
-  useI18n,
-  WEEKDAY_LONG_KEYS,
-  WEEKDAY_SHORT_KEYS,
-  type Locale,
-} from "@/lib/i18n";
+import { useI18n, type Locale } from "@/lib/i18n";
+import { useCalendarSettings } from "@/hooks/use-calendar-settings";
+import { WorkCalendarSettings } from "@/components/work-calendar-settings";
 
 const goldList = ["1000", "1500", "2000", "2500", "3000", "3500", "4000"];
 const gapList = ["10", "20", "30", "45", "60"];
-/** 星期缩写与全称共用一份映射，避免此处再手抄七行 key。 */
-const weekdayKeys = WEEKDAY_SHORT_KEYS;
-
 if (process.env.NODE_ENV === "development") {
   gapList.unshift("1");
 }
 
 export default function Home() {
   const { t, locale } = useI18n();
-  const [config, setConfig] = useState({
-    gold: "1500",
-    gap: gapList[0],
-    weekdays: [] as number[],
-    timeStart: "09:00",
-    timeEnd: "18:00",
-    whitelist_apps: [] as string[],
-  });
+  const { config, ready, saving, loadError, loadConfig, savePatch } = useCalendarSettings(gapList);
   const [installedApps, setInstalledApps] = useState<string[]>([]);
   const { isMacOS } = usePlatform();
 
@@ -70,34 +54,6 @@ export default function Home() {
   }, [isMacOS]);
 
   useTray();
-
-  useEffect(() => {
-    async function loadConfig() {
-      const store = await load(STORE_NAME.config, { autoSave: false });
-      const val = await store.get<{
-        gold: string;
-        gap: string;
-        weekdays: number[];
-        timeStart: string;
-        timeEnd: string;
-      }>("alert");
-      // 正式包的 gapList 不含 1 分钟测试档。旧 debug 配置若残留 gap="1"，
-      // 下拉会显示空白、原生仍按 1 分钟提醒；归一到合法值并写回。
-      if (val?.gap && !gapList.includes(val.gap)) {
-        const normalized = { ...val, gap: "20" };
-        await store.set("alert", normalized);
-        await store.save();
-        setConfig({ ...config, ...normalized });
-        return;
-      }
-      setConfig({
-        ...config,
-        ...val,
-      });
-    }
-
-    loadConfig();
-  }, []);
 
   const saveConfig = async (
     filed: string,
@@ -119,22 +75,7 @@ export default function Home() {
       reschedule: true,
     });
 
-    setConfig({
-      ...config,
-      [filed]: value,
-    });
-
-    const store = await load(STORE_NAME.config, { autoSave: false });
-    await store.set("alert", {
-      ...config,
-      [filed]: value,
-    });
-    await store.save();
-
-    // 重置计时器
-    invoke("reset_timer");
-    // 目标等配置落盘后广播刷新，让喝水历史、统计等已挂载页面立即重读。
-    emitRefresh();
+    return savePatch({ [filed]: value });
   };
 
   const selectedApp = config.whitelist_apps.filter((app) =>
@@ -147,6 +88,9 @@ export default function Home() {
         {t("settings.reminder.title")}
       </h3>
 
+      {loadError && <div role="alert" className="text-sm text-destructive mb-4">{t("calendar.loadFailed")} <Button variant="outline" size="sm" onClick={loadConfig}>{t("common.refresh")}</Button></div>}
+      {!ready && !loadError && <p className="text-sm text-muted-foreground">{t("calendar.loading")}</p>}
+      <fieldset disabled={!ready || saving} aria-busy={saving} className="min-w-0" data-reminder-settings-ready={String(ready && !saving)}>
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
@@ -216,42 +160,7 @@ export default function Home() {
         </Select>
       </div>
 
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
-        <div>
-          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            {t("settings.reminder.weekdays.title")}
-          </label>
-          <p className="text-[0.8rem] text-muted-foreground">
-            {t("settings.reminder.weekdays.description")}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {weekdayKeys.map((key, index) => (
-            <button
-              key={key}
-              type="button"
-              aria-pressed={Boolean(config.weekdays?.includes(index))}
-              aria-label={t(WEEKDAY_LONG_KEYS[index])}
-              className={`inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-sm font-medium transition-colors cursor-pointer
-                ${
-                  config.weekdays?.includes(index)
-                    ? "bg-primary text-primary-foreground"
-                    : "border bg-background hover:bg-accent hover:text-accent-foreground"
-                }`}
-              onClick={() => {
-                const weekdays = config.weekdays || [];
-                const newWeekdays = weekdays.includes(index)
-                  ? weekdays.filter((d) => d !== index)
-                  : [...weekdays, index];
-
-                saveConfig("weekdays", newWeekdays);
-              }}
-            >
-              <span aria-hidden="true">{t(key)}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+      {ready && <WorkCalendarSettings config={config} onSave={savePatch} />}
 
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>
@@ -269,7 +178,8 @@ export default function Home() {
               if (value >= config.timeEnd && config.timeEnd !== "00:00") {
                 const nextTimeIndex = timeList.indexOf(value) + 1;
                 const newEndTime = timeList[nextTimeIndex] || "00:00";
-                saveConfig("timeEnd", newEndTime);
+                savePatch({ timeStart: value, timeEnd: newEndTime });
+                return;
               }
               saveConfig("timeStart", value);
             }}
@@ -395,6 +305,7 @@ export default function Home() {
         </div>
       )}
 
+      </fieldset>
       {/* <div className="flex justify-end">
         <Button
           onClick={() => {

@@ -3,7 +3,10 @@
  * 新增文案时先加 zhCN 再补 enUS，enUS 用 satisfies 保证不漏键。
  */
 
+import { calendarZh, calendarEn } from "./calendar-messages";
+
 export const zhCN = {
+  ...calendarZh,
   "common.system": "跟随系统",
   "common.light": "浅色",
   "common.dark": "深色",
@@ -705,6 +708,7 @@ export const zhCN = {
 export type MessageKey = keyof typeof zhCN;
 
 export const enUS = {
+  ...calendarEn,
   "common.system": "System",
   "common.light": "Light",
   "common.dark": "Dark",

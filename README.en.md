@@ -16,6 +16,7 @@ A cross-platform water reminder app for macOS / Windows / Linux / Android — fu
 - ⏰ Smart Time Management
   - Customizable Reminder Intervals
   - Smart Workday Reminders
+  - Alternating weeks, personal days off and holiday imports ([details](docs/date-reminders.md))
   - Custom Time Range
 - 🔔 Diverse Notification Methods
   - Full-screen Notification Page

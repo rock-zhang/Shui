@@ -310,7 +310,8 @@ object ReminderScheduler {
 
     fun shouldNotify(context: Context): Boolean {
         if (!alertsEnabled(context)) return false
-        if (config(context)?.optJSONObject("alert") == null) return false
+        val alert = config(context)?.optJSONObject("alert") ?: return false
+        if (!isReminderDay(alert, Calendar.getInstance())) return false
         // gap==1 是测试档：即使今日已达标也要发，否则测试时喝够一杯就再也测不到。
         if (gapMinutes(context) == 1L) return true
         val goal = goalAmount(context)
@@ -802,6 +803,39 @@ object ReminderScheduler {
      * 「什么时候调用了它」而漂移。`anchorMs` 只给首次安装等账本还不存在的
      * 场景用；缺省读共享账本。
      */
+    /** Date-only precedence matches Rust WorkCalendar and the settings preview. */
+    private fun isReminderDay(alert: JSONObject, day: Calendar): Boolean {
+        val date = String.format(Locale.ROOT, "%04d-%02d-%02d", day.get(Calendar.YEAR), day.get(Calendar.MONTH) + 1, day.get(Calendar.DAY_OF_MONTH))
+        fun findRule(rules: JSONArray?): JSONObject? = rules?.let {
+            (0 until it.length()).mapNotNull { index -> it.optJSONObject(index) }.find { rule -> rule.optString("date") == date }
+        }
+        findRule(alert.optJSONArray("dateOverrides"))?.let { return it.optBoolean("remind") }
+        val calendars = alert.optJSONArray("holidayCalendars")
+        if (calendars != null) for (index in 0 until calendars.length()) {
+            val calendar = calendars.optJSONObject(index) ?: continue
+            if (calendar.optBoolean("enabled")) findRule(calendar.optJSONArray("days"))?.let { return it.optBoolean("remind") }
+        }
+        val weekday = day.get(Calendar.DAY_OF_WEEK) - 1
+        fun selected(days: JSONArray?): Boolean = days != null && (0 until days.length()).any { days.optInt(it) == weekday }
+        val rotation = alert.optJSONObject("alternatingWeeks")
+        if (alert.optString("scheduleMode") == "alternating" && rotation != null) {
+            // UTC ordinals count calendar dates, avoiding DST's 23/25-hour days.
+            fun ordinal(iso: String): Long {
+                val parts = iso.split("-").map { it.toInt() }
+                return java.util.GregorianCalendar(java.util.TimeZone.getTimeZone("UTC")).apply {
+                    gregorianChange = java.util.Date(Long.MIN_VALUE)
+                    clear()
+                    set(parts[0], parts[1] - 1, parts[2])
+                }.timeInMillis / 86_400_000L
+            }
+            val anchor = ordinal(rotation.getString("anchorDate"))
+            val monday = anchor - Math.floorMod(anchor + 3, 7L)
+            val big = Math.floorMod(Math.floorDiv(ordinal(date) - monday, 7L), 2L) == 0L
+            return selected(rotation.optJSONArray(if (big) "bigWeekdays" else "smallWeekdays"))
+        }
+        return selected(alert.optJSONArray("weekdays"))
+    }
+
     fun scheduleNext(context: Context, anchorMs: Long? = null) {
         val root = config(context) ?: run {
             Log.w(TAG, "scheduleNext 跳过：SharedPreferences 里没有配置，说明 schedule 命令从未到达原生层")
@@ -816,17 +850,31 @@ object ReminderScheduler {
 
         // 兜底值与前端 DEFAULT_ALERT、Rust init_store 三处必须一致（20 分钟）。
         val gap = (alert.optString("gap", "20").toIntOrNull() ?: 20).coerceIn(1, 720)
-        val daysArray: JSONArray? = alert.optJSONArray("weekdays")
-        val weekdays = if (daysArray != null && daysArray.length() > 0) {
-            (0 until daysArray.length()).map { daysArray.optInt(it, 0) }.toSet()
-        } else {
-            (0..6).toSet()
-        }
         val start = parseTime(alert.optString("timeStart", "09:00"))
         val end = parseTime(alert.optString("timeEnd", "18:00"))
         val quietEnabled = general.optBoolean("quietEnabled", false)
         val quietStart = parseTime(general.optString("quietStart", "22:00"))
         val quietEnd = parseTime(general.optString("quietEnd", "07:00"))
+        if (quietEnabled && quietStart == quietEnd) {
+            cancel(context)
+            return
+        }
+        val explicitDates = mutableSetOf<String>()
+        fun collectDates(days: JSONArray?) {
+            if (days != null) for (index in 0 until days.length()) {
+                days.optJSONObject(index)?.optString("date")?.takeIf { it.isNotEmpty() }?.let { explicitDates.add(it) }
+            }
+        }
+        collectDates(alert.optJSONArray("dateOverrides"))
+        val calendars = alert.optJSONArray("holidayCalendars")
+        if (calendars != null) for (index in 0 until calendars.length()) {
+            calendars.optJSONObject(index)?.takeIf { it.optBoolean("enabled") }?.let { collectDates(it.optJSONArray("days")) }
+        }
+        val dates = explicitDates.sorted()
+        val rotation = alert.optJSONObject("alternatingWeeks")
+        val hasWeeklyDays = if (alert.optString("scheduleMode") == "alternating" && rotation != null) {
+            (rotation.optJSONArray("bigWeekdays")?.length() ?: 0) + (rotation.optJSONArray("smallWeekdays")?.length() ?: 0) > 0
+        } else (alert.optJSONArray("weekdays")?.length() ?: 0) > 0
 
         val now = System.currentTimeMillis()
         val rawAnchor = (anchorMs ?: lastReminderAt(context)).takeIf { it > 0 } ?: now
@@ -837,24 +885,39 @@ object ReminderScheduler {
         while (candidateMs <= now) candidateMs += gap * 60_000L
         val candidate = Calendar.getInstance().apply { timeInMillis = candidateMs }
 
-        // gap==1 是测试档：完全绕过工作日/提醒时段/勿扰，让任意时刻都能
-        // 排到「now + 1 分钟」的闹钟，方便随时验证通知链路。否则当前时刻
-        // 已过 18:00 时，闹钟会被一路推到次日 09:xx，等不到任何通知。
+        // 1 分钟调试档可绕过时段，但仍遵守日期安排。
         val testMode = gap == 1
         var found = false
-        // 最多向后找 8 天，覆盖「只在周一提醒」这类配置。
-        var attempts = 0
-        val maxAttempts = 8 * 24 * 60
-        while (attempts < maxAttempts) {
-            val weekday = candidate.get(Calendar.DAY_OF_WEEK) - 1 // 0 = 周日，与前端一致
+        // Annual imports and long custom vacations can skip more than one week.
+        val limit = Calendar.getInstance().apply { add(Calendar.DAY_OF_MONTH, 400) }
+        dates.lastOrNull()?.let { date ->
+            val endOfDates = Calendar.getInstance().apply {
+                time = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).parse(date)!!
+                add(Calendar.DAY_OF_MONTH, 14)
+            }
+            if (endOfDates.after(limit)) limit.timeInMillis = endOfDates.timeInMillis
+        }
+        while (candidate.before(limit)) {
             val minute = minutesOfDay(candidate)
             val inWorkTime = inWindow(minute, start, end)
             val inQuiet = quietEnabled && inWindow(minute, quietStart, quietEnd)
-            if (testMode || (weekday in weekdays && inWorkTime && !inQuiet)) {
+            val workday = isReminderDay(alert, candidate)
+            if (workday && (testMode || (inWorkTime && !inQuiet))) {
                 found = true
                 break
             }
-            if (inWorkTime) {
+            if (!workday) {
+                if (!hasWeeklyDays) {
+                    val date = String.format(Locale.ROOT, "%04d-%02d-%02d", candidate.get(Calendar.YEAR), candidate.get(Calendar.MONTH) + 1, candidate.get(Calendar.DAY_OF_MONTH))
+                    val next = dates.firstOrNull { it > date } ?: break
+                    val parts = next.split("-").map { it.toInt() }
+                    candidate.set(parts[0], parts[1] - 1, parts[2])
+                } else candidate.add(Calendar.DAY_OF_MONTH, 1)
+                candidate.set(Calendar.HOUR_OF_DAY, start / 60)
+                candidate.set(Calendar.MINUTE, start % 60)
+                candidate.set(Calendar.SECOND, 0)
+                candidate.set(Calendar.MILLISECOND, 0)
+            } else if (inWorkTime) {
                 candidate.add(Calendar.MINUTE, gap)
             } else {
                 // 时段外的候选点直接对齐到下一个时段起点，而不是继续沿 gap 网格
@@ -871,11 +934,10 @@ object ReminderScheduler {
                     candidate.set(Calendar.MINUTE, start % 60)
                 }
             }
-            attempts += gap
         }
         if (!found) {
             // 当前配置下没有任何可提醒的时间：撤掉旧闹钟，也让今日页如实显示。
-            Log.w(TAG, "scheduleNext 跳过：未来 8 天内没有落在提醒时段/工作日且避开勿扰的时刻")
+            Log.w(TAG, "scheduleNext 跳过：当前排期没有可提醒时刻")
             AnalyticsTracker.logScheduleFailed(context, "no_slot")
             cancel(context)
             return

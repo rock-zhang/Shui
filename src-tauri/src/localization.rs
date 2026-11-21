@@ -139,6 +139,10 @@ pub fn t_in(locale: Locale, key: &'static str) -> &'static str {
         }
         (Locale::Zh, "status.not_workday.tooltip") => "今天不是提醒日",
         (Locale::En, "status.not_workday.tooltip") => "No reminders today",
+        (Locale::Zh, "calendar.custom_day_off") => "自定义休假日，今天不提醒",
+        (Locale::En, "calendar.custom_day_off") => "Custom day off: no reminders today",
+        (Locale::Zh, "calendar.holiday_day_off") => "节假日休息，今天不提醒",
+        (Locale::En, "calendar.holiday_day_off") => "Public holiday: no reminders today",
         (Locale::Zh, "status.out_of_range.tooltip") => "不在提醒时段",
         (Locale::En, "status.out_of_range.tooltip") => "Outside reminder hours",
 
