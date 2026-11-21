@@ -1,6 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- 本应用不做广告。Firebase Analytics 的传递依赖
+         （play-services-ads-identifier / measurement-api）会在合并清单里
+         自动注入广告权限，导致 Play 判定「使用了广告 ID」。这里显式移除：
+         既关闭 Ad ID 采集，也让 Play 的广告 ID 声明可以直接勾选「否」。 -->
+    <uses-permission
+        android:name="com.google.android.gms.permission.AD_ID"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.ACCESS_ADSERVICES_AD_ID"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION"
+        tools:node="remove" />
     <!-- 自更新安装权限：Play 变体由 Gradle 占位为 VIBRATE（已声明，合并去重），
          侧载变体才解析为真正的安装权限。切勿在此写死权限名。 -->
     <uses-permission android:name="${installPermission}" />
@@ -26,6 +41,12 @@
 
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
+
+    <!-- screenOrientation="portrait" 会让清单合并隐式推导出
+         android.hardware.screen.portrait 且 required=true，从而把不支持
+         竖屏硬件的设备（部分平板/电视/桌面/XR）排除在分发范围外。
+         这里显式声明为可选，恢复完整分发。 -->
+    <uses-feature android:name="android.hardware.screen.portrait" android:required="false" />
 
     <application
         android:icon="@mipmap/ic_launcher"
