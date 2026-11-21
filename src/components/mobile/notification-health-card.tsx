@@ -45,7 +45,7 @@ const WATCH_INTERVAL_MS = 900;
  * 既不派发 visibilitychange，也不执行原生的 evaluateJavascript。卡片在可见时
  * 低频重读，任何触发丢失都能在几秒内自愈；读取只是本地查一次渠道状态，成本很低。
  */
-const HEALTH_POLL_MS = 4_000;
+const HEALTH_POLL_MS = 2_000;
 
 /** 闹钟超过这么久没触发才判定「被系统拦了」，避开发送瞬间的正常抖动。 */
 const OVERDUE_TOLERANCE_S = 90;
@@ -54,7 +54,7 @@ const OVERDUE_TOLERANCE_S = 90;
 type Step = {
   key: string;
   title: string;
-  hint: string;
+  hint?: string;
   ok: boolean;
   /** 读不到状态、只能人工确认的项，不参与「未通过」计数。 */
   manual?: boolean;
@@ -211,6 +211,8 @@ export function NotificationHealthCard() {
   const [diag, setDiag] = useState<Diagnostics | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  /** 最近一次成功读取的时间戳，运行层里用来确认「到底有没有重读」。 */
+  const [readAt, setReadAt] = useState(0);
   const alive = useRef(true);
   const watchTimer = useRef<number | null>(null);
   const followUpTimers = useRef<number[]>([]);
@@ -235,6 +237,7 @@ export function NotificationHealthCard() {
     if (alive.current) {
       setHealth(next);
       setDiag(snapshot);
+      setReadAt(Date.now());
       setLoading(false);
     }
     return next;
@@ -468,17 +471,6 @@ export function NotificationHealthCard() {
     health.channelSound &&
     health.channelVibration;
 
-  const channelIssues: string[] = [];
-  if (!health.channelExists) {
-    channelIssues.push(t("mobile.health.channelMissing"));
-  } else {
-    if (!health.headsUp) {
-      channelIssues.push(t("mobile.health.bannerOff"));
-    }
-    if (!health.channelSound) channelIssues.push(t("mobile.health.noSound"));
-    if (!health.channelVibration) channelIssues.push(t("mobile.health.noVibration"));
-  }
-
   /**
    * 通知样式里能自动判定的三项：横幅 / 铃声 / 振动读渠道状态。锁屏没有读取
    * 接口（lockscreenVisibility 已废弃，多数 ROM 不再写入用户选择），单独用
@@ -545,9 +537,7 @@ export function NotificationHealthCard() {
       key: "style",
       title: t("mobile.health.check.style"),
       ok: channelOk,
-      hint: channelOk
-        ? t("mobile.health.style.hintOk")
-        : t("mobile.health.style.hintBad"),
+      hint: channelOk ? t("mobile.health.style.hintOk") : undefined,
       action: (
         <Button
           size="sm"
@@ -559,6 +549,8 @@ export function NotificationHealthCard() {
               item: "channel",
               action: "open_settings",
             });
+            // 应用通知页管总开关与 ColorOS 的「通知样式」；渠道页管横幅/铃声/振动
+            // 这些能写回渠道的开关。两边都要看，主按钮先送用户去覆盖面更大的那页。
             void run("open_notification_settings");
           }}
         >
@@ -578,6 +570,17 @@ export function NotificationHealthCard() {
             ))}
           </div>
           <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+            {t("mobile.health.style.channelRow")}
+            <button
+              type="button"
+              className="ml-1 font-medium text-foreground underline underline-offset-2 disabled:opacity-50"
+              disabled={busy !== null}
+              onClick={() => void run("open_notification_channel_settings")}
+            >
+              {t("mobile.health.goChannelSettings")}
+            </button>
+          </p>
+          <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
             {t("mobile.health.style.lockscreenRow")}
             <button
               type="button"
@@ -588,41 +591,23 @@ export function NotificationHealthCard() {
               {t("mobile.health.goSettings")}
             </button>
           </p>
-          {!channelOk && (
-            <>
-              <ul className="mt-1.5 space-y-0.5">
-                {channelIssues.map((issue) => (
-                  <li
-                    key={issue}
-                    className="flex items-start gap-1.5 text-[11px] leading-4 text-amber-700 dark:text-amber-300"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-500"
-                    />
-                    {issue}
-                  </li>
-                ))}
-              </ul>
-              {/* 只有渠道确实丢失/损坏时才给「修复」：横幅、铃声、振动被关
-                  多半是用户自己关的，重建等于覆盖他的选择，只保留「去设置」。 */}
-              {!health.channelExists && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <Button
-                    size="sm"
-                    className="min-h-8 px-2.5 text-xs"
-                    disabled={busy !== null}
-                    onClick={() => void repair()}
-                  >
-                    <Wrench className="mr-1 h-3.5 w-3.5" />
-                    {t("mobile.health.repair")}
-                  </Button>
-                  <span className="text-[10px] leading-4 text-muted-foreground">
-                    {t("mobile.health.repairNote")}
-                  </span>
-                </div>
-              )}
-            </>
+          {/* 只有渠道确实丢失/损坏时才给「修复」：横幅、铃声、振动被关
+              多半是用户自己关的，重建等于覆盖他的选择，只保留「去设置」。 */}
+          {!health.channelExists && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <Button
+                size="sm"
+                className="min-h-8 px-2.5 text-xs"
+                disabled={busy !== null}
+                onClick={() => void repair()}
+              >
+                <Wrench className="mr-1 h-3.5 w-3.5" />
+                {t("mobile.health.repair")}
+              </Button>
+              <span className="text-[10px] leading-4 text-muted-foreground">
+                {t("mobile.health.repairNote")}
+              </span>
+            </div>
           )}
         </div>
       ),
@@ -810,16 +795,18 @@ export function NotificationHealthCard() {
                         </span>
                       )}
                     </p>
-                    <p
-                      className={cn(
-                        "mt-0.5 text-xs leading-4",
-                        step.ok || step.manual
-                          ? "text-muted-foreground"
-                          : "text-amber-600 dark:text-amber-400"
-                      )}
-                    >
-                      {step.hint}
-                    </p>
+                    {step.hint && (
+                      <p
+                        className={cn(
+                          "mt-0.5 text-xs leading-4",
+                          step.ok || step.manual
+                            ? "text-muted-foreground"
+                            : "text-amber-600 dark:text-amber-400"
+                        )}
+                      >
+                        {step.hint}
+                      </p>
+                    )}
                   </div>
                   {step.action && <div className="shrink-0 pt-0.5">{step.action}</div>}
                 </div>
@@ -887,6 +874,28 @@ export function NotificationHealthCard() {
                   {diag.channelImportance > 0 && diag.channelImportance < 4 && t("mobile.health.details.belowFour")}
                 </span>
               </div>
+              {health && (
+                <>
+                  <div className="flex justify-between gap-3">
+                    <span className="shrink-0 text-muted-foreground">
+                      {t("mobile.health.report.sound")} / {t("mobile.health.report.vibration")}
+                    </span>
+                    <span className="tabular-nums">
+                      {health.channelSound ? t("mobile.health.report.on") : t("mobile.health.report.off")}
+                      {" / "}
+                      {health.channelVibration ? t("mobile.health.report.on") : t("mobile.health.report.off")}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="shrink-0 text-muted-foreground">{t("mobile.health.report.channel")}</span>
+                    <span className="truncate font-mono text-[10px] leading-5">{health.channelId}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="shrink-0 text-muted-foreground">{t("mobile.health.report.readAt")}</span>
+                    <span className="font-mono tabular-nums">{readAt ? clock(readAt, locale) : "-"}</span>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* 白名单不标红：它不是硬门槛，且厂商店里的「允许后台运行」根本不写这张表，

@@ -1,8 +1,10 @@
 package com.shui.app
 
+import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
 
@@ -83,6 +85,12 @@ class MainActivity : TauriActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Tauri 通知插件每次启动都会建一个 id 为 "default"、名称 Default 的渠道，
+        // 但 Android 上的提醒全部走 ReminderScheduler 自己的渠道，从不往它发通知。
+        // 留着只会在系统通知设置里多出一个 "Default" 分类，这里在插件加载后删掉。
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            getSystemService(NotificationManager::class.java)?.deleteNotificationChannel("default")
+        }
         // 语言偏好可能在 WebView 内刚切换：变化时用新文案刷新渠道名/描述。
         // createNotificationChannel 只更新名称，不覆盖用户的渠道设置；仅在
         // locale 真的变化时才会执行，正常启动不会重建渠道。

@@ -423,9 +423,15 @@ object ReminderScheduler {
     fun ensureChannel(
         context: Context,
         manager: NotificationManager,
-        id: String = channelId(context)
+        id: String = channelId(context),
+        refreshName: Boolean = false
     ) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        // ColorOS 实测：对**已存在**的渠道再调 createNotificationChannel，也会用传入
+        // 参数覆盖用户在系统设置里改过的横幅/声音/振动。渠道一旦建好，这里就不能再碰，
+        // 否则每次启动、每条通知、每次点「去设置」都会把用户的选择改回默认——表现
+        // 就是「改了不生效、状态永远不刷新」。只有明确要刷新渠道名（语言切换）才写。
+        if (!refreshName && manager.getNotificationChannel(id) != null) return
         manager.createNotificationChannel(buildChannel(id, context))
     }
 
@@ -443,12 +449,22 @@ object ReminderScheduler {
      *
      * 提前建只是把「默认 HIGH」这件事尽早钉死，不涉及任何权限申请。
      */
-    fun ensureChannels(context: Context) {
+    fun ensureChannels(context: Context, refreshName: Boolean = false) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        ensureChannel(context, manager, CHANNEL_ID)
-        ensureChannel(context, manager, CHANNEL_ID_SILENT)
+        if (refreshName) {
+            // 语言变化时只刷新已存在的渠道名，缺失的不补建。
+            for (id in listOf(CHANNEL_ID, CHANNEL_ID_SILENT)) {
+                if (manager.getNotificationChannel(id) != null) {
+                    manager.createNotificationChannel(buildChannel(id, context))
+                }
+            }
+            return
+        }
+        // 只建当前要用的那个渠道：声音开关关着时用静音渠道，开着时用有声渠道。
+        // 两个都预建会让系统设置里多出一个当前根本用不到的「静音」分类。
+        ensureChannel(context, manager, channelId(context))
     }
 
     /** 渠道上次使用的语言（归一化后的 locale），用于判断是否需要刷新名称。 */
@@ -468,7 +484,9 @@ object ReminderScheduler {
         val prefs = context.getSharedPreferences(ReminderPlugin.PREFS, Context.MODE_PRIVATE)
         if (prefs.getString(KEY_CHANNEL_LOCALE, null) == locale) return
         prefs.edit().putString(KEY_CHANNEL_LOCALE, locale).apply()
-        ensureChannels(context)
+        // 只有语言真的变了才重写渠道，用 refreshName 明确允许覆盖名称；
+        // 其余时候 ensureChannel 会跳过已存在的渠道，避免清掉用户的自定义。
+        ensureChannels(context, refreshName = true)
     }
 
     /**
