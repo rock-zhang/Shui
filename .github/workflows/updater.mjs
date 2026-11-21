@@ -205,6 +205,28 @@ const getVersionRelease = async (octokit, owner, repo, tag) => {
   return release;
 };
 
+// 上游 job 已把唯一 release id 传下来时优先用它：
+// 同名 tag 可能存在多个 draft（tag 删除后重推），按 tag 取第一条会读到缺资产的
+// 那个 release。
+const getReleaseById = async (octokit, owner, repo, releaseId) => {
+  const { data } = await octokit.rest.repos.getRelease({
+    owner,
+    repo,
+    release_id: releaseId,
+  });
+  return data;
+};
+
+// release 对象里内嵌的 assets 最多只有 30 条，资产多时会被静默截断，
+// 因此始终走分页接口单独拉取。
+const listReleaseAssets = async (octokit, owner, repo, releaseId) =>
+  octokit.paginate(octokit.rest.repos.listReleaseAssets, {
+    owner,
+    repo,
+    release_id: releaseId,
+    per_page: 100,
+  });
+
 // 旧版本的更新端点固定指向 releases/download/updater/latest.json，
 // 因此该 release 必须始终存在且为 published 状态
 //（draft 的 release 资产对未认证请求返回 404）。
@@ -257,13 +279,26 @@ const updateRelease = async () => {
   const repo = context.repo.repo;
   const tag = process.env.GITHUB_REF_NAME;
 
-  const versionRelease = await getVersionRelease(octokit, owner, repo, tag);
+  const versionRelease = process.env.RELEASE_ID
+    ? await getReleaseById(
+        octokit,
+        owner,
+        repo,
+        Number(process.env.RELEASE_ID),
+      )
+    : await getVersionRelease(octokit, owner, repo, tag);
+  const assets = await listReleaseAssets(
+    octokit,
+    owner,
+    repo,
+    versionRelease.id,
+  );
   // 4 处版本号 + tag 一并校验。publish.yaml 的 Verify version matches tag
   // 已在编译前拦过一次，这里是上传更新清单前的最后一道防线。
   const { version } = assertVersions({ tag });
 
   const latestJson = await buildUpdaterJson({
-    assets: versionRelease.assets,
+    assets,
     tag,
     owner,
     repo,

@@ -13,6 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      # 下游 job 显式用这个 id 上传 / 读取资产，不再按 tag 猜 release
+      release_id: ${{ steps.release.outputs.release_id }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,6 +44,35 @@ jobs:
         run: npx changelogithub --draft --name ${{ steps.vars.outputs.tag }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 删除 tag 后重新 push 会再建一个同名 draft：tauri-action 找草稿的方式是
+      # 「遍历 release 列表取第一个 tag 匹配项」（draft 无法用 getReleaseByTag 查），
+      # 多个同名草稿会让各 matrix job 把资产传散到不同 release，最后 latest.json
+      # 缺平台。这里统一收敛成一个草稿，并把 id 传给下游，消除按 tag 猜的行为。
+      - name: Deduplicate draft releases
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="$GITHUB_REF_NAME"
+          list=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq ".[] | select(.tag_name == \"$TAG\") | [.created_at, (.id|tostring), (.draft|tostring)] | @tsv" \
+            | sort -r)
+          if [ -z "$list" ]; then
+            echo "::error::未找到 tag $TAG 的 release"
+            exit 1
+          fi
+          keep_id=$(printf '%s\n' "$list" | head -1 | cut -f2)
+          printf '%s\n' "$list" | tail -n +2 | while IFS=$'\t' read -r _ id draft; do
+            if [ "$draft" = "true" ]; then
+              echo "删除重复草稿 release: $id"
+              gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$id"
+            else
+              echo "::warning::存在同 tag 的已发布 release，保留不删: $id"
+            fi
+          done
+          echo "release_id=$keep_id" >> "$GITHUB_OUTPUT"
 
   release:
     needs: create-release
@@ -185,6 +217,8 @@ jobs:
           # 使用之前配置的私钥密码
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
         with:
+          # 显式指定 release，避免同名重复草稿导致各 job 传散到不同 release
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           tagName: ${{ github.ref_name }}
           releaseName: "Shui v__VERSION__"
           releaseBody: "Feature"
@@ -201,7 +235,7 @@ jobs:
           args: --target ${{ matrix.target }} ${{ matrix.target == 'aarch64-unknown-linux-gnu' && '--bundles deb,rpm' || '' }}
 
   upload-assets:
-    needs: release
+    needs: [create-release, release]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -226,4 +260,5 @@ jobs:
       - name: Upload assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
         run: node .github/workflows/updater.mjs
