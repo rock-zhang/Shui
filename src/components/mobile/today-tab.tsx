@@ -60,8 +60,6 @@ type Translate = ReturnType<typeof useI18n>["t"];
 /** 长按卡片进入自定义杯量的按压时长；手指位移超过该像素视为滑动而非长按。 */
 const CUP_HOLD_MS = 2000;
 const CUP_MOVE_TOLERANCE_PX = 8;
-/** 编辑抽屉里的快捷档位（ml）。 */
-const CUP_CHIPS = [50, 100, 150, 250, 500, 750];
 /** 刻度尺上每一档（10ml）占的宽度，指针固定在正中。 */
 const CUP_TICK_GAP = 14;
 /** 刻度尺覆盖的完整档位序列，索引 i 对应的杯量是 MIN + i × STEP。 */
@@ -912,20 +910,6 @@ function CupAmountEditor({
           {labels[1]}
         </span>
         <span className="text-right">{labels[2]}</span>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {CUP_CHIPS.map((chip) => (
-          <Button
-            key={chip}
-            variant={amount === chip ? "default" : "outline"}
-            size="sm"
-            className="min-h-9 rounded-full tabular-nums"
-            onClick={() => animateTo(amountToTick(chip))}
-          >
-            {chip}
-          </Button>
-        ))}
       </div>
 
       <div className="mt-5 flex gap-2">
