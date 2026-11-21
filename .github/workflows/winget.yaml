@@ -1,0 +1,53 @@
+name: winget
+
+# - release: 正式发布后自动更新 manifest
+# - workflow_dispatch: 首次上架用（winget-releaser 只能更新已存在的包，无法创建新包）
+#   仓库里已有首版 manifest，点一次 Run workflow 即可提交，不需要本地 Windows。
+#
+# 只在 Release 正式发布后提交：草稿 release 的资产对匿名用户返回 404，
+# winget 校验 SHA256 会失败，所以不要改成 push tag 触发。
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      manifest-path:
+        description: 要提交的 manifest 目录（首次上架用）
+        required: true
+        default: .github/winget/manifests/r/rock-zhang/Shui/0.5.2
+
+permissions:
+  contents: read
+
+jobs:
+  # 后续版本：winget-releaser 基于已存在的包生成新版本并提 PR
+  submit:
+    if: ${{ github.event_name == 'release' && !github.event.release.prerelease }}
+    runs-on: windows-latest
+    steps:
+      # 需要仓库 Secret：WINGET_TOKEN（classic PAT，public_repo + workflow）
+      - uses: vedantmgoyal2009/winget-releaser@v2
+        with:
+          identifier: rock-zhang.Shui
+          # 三个架构的 NSIS 安装包，wingetcreate 会按 PE 头自动识别架构
+          installers-regex: 'setup\.exe$'
+          release-tag: ${{ github.event.release.tag_name }}
+          token: ${{ secrets.WINGET_TOKEN }}
+          max-versions-to-keep: 3
+
+  # 首次上架：把仓库里的首版 manifest 提交到 microsoft/winget-pkgs
+  bootstrap:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and submit manifest
+        shell: powershell
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          MANIFEST_PATH: ${{ inputs.manifest-path }}
+        run: |
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          winget validate --manifest $env:MANIFEST_PATH
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          .\wingetcreate.exe submit $env:MANIFEST_PATH --token $env:WINGET_TOKEN
