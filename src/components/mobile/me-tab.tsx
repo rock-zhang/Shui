@@ -47,6 +47,22 @@ import { MobileRow, MobileSection, MobileSegmented } from "./ui";
 const GITHUB_URL = "https://github.com/rock-zhang/Shui";
 const STORE_URL = "https://play.google.com/store/apps/details?id=com.shui.app";
 
+/**
+ * 【临时跳转验证 demo】「设置-应用」相关的全部候选入口，逐一点击在真机上
+ * 确认实际落地页。验证完成后随 demo 区块一起删除。
+ */
+const PROBE_TARGETS: { target: string; label: string }[] = [
+  { target: "application_settings", label: "系统 action：应用主页" },
+  { target: "manage_applications", label: "系统 action：应用管理（列表）" },
+  { target: "manage_all_applications", label: "系统 action：全部应用（列表）" },
+  { target: "app_details", label: "系统 action：本应用详情页" },
+  { target: "default_apps", label: "系统 action：默认应用" },
+  { target: "coloros_safecenter", label: "ColorOS 私有：手机管家自启动 ①" },
+  { target: "coloros_startup", label: "ColorOS 私有：手机管家自启动 ②" },
+  { target: "oplus_safecenter", label: "ColorOS 私有：oplus 管家自启动" },
+  { target: "oppo_safe", label: "ColorOS 私有：旧版 safe 自启动" },
+];
+
 type Notice = { key: MessageKey; params?: Record<string, string | number> };
 
 export function MeTab() {
@@ -92,6 +108,19 @@ export function MeTab() {
     setAnalyticsOn(next);
     await setNativeAnalyticsEnabled(next);
   }
+
+  // 【临时跳转验证 demo】逐个入口发起跳转，成功/失败都 toast 出来，
+  // 用户在真机上对照每个 target 的实际落地页。
+  const runProbe = async (target: string) => {
+    try {
+      await invoke("open_settings_probe", { target });
+      toast.success(`已发起跳转：${target}，请回到 App 对照落地页`, {
+        duration: 6000,
+      });
+    } catch (error) {
+      toast.error(`跳转失败 ${target}：${String(error)}`, { duration: 8000 });
+    }
+  };
 
   async function run(operation: () => Promise<void>) {
     if (locked.current) return;
@@ -540,6 +569,30 @@ export function MeTab() {
               {t("mobile.me.copy")}
             </span>
           </button>
+        </div>
+      </MobileSection>
+
+      {/* 【临时跳转验证 demo】验证各「设置-应用」入口的实际落地页，验证后删除。 */}
+      <MobileSection
+        title="跳转验证 demo"
+        description="逐个点击，确认每个入口在这台手机上实际落在哪个页面。失败的会提示原因。验证完成后整个区块会删除。"
+      >
+        <div className="overflow-hidden rounded-xl border border-dashed border-amber-500/60">
+          {PROBE_TARGETS.map(({ target, label }) => (
+            <button
+              key={target}
+              type="button"
+              onClick={() => void runProbe(target)}
+              className="flex min-h-12 w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-muted/50 active:bg-muted"
+            >
+              <span className="min-w-0 flex-1 text-[13px] text-muted-foreground">
+                {label}
+              </span>
+              <span className="shrink-0 font-mono text-[11px] text-amber-600 dark:text-amber-400">
+                {target}
+              </span>
+            </button>
+          ))}
         </div>
       </MobileSection>
     </>

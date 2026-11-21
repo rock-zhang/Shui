@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
-  Power,
   RefreshCw,
   RotateCcw,
   Wrench,
@@ -28,6 +27,7 @@ import {
 } from "@/lib/mobile";
 import { romFromHealth } from "@/lib/rom";
 import { track } from "@/lib/analytics";
+import { cn } from "@/lib/utils";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { useNotificationPermission } from "./notification-permission-context";
 import { OPEN_GUIDE_EVENT } from "./notification-setup-guide";
@@ -40,13 +40,15 @@ const WATCH_INTERVAL_MS = 900;
 /** 闹钟超过这么久没触发才判定「被系统拦了」，避开发送瞬间的正常抖动。 */
 const OVERDUE_TOLERANCE_S = 90;
 
-/** 一条可自动检测、且**检测结果为否就必须动手**的项。 */
-type Check = {
+/** 修复步骤：1、2 可自动检测，3 只能带用户去系统设置里手动确认。 */
+type Step = {
   key: string;
-  label: string;
-  ok: boolean;
+  title: string;
   hint: string;
-  action: React.ReactNode;
+  ok: boolean;
+  /** 读不到状态、只能人工确认的项，不参与「未通过」计数。 */
+  manual?: boolean;
+  action?: React.ReactNode;
 };
 
 function clock(ms: number, locale: string): string {
@@ -378,13 +380,20 @@ export function NotificationHealthCard() {
     if (!health.channelVibration) channelIssues.push(t("mobile.health.noVibration"));
   }
 
-  const checks: Check[] = [
+  /**
+   * 按系统实际拦截顺序排成 3 步：权限不过 → 什么都收不到；精确闹钟关着 →
+   * 到点被推迟；后台行为没开 → 划掉 App 后进程被清。
+   * 第 3 步状态读不到，只能给路径，所以标成「手动」且不计入待处理数量。
+   */
+  const steps: Step[] = [
     {
       key: "permission",
-      label: t("mobile.health.check.permission"),
+      title: t("mobile.health.check.permission"),
       ok: health.notificationsEnabled,
-      hint: t("mobile.health.check.permissionHint"),
-      action: (
+      hint: health.notificationsEnabled
+        ? t("mobile.notif.enabled")
+        : t("mobile.health.check.permissionHint"),
+      action: health.notificationsEnabled ? undefined : (
         <Button
           size="sm"
           className="min-h-8 px-2.5 text-xs"
@@ -403,10 +412,12 @@ export function NotificationHealthCard() {
     },
     {
       key: "exact",
-      label: t("mobile.health.check.exact"),
+      title: t("mobile.health.check.exact"),
       ok: health.exactAlarm,
-      hint: t("mobile.health.check.exactHint"),
-      action: (
+      hint: health.exactAlarm
+        ? t("mobile.health.exactEnabled")
+        : t("mobile.health.check.exactHint"),
+      action: health.exactAlarm ? undefined : (
         <Button
           size="sm"
           variant="outline"
@@ -426,9 +437,41 @@ export function NotificationHealthCard() {
         </Button>
       ),
     },
+    {
+      key: "background",
+      title: t("mobile.health.background.title"),
+      ok: false,
+      manual: true,
+      hint: t("mobile.health.step.backgroundHint"),
+      action: (
+        <Button
+          size="sm"
+          variant="outline"
+          className="min-h-8 px-2.5 text-xs"
+          disabled={busy !== null}
+          onClick={() => {
+            track("health_item_action", {
+              item: "background",
+              action: "open_guide",
+            });
+            window.dispatchEvent(
+              new CustomEvent(OPEN_GUIDE_EVENT, {
+                detail: { step: 2, source: "health_card" },
+              })
+            );
+          }}
+        >
+          {t("mobile.health.step.check")}
+        </Button>
+      ),
+    },
   ];
 
-  const todo = checks.filter((item) => !item.ok);
+  const failedCount =
+    steps.filter((item) => !item.ok && !item.manual).length + (channelOk ? 0 : 1);
+  // 高亮「当前该做的那一步」；只剩渠道问题时不高亮步骤，让下方渠道块自己说话。
+  const firstFailed = steps.findIndex((item) => !item.ok && !item.manual);
+  const currentIndex = firstFailed >= 0 ? firstFailed : channelOk ? 2 : -1;
 
   // 排期已过期很久仍没动静——比任何配置项都说明问题，必须顶到最前面。
   const overdueSeconds =
@@ -442,7 +485,7 @@ export function NotificationHealthCard() {
    * 压根没走完那三步，此时「重新查看引导」是个灰扑扑的虚线按钮就被跳过了。
    * 全部通过后才收起成低调的复查入口——没事可做还吆喝，反而像广告。
    */
-  const guideNeedsAttention = todo.length > 0 || !channelOk;
+  const guideNeedsAttention = failedCount > 0;
   const openGuide = () => {
     track("health_item_action", { item: "guide", action: "open_guide" });
     window.dispatchEvent(
@@ -456,9 +499,9 @@ export function NotificationHealthCard() {
     <MobileSection
       title={t("mobile.health.title")}
       description={
-        todo.length === 0
+        failedCount === 0
           ? t("mobile.health.allPassed")
-          : t("mobile.health.todo", { count: todo.length })
+          : t("mobile.health.todo", { count: failedCount })
       }
     >
       {/* 运行异常优先于配置项：配置全绿但闹钟根本不响，这才是用户真正遇到的场景。 */}
@@ -477,123 +520,107 @@ export function NotificationHealthCard() {
         </div>
       )}
 
-      {/* 渠道摘要：正常时一行，异常时才展开并提供唯一可自愈的动作。 */}
+      {/* 修复步骤：按系统实际拦截顺序排，当前该处理哪一步一眼可见。 */}
       <div className={overdue ? "mt-2" : undefined}>
-        {channelOk ? (
-          <div className="flex items-start gap-2 rounded-xl bg-emerald-500/10 px-3 py-2">
-            <CheckCircle2
-              aria-hidden="true"
-              className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
-            />
-            <p className="text-xs leading-5 text-emerald-700 dark:text-emerald-300">
-              {t("mobile.health.channelOk")}
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
-            <p className="flex items-start gap-2 text-xs leading-5 text-amber-700 dark:text-amber-300">
-              <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>
-                <span className="font-semibold">{t("mobile.health.channelBad")}</span>
-                {channelIssues.join(" · ")}
-              </span>
-            </p>
-            <div className="mt-2 flex gap-1.5">
-              <Button
-                size="sm"
-                className="min-h-8 px-2.5 text-xs"
-                disabled={busy !== null}
-                onClick={() => void repair()}
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <span className="text-xs font-medium text-muted-foreground">
+            {t("mobile.health.step.order")}
+          </span>
+          <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
+            {failedCount > 0
+              ? t("mobile.health.step.pending", { count: failedCount })
+              : t("mobile.health.step.confirm")}
+          </span>
+        </div>
+        <div className="divide-y divide-border/50">
+          {steps.map((step, index) => {
+            const isCurrent = index === currentIndex;
+            return (
+              <div
+                key={step.key}
+                className={cn(
+                  "flex items-start gap-2.5 px-2.5 py-2.5",
+                  isCurrent && "rounded-xl bg-muted/60"
+                )}
               >
-                <Wrench className="mr-1 h-3.5 w-3.5" />
-                {t("mobile.health.repair")}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="min-h-8 px-2.5 text-xs"
-                disabled={busy !== null}
-                onClick={() => {
-                  track("health_item_action", {
-                    item: "channel",
-                    action: "open_settings",
-                  });
-                  void run("open_notification_settings");
-                }}
-              >
-                {t("mobile.health.goSettings")}
-              </Button>
-            </div>
-          </div>
-        )}
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold",
+                    step.ok
+                      ? "border-transparent bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                      : isCurrent
+                        ? "border-amber-500/70 text-amber-600 dark:text-amber-400"
+                        : "border-border text-muted-foreground"
+                  )}
+                >
+                  {step.ok ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-1.5 text-sm font-medium leading-5">
+                    {step.title}
+                    {step.key === "background" && (
+                      <span className="rounded bg-amber-500 px-1.5 py-px text-[9px] font-bold leading-4 text-white dark:text-amber-950">
+                        {t("mobile.health.mustEnable")}
+                      </span>
+                    )}
+                  </p>
+                  <p
+                    className={cn(
+                      "mt-0.5 text-xs leading-4",
+                      step.ok || step.manual
+                        ? "text-muted-foreground"
+                        : "text-amber-600 dark:text-amber-400"
+                    )}
+                  >
+                    {step.hint}
+                  </p>
+                </div>
+                {step.action && <div className="shrink-0 pt-0.5">{step.action}</div>}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* 只列没过的检测项：通过的不占版面，避免"一片绿但就是不响"。 */}
-      {todo.length > 0 && (
-        <div className="mt-1.5 divide-y divide-border/50">
-          {todo.map((item) => (
-            <div key={item.key} className="flex items-start gap-2.5 py-2.5">
-              <AlertTriangle
-                aria-hidden="true"
-                className="mt-0.5 h-4 w-4 shrink-0 text-amber-500 dark:text-amber-400"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium leading-5">{item.label}</p>
-                <p className="mt-0.5 text-xs leading-4 text-amber-600 dark:text-amber-400">
-                  {item.hint}
-                </p>
-              </div>
-              <div className="shrink-0 pt-0.5">{item.action}</div>
-            </div>
-          ))}
+      {/* 渠道异常时才出现：重建渠道是唯一能自愈的手段。 */}
+      {!channelOk && (
+        <div className="mt-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
+          <p className="flex items-start gap-2 text-xs leading-5 text-amber-700 dark:text-amber-300">
+            <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              <span className="font-semibold">{t("mobile.health.channelBad")}</span>
+              {channelIssues.join(" · ")}
+            </span>
+          </p>
+          <div className="mt-2 flex gap-1.5">
+            <Button
+              size="sm"
+              className="min-h-8 px-2.5 text-xs"
+              disabled={busy !== null}
+              onClick={() => void repair()}
+            >
+              <Wrench className="mr-1 h-3.5 w-3.5" />
+              {t("mobile.health.repair")}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="min-h-8 px-2.5 text-xs"
+              disabled={busy !== null}
+              onClick={() => {
+                track("health_item_action", {
+                  item: "channel",
+                  action: "open_settings",
+                });
+                void run("open_notification_settings");
+              }}
+            >
+              {t("mobile.health.goSettings")}
+            </Button>
+          </div>
         </div>
       )}
-
-      {/* 头号项单独成块：后台运行没开 = 划掉 App 后彻底收不到，比上面几项都致命。
-          状态读不到（厂商私有），所以用「必开」强调 + 入口，而不是伪装成检测项。 */}
-      <div className="mt-3 rounded-xl border-2 border-amber-500/70 bg-amber-500/10 p-3">
-        <p className="flex items-start gap-2">
-          <Power
-            aria-hidden="true"
-            className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
-          />
-          <span className="min-w-0 flex-1 text-xs leading-5">
-            <span className="flex items-center gap-1.5">
-              <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">
-                {t("mobile.health.background.title")}
-              </span>
-              <span className="rounded bg-amber-500 px-1.5 py-px text-[9px] font-bold leading-4 text-white dark:text-amber-950">
-                {t("mobile.health.mustEnable")}
-              </span>
-            </span>
-            {/* 厂商开关没有公开 API，状态读不到，所以每次都请用户按路径检查。 */}
-            <span className="mt-1 block text-xs leading-4 text-muted-foreground">
-              {t("mobile.health.background.cannotRead")}
-            </span>
-            <span className="mt-0.5 block text-amber-700/90 dark:text-amber-300/80">
-              {t("mobile.health.background.mustBoth")}
-            </span>
-          </span>
-        </p>
-        <Button
-          size="sm"
-          className="mt-2 w-full min-h-9 bg-amber-500 text-white shadow-none hover:bg-amber-600 dark:text-amber-950"
-          disabled={busy !== null}
-          onClick={() => {
-            track("health_item_action", {
-              item: "background",
-              action: "open_guide",
-            });
-            window.dispatchEvent(
-              new CustomEvent(OPEN_GUIDE_EVENT, {
-                detail: { step: 2, source: "health_card" },
-              })
-            );
-          }}
-        >
-          {t("mobile.health.background.check")}
-        </Button>
-      </div>
 
       {/* 系统私有开关：读不到状态，只有跳转入口，不装作能检测。 */}
       <div className="mt-3">

@@ -59,6 +59,9 @@ function WaterTrendChart({
   goal: number;
 }) {
   const { t, locale } = useI18n();
+  // 横轴按日期倒序：最近的一天在最左边，越往右越早（与移动端一致）。
+  // 数据源本身是从旧到新的，这里只反转渲染顺序。
+  const orderedDays = [...days].reverse();
   const highestValue = Math.max(goal, ...days.map((day) => day.total), 1);
   const chartMax = Math.ceil(highestValue / 500) * 500;
   const goalHeight = Math.min((goal / chartMax) * 100, 100);
@@ -102,12 +105,12 @@ function WaterTrendChart({
               />
             )}
             <div className="absolute inset-0 flex items-end gap-1">
-              {days.map((day, index) => {
+              {orderedDays.map((day, index) => {
                 const barHeight = Math.min((day.total / chartMax) * 100, 100);
                 const showLabel =
                   period === 7 ||
                   index % 5 === 0 ||
-                  index === days.length - 1;
+                  index === orderedDays.length - 1;
 
                 return (
                   <div

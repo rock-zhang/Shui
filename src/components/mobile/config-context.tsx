@@ -17,6 +17,7 @@ import {
   DEFAULT_GENERAL,
   emitRefresh,
   GAP_OPTIONS,
+  normalizeQuickAmounts,
   readConfig,
   rescheduleReminders,
   syncReminderConfig,
@@ -61,6 +62,7 @@ const ALERT_ANALYTICS_KEYS: Record<string, string> = {
   weekdays: "weekdays",
   timeStart: "time_start",
   timeEnd: "time_end",
+  quickAmounts: "quick_amounts",
 };
 const GENERAL_ANALYTICS_KEYS: Record<string, string> = {
   isNotification: "is_notification",
@@ -137,14 +139,22 @@ export function MobileConfigProvider({ children }: { children: ReactNode }) {
         const alertConfig = gapValid
           ? loadedAlert
           : { ...loadedAlert, gap: DEFAULT_ALERT.gap };
-        if (!gapValid) {
-          void writeConfig("alert", alertConfig).catch((error) =>
+        // 旧版本 store 没有 quickAmounts，或历史写入含非法值时归一到合法档位。
+        const normalized = normalizeQuickAmounts(alertConfig.quickAmounts);
+        const amountsDirty =
+          JSON.stringify(normalized) !==
+          JSON.stringify(alertConfig.quickAmounts);
+        const alertNormalized = amountsDirty
+          ? { ...alertConfig, quickAmounts: normalized }
+          : alertConfig;
+        if (!gapValid || amountsDirty) {
+          void writeConfig("alert", alertNormalized).catch((error) =>
             console.error("归一化提醒间隔失败", error)
           );
         }
-        alertRef.current = alertConfig;
+        alertRef.current = alertNormalized;
         generalRef.current = generalConfig;
-        setAlert(alertConfig);
+        setAlert(alertNormalized);
         setGeneral(generalConfig);
         setHydrated(true);
       })

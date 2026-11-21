@@ -4,9 +4,7 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { recordDrink } from "@/utils/record-drink";
 import { trackDrinkRecorded } from "@/lib/analytics";
-import { useI18n, type MessageKey } from "@/lib/i18n";
-
-type Notice = { key: MessageKey; params?: Record<string, string | number> } | null;
+import { useI18n } from "@/lib/i18n";
 
 export function ManualDrink({ onRecorded }: { onRecorded: () => void }) {
   const { t } = useI18n();
@@ -14,7 +12,6 @@ export function ManualDrink({ onRecorded }: { onRecorded: () => void }) {
   const pending = useRef<{ amount: number; id: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
-  const [notice, setNotice] = useState<Notice>(null);
 
   async function submit(amount: number) {
     if (busy.current) return;
@@ -28,21 +25,10 @@ export function ManualDrink({ onRecorded }: { onRecorded: () => void }) {
       const receipt = await recordDrink(entry.amount, entry.id);
       pending.current = null;
       trackDrinkRecorded(receipt, entry.amount, "manual_today");
-      setNotice({
-        key: receipt.goalReached
-          ? receipt.added
-            ? "common.manualDrink.recordedTotalGoal"
-            : "common.manualDrink.alreadyTotalGoal"
-          : receipt.added
-            ? "common.manualDrink.recordedTotal"
-            : "common.manualDrink.alreadyTotal",
-        params: { total: receipt.total },
-      });
       onRecorded();
     } catch (failure) {
       console.error("手动记录失败:", failure);
       setError(true);
-      setNotice({ key: "common.manualDrink.uncertain" });
     } finally {
       busy.current = false;
       setSaving(false);
@@ -62,7 +48,7 @@ export function ManualDrink({ onRecorded }: { onRecorded: () => void }) {
         {error && <Button size="sm" disabled={saving} onClick={() => submit(pending.current?.amount ?? 100)}>{t("common.manualDrink.retry")}</Button>}
       </div>
       <p className={`mt-2 text-xs ${error ? "text-destructive" : "text-muted-foreground"}`} role={error ? "alert" : "status"}>
-        {saving ? t("common.manualDrink.saving") : notice ? t(notice.key, notice.params) : ""}
+        {saving ? t("common.manualDrink.saving") : error ? t("common.manualDrink.uncertain") : ""}
       </p>
     </section>
   );

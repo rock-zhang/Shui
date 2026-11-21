@@ -5,6 +5,7 @@ import android.app.Activity
 import android.app.AlarmManager
 import android.app.Notification
 import android.app.NotificationManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -446,6 +447,7 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         // 不完全一致：MANAGE_APPLICATIONS_SETTINGS 最标准，个别 ROM 只认
         // MANAGE_ALL_APPLICATIONS_SETTINGS。都不行才退回应用详情。
         val intents = listOf(
+            Intent(Settings.ACTION_APPLICATION_SETTINGS),
             Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS),
             Intent(Settings.ACTION_MANAGE_ALL_APPLICATIONS_SETTINGS)
         )
@@ -466,6 +468,62 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
         }
         Log.i(ReminderScheduler.TAG, "系统应用设置页不可用，已退回应用详情页")
         invoke.resolve()
+    }
+
+    /**
+     * 【临时跳转验证 demo】按 target 逐一打开「设置-应用」相关的候选页面，
+     * 用于在真机上确认每个 action / 私有入口实际落到哪一页。验证完成后整体移除。
+     * 失败时把异常类名和消息 reject 回前端，toast 能直接显示打不开的原因。
+     */
+    @Command
+    fun openSettingsProbe(invoke: Invoke) {
+        val target = invoke.getArgs().optString("target", "")
+        val intent: Intent = when (target) {
+            // ── 系统公开 action ──
+            "application_settings" -> Intent(Settings.ACTION_APPLICATION_SETTINGS)
+            "manage_applications" -> Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS)
+            "manage_all_applications" -> Intent(Settings.ACTION_MANAGE_ALL_APPLICATIONS_SETTINGS)
+            "app_details" -> Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:${activity.packageName}")
+            }
+            "default_apps" -> Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+            // ── ColorOS / OPPO 私有入口（不存在时抛 ActivityNotFoundException）──
+            "coloros_safecenter" -> Intent().setComponent(
+                ComponentName(
+                    "com.coloros.safecenter",
+                    "com.coloros.safecenter.permission.startup.StartupManagerActivity"
+                )
+            )
+            "coloros_startup" -> Intent().setComponent(
+                ComponentName(
+                    "com.coloros.safecenter",
+                    "com.coloros.safecenter.startup.StartupManagerActivity"
+                )
+            )
+            "oplus_safecenter" -> Intent().setComponent(
+                ComponentName(
+                    "com.oplus.safecenter",
+                    "com.oplus.safecenter.permission.startup.StartupManagerActivity"
+                )
+            )
+            "oppo_safe" -> Intent().setComponent(
+                ComponentName(
+                    "com.oppo.safe",
+                    "com.oppo.safe.permission.startup.StartupManagerActivity"
+                )
+            )
+            else -> {
+                invoke.reject("未知 target：$target")
+                return
+            }
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            activity.startActivity(intent)
+            invoke.resolve()
+        } catch (error: Exception) {
+            invoke.reject("$target 打不开：${error.javaClass.simpleName}: ${error.message}")
+        }
     }
 
     private fun startApplicationDetails(): Boolean {
