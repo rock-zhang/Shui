@@ -271,6 +271,7 @@ pub fn run() {
         mobile::open_notification_channel_settings,
         mobile::open_autostart_settings,
         mobile::open_settings_probe,
+        mobile::list_settings_activities,
         mobile::get_diagnostics,
         mobile::clear_missed_alarm,
         mobile::open_app_settings,

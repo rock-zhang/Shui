@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { formatTimeLabel } from "@/lib/mobile";
+import { track } from "@/lib/analytics";
 import { normalizeDrinkDay, type DrinkHistoryValue } from "@/lib/drink-day";
 
 type Notice = { key: MessageKey; params?: Record<string, string | number> } | null;
@@ -29,11 +30,13 @@ export function DrinkDetails({ entries, goal, onChanged }: {
     setNotice(null);
     try {
       await invoke("undo_drink", { date, requestId });
+      track("drink_undo", { result: "success", surface: "details" });
       setConfirmation(null);
       setNotice({ key: "common.details.undoSuccess" });
       onChanged();
     } catch (error) {
       console.error("撤销失败", error);
+      track("drink_undo", { result: "failed", surface: "details" });
       setNotice({ key: "common.details.undoFailed" });
     } finally {
       busy.current = false;

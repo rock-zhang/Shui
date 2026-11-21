@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight, X } from "lucide-react";
 import { toast } from "sonner";
-import { track } from "@/lib/analytics";
+import { minutesBucket, track } from "@/lib/analytics";
 import { useBackToClose } from "@/hooks/use-back-to-close";
 import {
   ONBOARDING_DISMISS_LIMIT,
@@ -134,11 +134,10 @@ export function OnboardingTour({
         const config = alertRef.current;
         track("onboarding_completed", {
           duration_ms: Math.max(0, Date.now() - shownAt.current),
-          goal_ml: config.gold,
-          gap_min: config.gap,
-          weekdays: (config.weekdays ?? []).join(","),
-          time_start: config.timeStart,
-          time_end: config.timeEnd,
+          goal_set: Number(config.gold) > 0,
+          gap_bucket: minutesBucket(Number(config.gap)),
+          weekday_count: (config.weekdays ?? []).length,
+          has_time_range: Boolean(config.timeStart && config.timeEnd),
         });
         toast.success(t("mobile.onboarding.completedToast"));
       }

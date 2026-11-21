@@ -41,6 +41,7 @@ object ReminderScheduler {
 
     const val ACTION_REMINDER = "com.shui.app.REMINDER"
     const val ACTION_SKIP = "com.shui.app.SKIP"
+    const val ACTION_DISMISS = "com.shui.app.DISMISS"
     const val ACTION_DRINK_PREFIX = "com.shui.app.DRINK_"
     // v5：有声渠道用系统默认通知提示音（RingtoneManager.TYPE_NOTIFICATION）。
     // 真机实锤：没声音的根因是国产 ROM 应用级的「铃声」开关默认关着，不是铃声 URI
@@ -120,6 +121,15 @@ object ReminderScheduler {
 
     /** 达标通知用独立 id：不能和喝水提醒互相覆盖。 */
     const val GOAL_NOTIFICATION_ID = 2002
+
+    /**
+     * App 自己撤销通知时写入的抑制截止时间（毫秒）。
+     *
+     * cancel() 同样会触发 setDeleteIntent 的广播；写入一个 short window 内的
+     * 截止时间，让紧随其后的 dismiss 广播被识别为「我们自己撤的」而不是用户
+     * 划走，避免把 skip / 记水 / 达标收通知误算成「划掉提醒」。
+     */
+    const val KEY_DISMISS_SUPPRESS_UNTIL = "dismiss_suppress_until_ms"
 
     /**
      * 通知快捷按钮的兜底杯量。用户在今日页长按卡片自定义 quickAmounts 后，
@@ -913,6 +923,16 @@ class ReminderReceiver : BroadcastReceiver() {
                 cancelNotification(context)
                 ReminderScheduler.scheduleNext(context)
             }
+            action == ReminderScheduler.ACTION_DISMISS -> {
+                // 只有超出抑制窗口的取消才算「用户划走」；App 自己 cancel 的
+                // 广播在窗口内到达，直接忽略。
+                val prefs = context.getSharedPreferences(ReminderPlugin.PREFS, Context.MODE_PRIVATE)
+                val suppressUntil = prefs.getLong(ReminderScheduler.KEY_DISMISS_SUPPRESS_UNTIL, 0L)
+                if (System.currentTimeMillis() > suppressUntil) {
+                    AnalyticsTracker.logNotificationDismissed(context)
+                }
+                prefs.edit().remove(ReminderScheduler.KEY_DISMISS_SUPPRESS_UNTIL).apply()
+            }
             action.startsWith(ReminderScheduler.ACTION_DRINK_PREFIX) -> {
                 val amount = action.removePrefix(ReminderScheduler.ACTION_DRINK_PREFIX).toIntOrNull()
                 if (amount != null && amount > 0) {
@@ -970,6 +990,15 @@ class ReminderReceiver : BroadcastReceiver() {
     }
 
     private fun cancelNotification(context: Context) {
+        // 先写抑制窗口再 cancel：cancel() 会触发 deleteIntent，不标记就会被
+        // 当成「用户划走」多报一条 notification_dismissed。
+        context.getSharedPreferences(ReminderPlugin.PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putLong(
+                ReminderScheduler.KEY_DISMISS_SUPPRESS_UNTIL,
+                System.currentTimeMillis() + 2000L
+            )
+            .apply()
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.cancel(ReminderScheduler.NOTIFICATION_ID)
     }
@@ -1047,7 +1076,7 @@ class ReminderReceiver : BroadcastReceiver() {
         return try {
             manager.notify(ReminderScheduler.GOAL_NOTIFICATION_ID, builder.build())
             Log.i(ReminderScheduler.TAG, "达标通知已投递：渠道=$channelId")
-            AnalyticsTracker.logGoalNotification(context, total, goal, trigger)
+            AnalyticsTracker.logGoalNotification(context, trigger)
             true
         } catch (error: SecurityException) {
             Log.w(ReminderScheduler.TAG, "达标通知投递被拒绝（POST_NOTIFICATIONS 未授予）", error)
@@ -1077,6 +1106,11 @@ class ReminderReceiver : BroadcastReceiver() {
             return PendingIntent.getBroadcast(context, requestCode, broadcast, flags)
         }
 
+        // 用户划掉通知时系统发这条广播；用来补「未点击、未操作就忽略提醒」的埋点。
+        val dismiss = Intent(context, ReminderReceiver::class.java)
+            .setAction(ReminderScheduler.ACTION_DISMISS)
+        val dismissIntent = PendingIntent.getBroadcast(context, 10, dismiss, flags)
+
         // 进度快照：通知里直接展示「已喝 / 目标」和比例条，用户不打开 App
         // 也能知道今天走到哪一步。未设置目标时不展示进度与副标题。
         val total = ReminderScheduler.todayAmount(context)
@@ -1102,6 +1136,7 @@ class ReminderReceiver : BroadcastReceiver() {
             .setOnlyAlertOnce(false)
             .setAutoCancel(true)
             .setContentIntent(content)
+            .setDeleteIntent(dismissIntent)
             .apply {
                 if (goal > 0) {
                     // 达标前最多显示 99%：1999/2000 时向上取整成 100% 会显得「已达成」，

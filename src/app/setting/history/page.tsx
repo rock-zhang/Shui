@@ -11,6 +11,7 @@ import { STORE_NAME } from "@/lib/constants";
 import { onRefresh } from "@/lib/mobile";
 import { useDayChange } from "@/hooks/use-day-change";
 import { useI18n } from "@/lib/i18n";
+import { track } from "@/lib/analytics";
 
 export default function DrinkHistoryPage() {
   const { t } = useI18n();
@@ -66,7 +67,16 @@ export default function DrinkHistoryPage() {
       <h3 className="text-lg font-medium">{t("settings.history.title")}</h3>
       <div className="flex gap-2">
         <Button size="sm" variant="ghost" disabled={loading} onClick={refresh}>{t("common.refresh")}</Button>
-        {([7, 30] as const).map(value => <Button key={value} size="sm" variant={period === value ? "secondary" : "ghost"} onClick={() => setPeriod(value)}>{t("settings.statistics.period", { days: value })}</Button>)}
+        {([7, 30] as const).map(value => <Button key={value} size="sm" variant={period === value ? "secondary" : "ghost"} onClick={() => {
+          if (value !== period) {
+            track("data_period_changed", {
+              from: String(period),
+              to: String(value),
+              surface: "history",
+            });
+          }
+          setPeriod(value);
+        }}>{t("settings.statistics.period", { days: value })}</Button>)}
       </div>
     </div>
     <section className="mb-4 rounded-lg border p-4" aria-label={t("settings.history.todayProgress")}>

@@ -45,6 +45,16 @@ fn countdown_async(app_handle: tauri::AppHandle) {
                     let _ = app_handle.emit("countdown", countdown);
                     if countdown <= 0 {
                         if reminder_session::close(&app_handle, token.as_deref(), Outcome::TimedOut) {
+                            crate::desktop_analytics::log_event(
+                                &app_handle,
+                                "reminder_outcome",
+                                serde_json::json!({ "outcome": "timedOut", "trigger": "desktop" }),
+                            );
+                            crate::desktop_analytics::log_event(
+                                &app_handle,
+                                "fullscreen_timeout",
+                                serde_json::json!({ "trigger": "desktop" }),
+                            );
                             reset_timer();
                         }
                         break;

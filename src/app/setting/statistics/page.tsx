@@ -29,6 +29,7 @@ import {
   summarizeDrinkDays,
 } from "@/lib/drink-history";
 import { useI18n, type Locale, type MessageKey } from "@/lib/i18n";
+import { track } from "@/lib/analytics";
 
 const PERIODS = [7, 30] as const;
 
@@ -390,6 +391,7 @@ export default function StatisticsPage() {
       const historyEntries = entries.filter(([key]) => /^\d{8}$/.test(key));
 
       if (historyEntries.length === 0) {
+        track("data_export_csv", { period: String(period), result: "empty" });
         toast.info(t("settings.statistics.export.empty"));
         return;
       }
@@ -403,9 +405,13 @@ export default function StatisticsPage() {
         content: csv,
       });
 
-      if (savedPath) toast.success(t("settings.statistics.export.success"));
+      if (savedPath) {
+        track("data_export_csv", { period: String(period), result: "success" });
+        toast.success(t("settings.statistics.export.success"));
+      }
     } catch (exportError) {
       console.error("导出饮水记录失败:", exportError);
+      track("data_export_csv", { period: String(period), result: "failed" });
       toast.error(t("settings.statistics.export.failed"));
     } finally {
       setExporting(false);
@@ -444,7 +450,15 @@ export default function StatisticsPage() {
                 size="sm"
                 variant={period === value ? "secondary" : "ghost"}
                 className="h-7 px-2.5 text-xs"
-                onClick={() => setPeriod(value)}
+                onClick={() => {
+                  if (value !== period) {
+                    track("data_period_changed", {
+                      from: String(period),
+                      to: String(value),
+                    });
+                  }
+                  setPeriod(value);
+                }}
               >
                 {t("settings.statistics.period", { days: value })}
               </Button>

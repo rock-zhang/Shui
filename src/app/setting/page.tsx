@@ -64,6 +64,10 @@ export default function Home() {
   const goToNotificationSettings = async () => {
     try {
       await openNotificationSettings();
+      track("settings_opened", {
+        target: "notification",
+        source: "general_card",
+      });
     } catch {
       toast.info(
         isMacOS
@@ -85,10 +89,18 @@ export default function Home() {
     setTestPending(true);
     try {
       await sendTestNotification();
+      track("test_notification_click", {
+        success: true,
+        surface: "desktop_settings",
+      });
       toast.info(t("settings.general.notification.testSent"), {
         duration: 6000,
       });
     } catch {
+      track("test_notification_click", {
+        success: false,
+        surface: "desktop_settings",
+      });
       toast.error(t("settings.general.notification.testFailed"));
     } finally {
       setTestPending(false);
@@ -157,6 +169,10 @@ export default function Home() {
     }
     setAnalyticsOn(next);
     await setAnalyticsEnabled(next);
+    if (next) {
+      // 开启必须在原生侧启用之后再上报，否则这条会被丢弃。
+      await trackNow("analytics_opt_in");
+    }
   }
 
   const saveConfig = async (filed: string, checked: boolean) => {
@@ -370,9 +386,13 @@ export default function Home() {
         </div>
         <Select
           value={preference}
-          onValueChange={(next) =>
-            setPreference(next as LanguagePreference)
-          }
+          onValueChange={(next) => {
+            const value = next as LanguagePreference;
+            if (value !== preference) {
+              track("language_changed", { from: preference, to: value });
+            }
+            setPreference(value);
+          }}
         >
           <SelectTrigger className="w-[150px]">
             <SelectValue />
@@ -399,7 +419,13 @@ export default function Home() {
         <Select
           value={themeMounted ? theme : "system"}
           disabled={!themeMounted}
-          onValueChange={setTheme}
+          onValueChange={(next) => {
+            const current = theme ?? "system";
+            if (next !== current) {
+              track("theme_changed", { from: current, to: next });
+            }
+            setTheme(next);
+          }}
         >
           <SelectTrigger className="w-[150px]">
             <SelectValue

@@ -171,7 +171,7 @@ export function MissedAlarmDialog() {
       delay_minutes: minutesBucket(delayMinutes),
       alarm_cleared: cleared,
       missed_hour: new Date(missedAt).getHours(),
-      gap_min: Number(alert.gap) || 0,
+      gap_bucket: minutesBucket(Number(alert.gap) || 0),
     });
   }, [open, enabled, missedAt, cleared, alert.gap]);
 

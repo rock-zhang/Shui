@@ -13,7 +13,7 @@ import { platform } from "@tauri-apps/plugin-os";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { emitRefresh } from "@/lib/mobile";
-import { trackDrinkRecorded } from "@/lib/analytics";
+import { track, trackDrinkRecorded } from "@/lib/analytics";
 import { playConfirmSound } from "@/utils/sound";
 import type { DrinkReceipt } from "@/lib/drink-day";
 
@@ -42,6 +42,7 @@ export function useTray() {
   const getMenu = useCallback(async () => {
     const menu = await Menu.new();
     const openSettings = async () => {
+      track("tray_action", { action: "open_settings" });
       const mainWindow = await WebviewWindow.getByLabel("main");
       if (mainWindow) {
         if (await mainWindow.isMinimized()) await mainWindow.unminimize();
@@ -64,6 +65,7 @@ export function useTray() {
       await MenuItem.new({
         text: t("tray.restNow"),
         action: async () => {
+          track("tray_action", { action: "rest_now" });
           invoke("call_reminder");
         },
       })
@@ -82,7 +84,7 @@ export function useTray() {
                 amount,
                 requestId: crypto.randomUUID(),
               });
-              trackDrinkRecorded(receipt, amount, "manual_today");
+              trackDrinkRecorded(receipt, amount, "tray");
               emitRefresh();
               void playConfirmSound();
             } catch (error) {
@@ -102,12 +104,14 @@ export function useTray() {
         {
           text: t("tray.pause"),
           action: async () => {
+            track("tray_action", { action: "pause" });
             invoke("pause_timer");
           },
         },
         {
           text: t("tray.restart"),
           action: async () => {
+            track("tray_action", { action: "resume" });
             invoke("start_timer");
           },
         },

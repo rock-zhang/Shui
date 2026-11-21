@@ -40,7 +40,7 @@ async function settingsAction({ minimized = false, missing = false } = {}) {
     '@tauri-apps/plugin-os': { platform: () => 'macos' },
     'sonner': { toast: { error: () => {} } },
     '@/lib/mobile': { emitRefresh: () => {} },
-    '@/lib/analytics': { trackDrinkRecorded: () => {} },
+    '@/lib/analytics': { track: () => {}, trackDrinkRecorded: () => {} },
     '@/utils/sound': { playConfirmSound: async () => {} },
     '@/lib/i18n': {
       useI18n: () => ({

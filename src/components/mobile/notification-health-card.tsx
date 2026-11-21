@@ -7,9 +7,11 @@ import {
   AlertTriangle,
   BatteryCharging,
   BellRing,
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  HelpCircle,
   RefreshCw,
   RotateCcw,
   Wrench,
@@ -17,7 +19,6 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
-  CHANNEL_IMPORTANCE,
   onRefresh,
   readDiagnostics,
   readNotificationHealth,
@@ -31,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { useNotificationPermission } from "./notification-permission-context";
 import { OPEN_GUIDE_EVENT } from "./notification-setup-guide";
+import { openBackgroundSetting } from "./background-guide-cards";
 import { MobileSection } from "./ui";
 
 /** 跳系统设置后轮询确认结果的时长上限与间隔（与权限 Provider 保持一致）。 */
@@ -40,7 +42,7 @@ const WATCH_INTERVAL_MS = 900;
 /** 闹钟超过这么久没触发才判定「被系统拦了」，避开发送瞬间的正常抖动。 */
 const OVERDUE_TOLERANCE_S = 90;
 
-/** 修复步骤：1、2 可自动检测，3 只能带用户去系统设置里手动确认。 */
+/** 修复步骤：可检测项自动判定，自启动与完全后台行为只能带用户去系统设置确认。 */
 type Step = {
   key: string;
   title: string;
@@ -49,6 +51,8 @@ type Step = {
   /** 读不到状态、只能人工确认的项，不参与「未通过」计数。 */
   manual?: boolean;
   action?: React.ReactNode;
+  /** 行下方跨列展开的补充内容（如通知样式的四项状态）。 */
+  content?: React.ReactNode;
 };
 
 function clock(ms: number, locale: string): string {
@@ -86,31 +90,91 @@ function toReport(
   ].join("\n");
 }
 
-/** 检测不到状态、只能带用户去设置页的项。 */
-function ManualRow({
+/**
+ * 通知样式的小状态标：横幅 / 铃声 / 振动读渠道状态，锁屏读不到（系统已废弃
+ * 该字段），只能标成「需自检」。这样四个开关不再既有检测块又有手动行。
+ */
+function ChannelChip({
   label,
-  hint,
-  disabled,
-  onClick,
+  state,
+  title,
 }: {
   label: string;
-  hint: string;
-  disabled?: boolean;
-  onClick: () => void;
+  state: "ok" | "bad" | "unknown";
+  title?: string;
 }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-xl border border-border/70 bg-background/60 px-3 py-2 text-left transition-colors hover:border-sky-400/60 disabled:opacity-60"
+    <span
+      title={title}
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] leading-4",
+        state === "ok" &&
+          "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+        state === "bad" &&
+          "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+        state === "unknown" && "border-border bg-muted/50 text-muted-foreground"
+      )}
     >
-      <span className="min-w-0 flex-1 text-xs">
-        <span className="font-medium">{label}</span>
-        <span className="block leading-4 text-muted-foreground">{hint}</span>
-      </span>
-      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-    </button>
+      {state === "ok" ? (
+        <Check aria-hidden="true" className="h-3 w-3" />
+      ) : state === "bad" ? (
+        <AlertTriangle aria-hidden="true" className="h-3 w-3" />
+      ) : (
+        <HelpCircle aria-hidden="true" className="h-3 w-3" />
+      )}
+      {label}
+    </span>
+  );
+}
+
+/**
+ * 品牌化的「手动入口」：把系统设置层级画成面包屑，跳转被 ROM 重映射时
+ * 用户仍能照着点。文案（系统名 / 路径 / 开关名）全部来自 rom.ts。
+ */
+function RomPathHint({
+  brand,
+  path,
+  alternate,
+  fallback,
+}: {
+  brand: string;
+  path: string[];
+  alternate?: string;
+  fallback: string;
+}) {
+  return (
+    <div>
+      <p className="text-[11px] leading-4 text-muted-foreground">{brand}</p>
+      <div className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-1">
+        {path.map((node, index) => {
+          const last = index === path.length - 1;
+          return (
+            <span key={`${node}-${index}`} className="inline-flex items-center gap-1">
+              {index > 0 && (
+                <ChevronRight
+                  aria-hidden="true"
+                  className="h-3 w-3 shrink-0 text-muted-foreground/50"
+                />
+              )}
+              <span
+                className={cn(
+                  "rounded-md px-1.5 py-0.5 text-[11px] leading-4 ring-1",
+                  last
+                    ? "bg-background font-medium text-foreground ring-border/80"
+                    : "bg-muted/60 text-muted-foreground ring-border/50"
+                )}
+              >
+                {node}
+              </span>
+            </span>
+          );
+        })}
+      </div>
+      {alternate && (
+        <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{alternate}</p>
+      )}
+      <p className="mt-1 text-[10px] leading-4 text-muted-foreground/80">{fallback}</p>
+    </div>
   );
 }
 
@@ -121,7 +185,8 @@ function ManualRow({
  * 在两处重复出现，一处能点、一处只是只读的勾；诊断卡的「定制系统必做」整段又和
  * 后台运行块说的是同一件事。合并成一张后分两层——
  *
- *   1. 配置层（默认可见）：只列**没通过且必须动手**的项，读完就知道该去点什么。
+ *   1. 配置层（默认可见）：按处理顺序列出 5 步——通知权限、通知样式、
+ *      自启动、完全后台行为、精确闹钟。自启动与后台读不到状态，只给直达设置页的入口。
  *   2. 运行层（折叠）：排期、上次提醒、Doze、版本这些取证用的数字，平时不占版面，
  *      闹钟真的过期未触发时才在顶部报警。
  *
@@ -250,6 +315,28 @@ export function NotificationHealthCard() {
     [t]
   );
 
+  /**
+   * 自启动 / 完全后台行为：和三步引导共用同一个命令与埋点。
+   * 两者是独立开关、入口也常不在同一页，所以体检清单里各占一行、各自直连。
+   */
+  const openBackgroundItem = useCallback(
+    async (command: "open_autostart_settings" | "open_app_settings") => {
+      setBusy(command);
+      track("health_item_action", {
+        item: command === "open_autostart_settings" ? "autostart" : "background",
+        action: "open_settings",
+      });
+      try {
+        await openBackgroundSetting(command, "health_card");
+      } catch {
+        toast.error(t("mobile.notif.openSettingsFailed"));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [t]
+  );
+
   /** 渠道被系统改坏时重建：这是渠道层面唯一能自愈的手段。 */
   const repair = useCallback(async () => {
     track("health_item_action", { item: "channel", action: "repair" });
@@ -349,7 +436,10 @@ export function NotificationHealthCard() {
   }
 
   const rom = romFromHealth(health, locale);
-  const isDomesticRom = rom.domestic;
+  // 品牌名可能有认不出来的时候，退回「本机系统」，路径本身仍然准确。
+  const romBrand = t("mobile.health.rom.pathHint", {
+    brand: rom.name ?? t("mobile.health.rom.genericBrand"),
+  });
 
   /**
    * 渠道层是否自洽（不代表一定能弹横幅，见组件注释）。
@@ -370,20 +460,53 @@ export function NotificationHealthCard() {
     channelIssues.push(t("mobile.health.channelMissing"));
   } else {
     if (!health.headsUp) {
-      channelIssues.push(
-        health.channelImportance < CHANNEL_IMPORTANCE.HIGH
-          ? t("mobile.health.lowImportance", { level: health.channelImportance })
-          : t("mobile.health.importanceLow")
-      );
+      channelIssues.push(t("mobile.health.bannerOff"));
     }
     if (!health.channelSound) channelIssues.push(t("mobile.health.noSound"));
     if (!health.channelVibration) channelIssues.push(t("mobile.health.noVibration"));
   }
 
   /**
-   * 按系统实际拦截顺序排成 3 步：权限不过 → 什么都收不到；精确闹钟关着 →
-   * 到点被推迟；后台行为没开 → 划掉 App 后进程被清。
-   * 第 3 步状态读不到，只能给路径，所以标成「手动」且不计入待处理数量。
+   * 通知样式的四项：横幅 / 铃声 / 振动读渠道状态，锁屏读不到（系统已废弃
+   * lockscreenVisibility），只能请用户自己确认。四项共用「去通知设置」入口。
+   */
+  const styleChips: Array<{
+    key: string;
+    label: string;
+    state: "ok" | "bad" | "unknown";
+    title?: string;
+  }> = [
+    {
+      key: "banner",
+      label: t("mobile.health.style.banner"),
+      state: health.channelExists && health.headsUp ? "ok" : "bad",
+    },
+    {
+      key: "lockscreen",
+      label: t("mobile.health.style.lockscreen"),
+      state: "unknown",
+      title: t("mobile.health.style.selfCheck"),
+    },
+    {
+      key: "ringtone",
+      label: t("mobile.health.style.ringtone"),
+      state: health.channelExists && health.channelSound ? "ok" : "bad",
+    },
+    {
+      key: "vibration",
+      label: t("mobile.health.style.vibration"),
+      state: health.channelExists && health.channelVibration ? "ok" : "bad",
+    },
+  ];
+
+  /**
+   * 按处理顺序排成 5 步：权限不过 → 什么都收不到；样式被关 → 只静静躺在通知栏；
+   * 后台行为没开 → 划掉 App 后进程被清；精确闹钟只影响准点程度、不影响收不收得到，
+   * 所以放在最后兜底。
+   *
+   * 自启动与完全后台行为是两道独立的门，入口也常常不在同一页，所以各占一行、
+   * 各自直连设置页（与三步引导共用同一套命令和埋点）。这两项状态读不到，
+   * 只能标成「手动」且不计入待处理数量。
    */
   const steps: Step[] = [
     {
@@ -408,6 +531,132 @@ export function NotificationHealthCard() {
         >
           {canRequest ? t("mobile.health.allow") : t("mobile.health.goEnable")}
         </Button>
+      ),
+    },
+    {
+      key: "style",
+      title: t("mobile.health.check.style"),
+      ok: channelOk,
+      hint: channelOk
+        ? t("mobile.health.style.hintOk")
+        : t("mobile.health.style.hintBad"),
+      action: (
+        <Button
+          size="sm"
+          variant="outline"
+          className="min-h-8 px-2.5 text-xs"
+          disabled={busy !== null}
+          onClick={() => {
+            track("health_item_action", {
+              item: "channel",
+              action: "open_settings",
+            });
+            void run("open_notification_settings");
+          }}
+        >
+          {t("mobile.health.goSettings")}
+        </Button>
+      ),
+      content: (
+        <div>
+          <div className="flex flex-wrap gap-1.5">
+            {styleChips.map((chip) => (
+              <ChannelChip
+                key={chip.key}
+                label={chip.label}
+                state={chip.state}
+                title={chip.title}
+              />
+            ))}
+          </div>
+          {!channelOk && (
+            <>
+              <ul className="mt-1.5 space-y-0.5">
+                {channelIssues.map((issue) => (
+                  <li
+                    key={issue}
+                    className="flex items-start gap-1.5 text-[11px] leading-4 text-amber-700 dark:text-amber-300"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-amber-500"
+                    />
+                    {issue}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <Button
+                  size="sm"
+                  className="min-h-8 px-2.5 text-xs"
+                  disabled={busy !== null}
+                  onClick={() => void repair()}
+                >
+                  <Wrench className="mr-1 h-3.5 w-3.5" />
+                  {t("mobile.health.repair")}
+                </Button>
+                <span className="text-[10px] leading-4 text-muted-foreground">
+                  {t("mobile.health.repairNote")}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "autostart",
+      title: rom.autostartLabel,
+      ok: false,
+      manual: true,
+      hint: rom.autostartHint,
+      action: (
+        <Button
+          size="sm"
+          variant="outline"
+          className="min-h-8 px-2.5 text-xs"
+          disabled={busy !== null}
+          onClick={() => void openBackgroundItem("open_autostart_settings")}
+        >
+          {t("mobile.health.goSettings")}
+        </Button>
+      ),
+      // 各厂商的自启动入口位置差别很大，跳转也可能被 ROM 重映射。这里把
+      // 本机品牌对应的手动路径画成面包屑，跳错了用户还能照着找。
+      content: (
+        <RomPathHint
+          brand={romBrand}
+          path={rom.autostartPath}
+          alternate={rom.autostartAlt}
+          fallback={t("mobile.health.rom.fallback")}
+        />
+      ),
+    },
+    {
+      key: "background",
+      title: rom.backgroundLabel,
+      ok: false,
+      manual: true,
+      hint: rom.backgroundHint,
+      action: (
+        <Button
+          size="sm"
+          variant="outline"
+          className="min-h-8 px-2.5 text-xs"
+          disabled={busy !== null}
+          onClick={() => void openBackgroundItem("open_app_settings")}
+        >
+          {t("mobile.health.goSettings")}
+        </Button>
+      ),
+      // 和自启动是两个独立开关、入口常不在同一页，路径同样按品牌写出来。
+      content: (
+        <RomPathHint
+          brand={romBrand}
+          path={rom.backgroundPath}
+          alternate={rom.backgroundAlt}
+          fallback={t("mobile.health.rom.fallback")}
+        />
       ),
     },
     {
@@ -437,41 +686,13 @@ export function NotificationHealthCard() {
         </Button>
       ),
     },
-    {
-      key: "background",
-      title: t("mobile.health.background.title"),
-      ok: false,
-      manual: true,
-      hint: t("mobile.health.step.backgroundHint"),
-      action: (
-        <Button
-          size="sm"
-          variant="outline"
-          className="min-h-8 px-2.5 text-xs"
-          disabled={busy !== null}
-          onClick={() => {
-            track("health_item_action", {
-              item: "background",
-              action: "open_guide",
-            });
-            window.dispatchEvent(
-              new CustomEvent(OPEN_GUIDE_EVENT, {
-                detail: { step: 2, source: "health_card" },
-              })
-            );
-          }}
-        >
-          {t("mobile.health.step.check")}
-        </Button>
-      ),
-    },
   ];
 
-  const failedCount =
-    steps.filter((item) => !item.ok && !item.manual).length + (channelOk ? 0 : 1);
-  // 高亮「当前该做的那一步」；只剩渠道问题时不高亮步骤，让下方渠道块自己说话。
+  const failedCount = steps.filter((item) => !item.ok && !item.manual).length;
+  // 高亮「当前该做的那一步」；可检测项都通过后，高亮第一个仍需人工确认的项。
   const firstFailed = steps.findIndex((item) => !item.ok && !item.manual);
-  const currentIndex = firstFailed >= 0 ? firstFailed : channelOk ? 2 : -1;
+  const currentIndex =
+    firstFailed >= 0 ? firstFailed : steps.findIndex((item) => item.manual);
 
   // 排期已过期很久仍没动静——比任何配置项都说明问题，必须顶到最前面。
   const overdueSeconds =
@@ -539,114 +760,50 @@ export function NotificationHealthCard() {
               <div
                 key={step.key}
                 className={cn(
-                  "flex items-start gap-2.5 px-2.5 py-2.5",
+                  "px-2.5 py-2.5",
                   isCurrent && "rounded-xl bg-muted/60"
                 )}
               >
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold",
-                    step.ok
-                      ? "border-transparent bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                      : isCurrent
-                        ? "border-amber-500/70 text-amber-600 dark:text-amber-400"
-                        : "border-border text-muted-foreground"
-                  )}
-                >
-                  {step.ok ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-1.5 text-sm font-medium leading-5">
-                    {step.title}
-                    {step.key === "background" && (
-                      <span className="rounded bg-amber-500 px-1.5 py-px text-[9px] font-bold leading-4 text-white dark:text-amber-950">
-                        {t("mobile.health.mustEnable")}
-                      </span>
-                    )}
-                  </p>
-                  <p
+                <div className="flex items-start gap-2.5">
+                  <span
+                    aria-hidden="true"
                     className={cn(
-                      "mt-0.5 text-xs leading-4",
-                      step.ok || step.manual
-                        ? "text-muted-foreground"
-                        : "text-amber-600 dark:text-amber-400"
+                      "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold",
+                      step.ok
+                        ? "border-transparent bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                        : isCurrent
+                          ? "border-amber-500/70 text-amber-600 dark:text-amber-400"
+                          : "border-border text-muted-foreground"
                     )}
                   >
-                    {step.hint}
-                  </p>
+                    {step.ok ? <CheckCircle2 className="h-4 w-4" /> : index + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-1.5 text-sm font-medium leading-5">
+                      {step.title}
+                      {step.manual && (
+                        <span className="rounded bg-amber-500 px-1.5 py-px text-[9px] font-bold leading-4 text-white dark:text-amber-950">
+                          {t("mobile.health.mustEnable")}
+                        </span>
+                      )}
+                    </p>
+                    <p
+                      className={cn(
+                        "mt-0.5 text-xs leading-4",
+                        step.ok || step.manual
+                          ? "text-muted-foreground"
+                          : "text-amber-600 dark:text-amber-400"
+                      )}
+                    >
+                      {step.hint}
+                    </p>
+                  </div>
+                  {step.action && <div className="shrink-0 pt-0.5">{step.action}</div>}
                 </div>
-                {step.action && <div className="shrink-0 pt-0.5">{step.action}</div>}
+                {step.content && <div className="mt-2 pl-[34px]">{step.content}</div>}
               </div>
             );
           })}
-        </div>
-      </div>
-
-      {/* 渠道异常时才出现：重建渠道是唯一能自愈的手段。 */}
-      {!channelOk && (
-        <div className="mt-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
-          <p className="flex items-start gap-2 text-xs leading-5 text-amber-700 dark:text-amber-300">
-            <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              <span className="font-semibold">{t("mobile.health.channelBad")}</span>
-              {channelIssues.join(" · ")}
-            </span>
-          </p>
-          <div className="mt-2 flex gap-1.5">
-            <Button
-              size="sm"
-              className="min-h-8 px-2.5 text-xs"
-              disabled={busy !== null}
-              onClick={() => void repair()}
-            >
-              <Wrench className="mr-1 h-3.5 w-3.5" />
-              {t("mobile.health.repair")}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="min-h-8 px-2.5 text-xs"
-              disabled={busy !== null}
-              onClick={() => {
-                track("health_item_action", {
-                  item: "channel",
-                  action: "open_settings",
-                });
-                void run("open_notification_settings");
-              }}
-            >
-              {t("mobile.health.goSettings")}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* 系统私有开关：读不到状态，只有跳转入口，不装作能检测。 */}
-      <div className="mt-3">
-        <p className="mb-1.5 text-xs font-medium text-foreground">
-          {t("mobile.health.private.title")}
-          <span className="ml-1 font-normal text-muted-foreground">
-            {t("mobile.health.private.note")}
-          </span>
-        </p>
-        <div className="space-y-1.5">
-          <ManualRow
-            label={t("mobile.health.private.fourToggles")}
-            hint={
-              isDomesticRom
-                ? t("mobile.health.private.domesticHint")
-                : t("mobile.health.private.genericHint")
-            }
-            disabled={busy !== null}
-            onClick={() => {
-              track("health_item_action", {
-                item: "channel",
-                action: "open_settings",
-              });
-              void run("open_notification_settings", t("mobile.health.private.openHint"));
-            }}
-          />
         </div>
       </div>
 

@@ -22,6 +22,31 @@
         <package android:name="com.iqoo.secure" />
         <package android:name="com.meizu.safe" />
         <package android:name="com.samsung.android.lool" />
+
+        <!-- 【临时跳转验证 demo】要 resolveActivity 并扫描设置包内的 Activity，
+             Android 11+ 必须在 queries 里显式声明可见性，否则一律返回 null。
+             验证完成后随 demo 一起删除。 -->
+        <intent>
+            <action android:name="android.settings.APPLICATION_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.MANAGE_APPLICATIONS_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.MANAGE_ALL_APPLICATIONS_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.APPLICATION_DETAILS_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.MANAGE_DEFAULT_APPS_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.SETTINGS" />
+        </intent>
+        <package android:name="com.android.settings" />
+        <package android:name="com.coloros.settings" />
+        <package android:name="com.oplus.settings" />
     </queries>
 
     <!-- AndroidTV support -->
@@ -46,6 +71,15 @@
             android:value="false" />
         <meta-data
             android:name="google_analytics_default_allow_ad_personalization_signals"
+            android:value="false" />
+
+        <!-- 同意前不采集：进程启动时先关掉 Analytics 与 Crashlytics，
+             用户明确同意后由 AnalyticsTracker 在运行时重新开启。 -->
+        <meta-data
+            android:name="firebase_analytics_collection_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="firebase_crashlytics_collection_enabled"
             android:value="false" />
 
 

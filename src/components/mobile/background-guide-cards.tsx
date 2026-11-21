@@ -11,6 +11,26 @@ import { useI18n } from "@/lib/i18n";
 type Command = "open_autostart_settings" | "open_app_settings";
 
 /**
+ * 打开后台相关系统设置页。三步引导、漏提醒弹窗、通知体检共用这一条路径，
+ * 保证三处点「去设置」落到同一页，埋点口径也一致。
+ */
+export async function openBackgroundSetting(command: Command, source: string) {
+  track("settings_opened", {
+    target: command === "open_autostart_settings" ? "autostart" : "app_details",
+    source,
+  });
+  // 只有三步引导内的点击才算 guide_step_action；其它入口只记 settings_opened。
+  if (source.startsWith("guide")) {
+    track("guide_step_action", {
+      step: 2,
+      action:
+        command === "open_autostart_settings" ? "open_autostart" : "open_app_details",
+    });
+  }
+  await invoke(command);
+}
+
+/**
  * 两个后台开关的分步引导。
  *
  * 自启动和「完全后台行为」是两道独立的门、入口也常常不在同一页，所以分别
@@ -29,21 +49,9 @@ export function BackgroundGuideCards({
   const [pending, setPending] = useState<Command | null>(null);
 
   async function open(command: Command) {
-    track("settings_opened", {
-      target: command === "open_autostart_settings" ? "autostart" : "app_details",
-      source,
-    });
-    // 只有三步引导内的点击才算 guide_step_action；漏提醒弹窗只是复用同一套卡片。
-    if (source.startsWith("guide")) {
-      track("guide_step_action", {
-        step: 2,
-        action:
-          command === "open_autostart_settings" ? "open_autostart" : "open_app_details",
-      });
-    }
     setPending(command);
     try {
-      await invoke(command);
+      await openBackgroundSetting(command, source);
     } catch {
       toast.error(t("mobile.guide.background.openFailed"));
     } finally {

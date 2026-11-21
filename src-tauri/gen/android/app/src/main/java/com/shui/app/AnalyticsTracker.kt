@@ -36,6 +36,7 @@ object AnalyticsTracker {
     private const val PREFS = "shui_analytics"
 
     private const val KEY_ENABLED = "enabled"
+    private const val PLAY_STORE_PACKAGE = "com.android.vending"
     private const val KEY_LAST_SNAPSHOT = "last_permission_snapshot"
     private const val KEY_LAST_PERMISSION_SOURCE = "last_permission_source"
     private const val KEY_LAST_NOTIF_SHOWN_AT = "last_notification_shown_at"
@@ -53,7 +54,6 @@ object AnalyticsTracker {
     private const val C_FULLSCREEN_DRINK = "fullscreen_drink_count"
     private const val C_MANUAL_DRINK = "manual_drink_count"
     private const val C_DRINK_RECORDS = "drink_record_count"
-    private const val C_DRINK_ML = "drink_ml_total"
     private const val C_GOAL_DAYS = "goal_reached_days"
     private const val C_ACTIVE_DAYS = "active_days"
     private const val C_INSTALL_DAYS = "install_days"
@@ -99,8 +99,33 @@ object AnalyticsTracker {
         syncProperties(app)
     }
 
+    /**
+     * 默认值按安装渠道区分：Play 商店安装（AAB）默认关闭，需要用户主动开启；
+     * 侧载 APK 默认开启。用户手动切换后，以保存的值为准。
+     */
+    @Volatile
+    private var defaultEnabledCache: Boolean? = null
+
+    private fun defaultEnabled(context: Context): Boolean {
+        defaultEnabledCache?.let { return it }
+        val fromPlay = try {
+            val installer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                context.packageManager
+                    .getInstallSourceInfo(context.packageName)
+                    .installingPackageName
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getInstallerPackageName(context.packageName)
+            }
+            installer == PLAY_STORE_PACKAGE
+        } catch (_: Throwable) {
+            true
+        }
+        return (!fromPlay).also { defaultEnabledCache = it }
+    }
+
     fun isEnabled(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_ENABLED, true)
+        prefs(context).getBoolean(KEY_ENABLED, defaultEnabled(context))
 
     fun setEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
@@ -291,9 +316,6 @@ object AnalyticsTracker {
                 .put("trigger", trigger)
                 .put("channel_sound", channelSound)
                 .put("progress_bucket", progressBucket(total, goal))
-                .put("total_ml", total)
-                .put("goal_ml", goal)
-                .put("percent", percent(total, goal))
         )
         markNotificationShown(context)
     }
@@ -326,14 +348,26 @@ object AnalyticsTracker {
         )
     }
 
-    fun logGoalNotification(context: Context, total: Long, goal: Long, trigger: String) {
+    /** 用户主动划掉提醒通知（区别于点击内容、点按钮与 App 自己撤销）。 */
+    fun logNotificationDismissed(context: Context) {
+        logEvent(
+            context,
+            "notification_dismissed",
+            JSONObject().put(
+                "progress_bucket",
+                progressBucket(
+                    ReminderScheduler.todayAmount(context),
+                    ReminderScheduler.goalAmount(context)
+                )
+            )
+        )
+    }
+
+    fun logGoalNotification(context: Context, trigger: String) {
         logEvent(
             context,
             "goal_notification_shown",
-            JSONObject()
-                .put("total_ml", total)
-                .put("goal_ml", goal)
-                .put("trigger", trigger)
+            JSONObject().put("trigger", trigger)
         )
     }
 
@@ -359,9 +393,8 @@ object AnalyticsTracker {
             context,
             "notification_action_drink",
             JSONObject()
-                .put("amount", amount)
+                .put("amount_bucket", amountBucket(amount))
                 .put("source", "notification")
-                .put("today_total_after", after)
                 .put("progress_bucket", progressBucket(after, goal))
                 .put("goal_reached_after", goalReached)
         )
@@ -384,9 +417,8 @@ object AnalyticsTracker {
             context,
             "drink_recorded",
             JSONObject()
-                .put("amount", amount)
+                .put("amount_bucket", amountBucket(amount))
                 .put("source", source)
-                .put("today_total_after", todayTotalAfter)
                 .put("progress_bucket", progressBucket(todayTotalAfter, goal))
                 .put("goal_reached", goalReached)
                 .put("deferred", deferred)
@@ -397,8 +429,7 @@ object AnalyticsTracker {
                 context,
                 "drink_goal_reached",
                 JSONObject()
-                    .put("total_ml", todayTotalAfter)
-                    .put("goal_ml", goal)
+                    .put("progress_bucket", progressBucket(todayTotalAfter, goal))
                     .put("source", source)
             )
         }
@@ -436,9 +467,7 @@ object AnalyticsTracker {
             "fullscreen_reminder_shown" -> bump(context, C_FULLSCREEN_SHOWN)
             "fullscreen_drink_click" -> bump(context, C_FULLSCREEN_DRINK)
             "drink_recorded" -> {
-                val amount = params?.optLong("amount", 0L) ?: 0L
                 bump(context, C_DRINK_RECORDS)
-                bump(context, C_DRINK_ML, amount)
                 if (params?.optString("source") == "manual_today") bump(context, C_MANUAL_DRINK)
                 if (params?.optBoolean("goal_reached", false) == true) markGoalDay(context)
             }
@@ -498,8 +527,7 @@ object AnalyticsTracker {
             "notif_heads_up" to snapshot.headsUp.toString(),
             "domestic_rom" to snapshot.domestic.toString(),
             "rom_family" to snapshot.romFamily,
-            "reminder_gap_min" to snapshot.gapMinutes.toString(),
-            "goal_ml" to snapshot.goalMl.toString(),
+            "reminder_gap_bucket" to minutesBucket(snapshot.gapMinutes),
             "reminder_mode" to snapshot.reminderMode,
             "guide_status" to (p.getString(KEY_GUIDE_STATUS, "not_shown") ?: "not_shown"),
             "app_env" to if (BuildConfig.DEBUG) "debug" else "release",
@@ -510,7 +538,6 @@ object AnalyticsTracker {
             C_FULLSCREEN_DRINK to p.getLong(C_FULLSCREEN_DRINK, 0L).toString(),
             C_MANUAL_DRINK to p.getLong(C_MANUAL_DRINK, 0L).toString(),
             C_DRINK_RECORDS to p.getLong(C_DRINK_RECORDS, 0L).toString(),
-            C_DRINK_ML to p.getLong(C_DRINK_ML, 0L).toString(),
             C_GOAL_DAYS to p.getLong(C_GOAL_DAYS, 0L).toString(),
             C_ACTIVE_DAYS to p.getLong(C_ACTIVE_DAYS, 1L).toString(),
             C_INSTALL_DAYS to p.getLong(C_INSTALL_DAYS, 1L).toString()
@@ -592,9 +619,19 @@ object AnalyticsTracker {
         1L
     }
 
-    private fun percent(total: Long, goal: Long): Int {
-        if (goal <= 0) return 0
-        return (total * 100 / goal).coerceIn(0L, 100L).toInt()
+    private fun amountBucket(amount: Long): String = when {
+        amount <= 100 -> "le_100"
+        amount <= 200 -> "le_200"
+        amount <= 300 -> "le_300"
+        else -> "gt_300"
+    }
+
+    private fun minutesBucket(minutes: Long): String = when {
+        minutes <= 15 -> "le_15"
+        minutes <= 60 -> "15_60"
+        minutes <= 6 * 60 -> "1_6h"
+        minutes <= 24 * 60 -> "6_24h"
+        else -> "gt_24h"
     }
 
     private fun progressBucket(total: Long, goal: Long): String {

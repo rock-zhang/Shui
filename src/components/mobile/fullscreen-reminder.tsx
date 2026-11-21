@@ -16,7 +16,7 @@ import {
 } from "@/lib/drink-day";
 import { getLocalDateKey } from "@/lib/drink-history";
 import { emitNextReminder, notifyGoalReached } from "@/lib/mobile";
-import { progressBucket, track, trackDrinkRecorded } from "@/lib/analytics";
+import { amountBucket, progressBucket, track, trackDrinkRecorded } from "@/lib/analytics";
 import type { ReminderTrigger } from "./mobile-app";
 
 /** Same 15-layer rainbow backdrop as the desktop reminder, scoped to this card. */
@@ -174,8 +174,6 @@ export function FullscreenReminder({
           track("fullscreen_reminder_shown", {
             trigger,
             progress_bucket: progressBucket(total, goal),
-            total_ml: total,
-            goal_ml: goal,
           });
         }
       } catch {
@@ -192,7 +190,7 @@ export function FullscreenReminder({
     busy.current = true;
     setSaving(true);
     setError(null);
-    track("fullscreen_drink_click", { amount, source: "fullscreen" });
+    track("fullscreen_drink_click", { amount_bucket: amountBucket(amount), source: "fullscreen" });
     try {
       const receipt = session
         ? await invoke<DrinkReceipt>("record_reminder_drink", {

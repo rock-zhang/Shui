@@ -20,7 +20,7 @@ import { currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 import { STORE_NAME } from "@/lib/constants";
 import { usePlatform } from "@/hooks/use-platform";
 import { normalizeDrinkDay, type DrinkHistoryValue, type DrinkReceipt } from "@/lib/drink-day";
-import { progressBucket, track, trackDrinkRecorded } from "@/lib/analytics";
+import { amountBucket, progressBucket, track, trackDrinkRecorded } from "@/lib/analytics";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 
 async function hideWindowAction(outcome: "confirmed" | "skipped" = "confirmed", expectedSession?: string) {
@@ -209,8 +209,6 @@ export default function ReminderPage() {
         track("fullscreen_reminder_shown", {
           trigger: "desktop",
           progress_bucket: progressBucket(total, goal),
-          total_ml: total,
-          goal_ml: goal,
         });
       }
     };
@@ -224,7 +222,7 @@ export default function ReminderPage() {
     if (saving.current) return;
     saving.current = true;
     setSaveError(null);
-    track("fullscreen_drink_click", { amount: ml, source: "fullscreen" });
+    track("fullscreen_drink_click", { amount_bucket: amountBucket(ml), source: "fullscreen" });
     try {
       // Refresh on click: a reused window can still hold the previous session
       // before the first countdown event of its next presentation arrives.

@@ -460,7 +460,7 @@ pub fn analytics_sync_properties(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn analytics_is_enabled(app: tauri::AppHandle) -> Result<bool, String> {
     native::<Value>(&app, "analyticsIsEnabled", json!({}))
-        .map(|value| value.get("enabled").and_then(Value::as_bool).unwrap_or(true))
+        .map(|value| value.get("enabled").and_then(Value::as_bool).unwrap_or(false))
 }
 
 #[tauri::command]
@@ -577,17 +577,33 @@ pub fn open_notification_channel_settings(app: tauri::AppHandle) -> Result<(), S
     native::<Value>(&app, "openNotificationChannelSettings", json!({})).map(|_| ())
 }
 
-/// 直达系统设置 →「应用」页；打不开时原生侧回退到应用详情。
+/// 引导用户打开自启动：原生侧按品牌依次尝试厂商私有自启动页、系统「应用」页，
+/// 都打不开时回退到本应用详情页，保证任何 ROM 上都有可操作的落点。
 #[tauri::command]
 pub fn open_autostart_settings(app: tauri::AppHandle) -> Result<(), String> {
     native::<Value>(&app, "openAutoStartSettings", json!({})).map(|_| ())
 }
 
-/// 【临时跳转验证 demo】按 target 打开某个「设置-应用」候选页面，
-/// 用于真机确认各入口实际落地页。验证完成后随 demo 一起移除。
+/// 【临时跳转验证 demo】按 target（或显式 component）打开某个「设置-应用」候选页面，
+/// 用于真机确认各入口实际落地页；返回实际解析到的组件名。验证完成后随 demo 一起移除。
 #[tauri::command]
-pub fn open_settings_probe(app: tauri::AppHandle, target: String) -> Result<(), String> {
-    native::<Value>(&app, "openSettingsProbe", json!({ "target": target })).map(|_| ())
+pub fn open_settings_probe(
+    app: tauri::AppHandle,
+    target: String,
+    component: Option<String>,
+) -> Result<Value, String> {
+    native::<Value>(
+        &app,
+        "openSettingsProbe",
+        json!({ "target": target, "component": component.unwrap_or_default() }),
+    )
+}
+
+/// 【临时跳转验证 demo】列出本机设置包里与应用/自启动相关的 Activity，
+/// 供前端逐个试跳定位真正的「设置 → 应用」主页。验证完成后随 demo 一起移除。
+#[tauri::command]
+pub fn list_settings_activities(app: tauri::AppHandle) -> Result<Value, String> {
+    native::<Value>(&app, "listSettingsActivities", json!({}))
 }
 
 /// 真机诊断快照：一次返回所有决定提醒能否准时到达的原生状态。

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { DatabaseBackup, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useI18n, type MessageKey } from "@/lib/i18n";
+import { track } from "@/lib/analytics";
 import {
   backupError, confirmDrinkImport, exportDrinkBackup, formatBackupDate,
   previewDrinkImport, type ImportPreview,
@@ -34,12 +35,26 @@ export default function DataPage() {
     setPreview(null);
     const selected = await previewDrinkImport();
     setPreview(selected);
-    if (!selected) setNotice({ key: "settings.data.import.canceled" });
+    if (selected) {
+      track("backup_import_preview", {
+        days: selected.days,
+        new_days: selected.newDays,
+        skipped_days: selected.skippedDays,
+      });
+    } else {
+      setNotice({ key: "settings.data.import.canceled" });
+    }
   });
 
   const confirm = () => run(async () => {
     if (!preview) return;
     const receipt = await confirmDrinkImport(preview.token);
+    track("backup_import_confirm", {
+      imported_days: receipt.importedDays,
+      imported_amount: receipt.importedAmount,
+      skipped_days: receipt.skippedDays,
+      already_imported: receipt.alreadyImported,
+    });
     setPreview(null);
     setNotice({
       key: receipt.alreadyImported
@@ -62,6 +77,7 @@ export default function DataPage() {
       <p className="mb-3 text-xs leading-5 text-muted-foreground">{t("settings.data.backup.description")}</p>
       <Button variant="outline" size="sm" disabled={busy} onClick={() => run(async () => {
         const path = await exportDrinkBackup();
+        track("backup_export", { result: path ? "success" : "canceled" });
         setNotice({
           key: path ? "settings.data.backup.saved" : "settings.data.backup.canceled",
         });
@@ -86,7 +102,7 @@ export default function DataPage() {
         <p className="my-3 text-xs leading-5 text-muted-foreground">{t("settings.data.import.confirmNote")}</p>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" disabled={busy || preview.newDays === 0} onClick={confirm}>{busy ? t("settings.data.import.importing") : t("settings.data.import.confirm")}</Button>
-          <Button size="sm" variant="ghost" disabled={busy} onClick={() => { setPreview(null); setError(""); setNotice({ key: "settings.data.import.canceledNotice" }); }}>{t("common.cancel")}</Button>
+          <Button size="sm" variant="ghost" disabled={busy} onClick={() => { track("backup_import_cancel"); setPreview(null); setError(""); setNotice({ key: "settings.data.import.canceledNotice" }); }}>{t("common.cancel")}</Button>
         </div>
         {preview.newDays === 0 && <p className="mt-2 text-xs text-muted-foreground">{t("settings.data.import.allExist")}</p>}
       </div>}

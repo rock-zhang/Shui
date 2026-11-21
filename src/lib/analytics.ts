@@ -77,15 +77,15 @@ export function screenView(
 
 /**
  * 喝水记录统一入口：只有真正新增时上报；幂等命中走 duplicate 事件。
- * 来源区分 manual_today / fullscreen / notification。
+ * 来源区分 manual_today / tray / fullscreen / notification。
  */
 export function trackDrinkRecorded(
   receipt: { total: number; goal: number; goalReached: boolean; added: boolean },
   amount: number,
-  source: "manual_today" | "fullscreen" | "notification"
+  source: "manual_today" | "tray" | "fullscreen" | "notification"
 ): void {
   if (!receipt.added) {
-    track("drink_duplicate_ignored", { source, amount });
+    track("drink_duplicate_ignored", { source, amount_bucket: amountBucket(amount) });
     return;
   }
   const justReached =
@@ -93,20 +93,26 @@ export function trackDrinkRecorded(
     receipt.goal > 0 &&
     receipt.total - amount < receipt.goal;
   track("drink_recorded", {
-    amount,
+    amount_bucket: amountBucket(amount),
     source,
-    today_total_after: receipt.total,
     progress_bucket: progressBucket(receipt.total, receipt.goal),
     goal_reached: receipt.goalReached,
     deferred: false,
   });
   if (justReached) {
     track("drink_goal_reached", {
-      total_ml: receipt.total,
-      goal_ml: receipt.goal,
+      progress_bucket: progressBucket(receipt.total, receipt.goal),
       source,
     });
   }
+}
+
+/** 水量分桶：精确毫升数只留在本机，分析平台只看到区间。 */
+export function amountBucket(amount: number): string {
+  if (amount <= 100) return "le_100";
+  if (amount <= 200) return "le_200";
+  if (amount <= 300) return "le_300";
+  return "gt_300";
 }
 
 export function progressBucket(total: number, goal: number): string {
@@ -134,11 +140,11 @@ export function syncAnalyticsProperties(): void {
 }
 
 export async function isAnalyticsEnabled(): Promise<boolean> {
-  if (!canTrack()) return true;
+  if (!canTrack()) return false;
   try {
     return await invoke<boolean>("analytics_is_enabled");
   } catch {
-    return true;
+    return false;
   }
 }
 

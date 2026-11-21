@@ -10,6 +10,7 @@ import { useUpdaterCheck, useUpdaterDownload } from "@/hooks/use-updater";
 import { useUpdate } from "@/components/update-provider";
 import { useI18n } from "@/lib/i18n";
 import { isSideloadBuild } from "@/lib/mobile";
+import { track } from "@/lib/analytics";
 
 export default function About() {
   const { t } = useI18n();
@@ -37,17 +38,25 @@ export default function About() {
 
   const openGithub = async () => {
     await openUrl("https://github.com/rock-zhang/Shui");
+    track("external_link_open", { target: "github" });
   };
 
   const handleCopyAppInfo = async () => {
-    const appInfo = await invoke("get_app_runtime_info");
-    await writeText(JSON.stringify(appInfo));
-    toast.success(t("settings.about.copySuccess"));
+    try {
+      const appInfo = await invoke("get_app_runtime_info");
+      await writeText(JSON.stringify(appInfo));
+      track("app_info_copy", { success: true });
+      toast.success(t("settings.about.copySuccess"));
+    } catch (error) {
+      console.error("复制应用信息失败:", error);
+      track("app_info_copy", { success: false });
+    }
   };
 
   const handleCheck = async () => {
     // checkForUpdate 内部已经负责「发现新版本 / 已是最新 / 检查失败」三种
     // 提示，这里再补一条就是连续两条重复 toast。
+    track("update_check");
     await checkForUpdate();
   };
 
@@ -112,7 +121,13 @@ export default function About() {
             </Button>
           )}
           {canSelfUpdate && updateAvailable && (
-            <Button onClick={downloadAndInstall} disabled={installing}>
+            <Button
+              onClick={() => {
+                track("update_install");
+                void downloadAndInstall();
+              }}
+              disabled={installing}
+            >
               {installing
                 ? t("settings.about.installing", { progress })
                 : t("settings.about.updateNow")}

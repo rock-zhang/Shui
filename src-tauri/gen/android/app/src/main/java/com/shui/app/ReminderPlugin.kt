@@ -31,6 +31,7 @@ import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
@@ -430,55 +431,138 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     /**
-     * 「允许自启动」的入口：直接进系统设置 →「应用」页。
+     * 「允许自启动」的入口：把用户送到离自启动开关最近的一页。
      *
-     * 曾经这里按品牌逐个试探厂商私有的自启动管理页，但这些 Activity 在不同
-     * ROM / 版本上经常改名或迁移到别的包，命中率低，还会落在与本机不符的
-     * 页面上。厂商开关本来就无法读写，统一落到系统「设置 > 应用」列表，
-     * 用户按卡片里的路径自己找到 Shui 更稳。系统页打不开时退回应用详情。
-     *
-     * 不用 resolveActivity 预判：Android 11+ 的包可见性限制会让它误判成
-     * 「不存在」。直接 startActivity 并捕获异常更可靠。
+     * 厂商的自启动开关应用既读不到也改不了，这里唯一的职责是「带路」。
+     * 顺序是：本品牌的私有自启动 / 启动管理页 → 系统「应用」列表 → 本应用详情页。
+     * 私有页面在不同 ROM / 版本上会改名或迁移，标准 action 在 ColorOS 这类
+     * 深度定制 ROM 上也会被重映射，所以逐个尝试、打不开就换下一个，
+     * 保证任何品牌最终都能落到一个可操作的页面，而不是点了没反应。
      */
     @Suppress("UNUSED_PARAMETER")
     @Command
     fun openAutoStartSettings(invoke: Invoke) {
-        // 两个动作都指向系统的「应用」页（含应用列表），不同 ROM 支持的入口
-        // 不完全一致：MANAGE_APPLICATIONS_SETTINGS 最标准，个别 ROM 只认
-        // MANAGE_ALL_APPLICATIONS_SETTINGS。都不行才退回应用详情。
-        val intents = listOf(
-            Intent(Settings.ACTION_APPLICATION_SETTINGS),
-            Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS),
-            Intent(Settings.ACTION_MANAGE_ALL_APPLICATIONS_SETTINGS)
-        )
-        for (intent in intents) {
+        for (intent in autoStartIntents()) {
             try {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 activity.startActivity(intent)
-                Log.i(ReminderScheduler.TAG, "已打开系统应用设置页：${intent.action}")
                 invoke.resolve()
                 return
             } catch (_: Exception) {
-                // 该机型没有这个系统页，继续试下一个。
+                // 该页面在这台机器上不存在或不可导出，继续试下一个。
             }
         }
         if (!startApplicationDetails()) {
-            invoke.reject("无法打开系统应用设置页，请手动进入系统设置 → 应用")
+            invoke.reject("无法打开自启动设置，请手动进入系统设置 → 应用")
             return
         }
-        Log.i(ReminderScheduler.TAG, "系统应用设置页不可用，已退回应用详情页")
         invoke.resolve()
     }
 
     /**
+     * 按品牌给出自启动候选页：厂商私有页在前，系统应用列表在后。
+     * 品牌识别只用作「先试哪个」，识别错也只是多试两次，不影响兜底。
+     */
+    private fun autoStartIntents(): List<Intent> {
+        val text = "${Build.MANUFACTURER} ${Build.BRAND}".lowercase()
+        val vendorPages = when {
+            // ColorOS / realme UI / OxygenOS：自启动管理在手机管家的私有页面。
+            Regex("oppo|realme|oneplus|oplus|coloros").containsMatchIn(text) -> listOf(
+                componentIntent(
+                    "com.coloros.safecenter",
+                    "com.coloros.safecenter.permission.startup.StartupManagerActivity"
+                ),
+                componentIntent(
+                    "com.coloros.safecenter",
+                    "com.coloros.safecenter.startupapp.StartupAppListActivity"
+                ),
+                componentIntent(
+                    "com.oplus.safecenter",
+                    "com.oplus.safecenter.permission.startup.StartupManagerActivity"
+                ),
+                componentIntent(
+                    "com.oplus.safecenter",
+                    "com.oplus.safecenter.startupapp.StartupAppListActivity"
+                ),
+                componentIntent(
+                    "com.oppo.safe",
+                    "com.oppo.safe.permission.startup.StartupManagerActivity"
+                )
+            )
+            // MIUI / HyperOS：手机管家 → 自启动管理。
+            Regex("xiaomi|redmi|poco|miui|hyperos").containsMatchIn(text) -> listOf(
+                componentIntent(
+                    "com.miui.securitycenter",
+                    "com.miui.permcenter.autostart.AutoStartManagementActivity"
+                )
+            )
+            // EMUI / MagicOS：应用启动管理。
+            Regex("huawei|honor").containsMatchIn(text) -> listOf(
+                componentIntent(
+                    "com.huawei.systemmanager",
+                    "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"
+                ),
+                componentIntent(
+                    "com.hihonor.systemmanager",
+                    "com.hihonor.systemmanager.startupmgr.ui.StartupNormalAppListActivity"
+                )
+            )
+            // Funtouch / OriginOS：i管家 → 后台启动管理。
+            Regex("vivo|iqoo").containsMatchIn(text) -> listOf(
+                componentIntent(
+                    "com.vivo.permissionmanager",
+                    "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"
+                ),
+                componentIntent(
+                    "com.iqoo.secure",
+                    "com.iqoo.secure.ui.phoneoptimize.BgStartUpManager"
+                )
+            )
+            // One UI：电池 → 后台使用限制（休眠应用 / 深度休眠应用）。
+            Regex("samsung").containsMatchIn(text) -> listOf(
+                componentIntent(
+                    "com.samsung.android.lool",
+                    "com.samsung.android.sm.ui.battery.BatteryActivity"
+                )
+            )
+            else -> emptyList()
+        }
+        // 私有页都不存在时（Pixel / 摩托 / 诺基亚等原生系统直接从这里开始），
+        // 落到系统「应用」列表，用户点进 Shui 自己找开关。
+        return vendorPages + listOf(
+            Intent(Settings.ACTION_APPLICATION_SETTINGS),
+            Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS),
+            Intent(Settings.ACTION_MANAGE_ALL_APPLICATIONS_SETTINGS)
+        )
+    }
+
+    private fun componentIntent(pkg: String, cls: String): Intent =
+        Intent().setComponent(ComponentName(pkg, cls))
+
+    /**
      * 【临时跳转验证 demo】按 target 逐一打开「设置-应用」相关的候选页面，
      * 用于在真机上确认每个 action / 私有入口实际落到哪一页。验证完成后整体移除。
+     *
+     * 真机实测各标准 action 在 ColorOS 上都被重映射，所以这里额外做两件事：
+     *  1. 打开后把 resolveActivity 解析到的组件名回传，前端 toast 直接显示
+     *     「action → 实际处理者」，不用再靠肉眼猜落地页；
+     *  2. 支持传 component（package/class）直接打开扫描出来的候选页，
+     *     配合 listSettingsActivities 在本机定位真正的「设置 → 应用」页。
      * 失败时把异常类名和消息 reject 回前端，toast 能直接显示打不开的原因。
      */
     @Command
     fun openSettingsProbe(invoke: Invoke) {
-        val target = invoke.getArgs().optString("target", "")
-        val intent: Intent = when (target) {
+        val args = invoke.getArgs()
+        val target = args.optString("target", "")
+        val component = args.optString("component", "")
+        val intent: Intent = if (component.isNotEmpty()) {
+            val parts = component.split("/", limit = 2)
+            if (parts.size != 2) {
+                invoke.reject("component 格式应为 package/class：$component")
+                return
+            }
+            Intent().setComponent(ComponentName(parts[0], parts[1]))
+        } else when (target) {
             // ── 系统公开 action ──
             "application_settings" -> Intent(Settings.ACTION_APPLICATION_SETTINGS)
             "manage_applications" -> Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS)
@@ -487,6 +571,7 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
                 data = Uri.parse("package:${activity.packageName}")
             }
             "default_apps" -> Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+            "settings_root" -> Intent(Settings.ACTION_SETTINGS)
             // ── ColorOS / OPPO 私有入口（不存在时抛 ActivityNotFoundException）──
             "coloros_safecenter" -> Intent().setComponent(
                 ComponentName(
@@ -500,10 +585,22 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
                     "com.coloros.safecenter.startup.StartupManagerActivity"
                 )
             )
+            "coloros_startup_app" -> Intent().setComponent(
+                ComponentName(
+                    "com.coloros.safecenter",
+                    "com.coloros.safecenter.startupapp.StartupAppListActivity"
+                )
+            )
             "oplus_safecenter" -> Intent().setComponent(
                 ComponentName(
                     "com.oplus.safecenter",
                     "com.oplus.safecenter.permission.startup.StartupManagerActivity"
+                )
+            )
+            "oplus_startup_app" -> Intent().setComponent(
+                ComponentName(
+                    "com.oplus.safecenter",
+                    "com.oplus.safecenter.startupapp.StartupAppListActivity"
                 )
             )
             "oppo_safe" -> Intent().setComponent(
@@ -518,12 +615,55 @@ class ReminderPlugin(private val activity: Activity) : Plugin(activity) {
             }
         }
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        // resolveActivity 受 Android 11+ 包可见性限制，manifest 的 queries 里已为
+        // 这些 action 显式声明，否则这里会一律返回 null。
+        val handler = if (component.isNotEmpty()) {
+            component
+        } else {
+            intent.resolveActivity(activity.packageManager)?.flattenToShortString()
+                ?: "未解析到处理者"
+        }
         try {
             activity.startActivity(intent)
-            invoke.resolve()
+            invoke.resolve(JSObject().apply { put("handler", handler) })
         } catch (error: Exception) {
             invoke.reject("$target 打不开：${error.javaClass.simpleName}: ${error.message}")
         }
+    }
+
+    /**
+     * 【临时跳转验证 demo】把本机设置包里名字与应用/自启动相关的 Activity 全列出来，
+     * 供前端逐个试跳，从而找到真正的「设置 → 应用」主页（ColorOS 上标准 action
+     * 都被重映射，只能按真机实际情况定位）。验证完成后整体移除。
+     */
+    @Suppress("UNUSED_PARAMETER")
+    @Command
+    fun listSettingsActivities(invoke: Invoke) {
+        val pm = activity.packageManager
+        val keywords = Regex("(?i)(standby|app|application|manage|startup|autostart|launch)")
+        val items = JSONArray()
+        // ColorOS 各版本设置包名不统一，逐个尝试，不存在就跳过。
+        val packages = listOf("com.android.settings", "com.coloros.settings", "com.oplus.settings")
+        for (pkg in packages) {
+            val info = try {
+                pm.getPackageInfo(pkg, PackageManager.GET_ACTIVITIES)
+            } catch (_: Exception) {
+                null
+            } ?: continue
+            info.activities?.forEach { entry ->
+                if (!keywords.containsMatchIn(entry.name)) return@forEach
+                items.put(JSObject().apply {
+                    put("component", "$pkg/${entry.name}")
+                    put("exported", entry.exported)
+                    put("label", try {
+                        entry.loadLabel(pm).toString()
+                    } catch (_: Exception) {
+                        entry.name
+                    })
+                })
+            }
+        }
+        invoke.resolve(JSObject().apply { put("items", items) })
     }
 
     private fun startApplicationDetails(): Boolean {
