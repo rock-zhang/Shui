@@ -1,6 +1,6 @@
 # 产品 TODO（按模块分类）
 
-> 最近更新：2026-11-20。补充官网优化（P1）；2026-11-19 整合原有产品评估结论与当日补充的 Android 端 6 条待办。
+> 最近更新：2026-11-21。1.2 中英双语确认完成（更多语言转为 P2 结构改造项）；1.1 首次启动引导、1.3 禁止横屏的真机验收已通过，两项关闭；2026-11-20 补充官网优化（P1）；2026-11-21 补充 1.8 Play 包应用内更新（P2）；2026-11-21 补充 1.2.2 英文版收尾（P1）与 i18n 方案重构。
 > 2026-11-20 已对照代码库逐项复查：未勾选项除第 9 节 `gradle.properties` 外均确认尚未实现（快捷水量仍硬编码 50/100/200/300、通知无「稍后」Action、无 streak/同步/备份提示/反馈 mailto 等），优先级排序不变。
 > 相关文档：[安卓桌面小组件设计](./android-widget-todo.md)、[Google Play 上架材料](./play-store/listing.md)、[发布流程](./release.md)
 > 使用方式：完成一项勾一项；P0 未清空前不发版。
@@ -17,14 +17,15 @@
 
 | 优先级 | 模块 | 事项 |
 | --- | --- | --- |
-| P0 | Android | 首次启动个性化引导 |
-| P0 | 通用 | 多语言适配（排在首次引导之后开发） |
-| P0 | Android | 禁止横屏（小改动，随时可插） |
+| P0 | Android | 首次启动个性化引导（真机验收已完成） |
+| P0 | 通用 | 多语言适配（中英已完成；英文收尾见 1.2.2；更多语言见 1.2.1） |
+| P0 | Android | 禁止横屏（真机回归已完成） |
 | P1 | Android | 桌面小组件、通知「稍后提醒」、自定义杯量 |
 | P1 | 跨端 | 多端联动（配置共享 / 提醒共享） |
 | P1 | 留存 | 连续达标天数（streak）+ 里程碑 |
 | P1 | 增长 | 官网优化（真实下载入口、英文版、隐私页） |
 | P2 | 差异化 | AI 个性化建议、规则版目标推荐、周报洞察、Health Connect |
+| P2 | Android | Play 包应用内更新（In-App Updates，见 1.8） |
 | P2 | 通用 | 数据备份提示（优先级下调，见 3.1） |
 
 **建议执行顺序**：禁止横屏 → 首次启动个性化引导 → 多语言适配 → 桌面小组件 → 留存功能 → 跨端联动。
@@ -43,11 +44,11 @@
   - [x] `ui.tsx` 的 `MobileSection` / `MobileTimeInput` 支持 `tourId`，`reminder-tab.tsx` 挂上 5 个锚点。
   - [x] `mobile-app.tsx` 接入引导；完成或连按三次跳过后才挂载通知三步引导，避免两个浮层抢首屏。
   - [x] `tests/onboarding.test.cjs`：步骤顺序、最后一步不越界、气泡上下翻转与横向夹取。
-  - [ ] 真机验收（见下方验收项）。
+  - [x] 真机验收（见下方验收项）。
 - **注意**：通知三步引导已有版本号与「只自动弹一次」逻辑，本次通过条件挂载复用，未改其内部；配置保存完全复用 `patchAlert`，点击即生效并自动重排。
 - **验收**：全新安装后能从高亮目标完成 5 步配置；每步点击后高亮自动移动且滚动到位；完成后才出现通知三步引导；第二次启动直接进今日页；连续 3 次跳过后不再自动弹且放行通知引导。
 
-### 1.2 多语言适配（P0，排在 1.1 之后）
+### 1.2 多语言适配（中英已完成；更多语言见文末「后续扩展」）
 
 > 排期说明：先在 1.1 把首次启动流程跑通，再接 i18n，避免词典键随引导改版反复返工；它仍是上架阻塞项，不能拖到发版前。
 
@@ -63,15 +64,45 @@
   - [x] Rust：托盘状态、桌面通知标题与按钮、文件对话框、提醒文案池；偏好从 config store 读取，`store://change` 事件实时刷新，切换语言无需重启。
   - [x] Kotlin：通知渠道名/描述（locale 变化时幂等重建，不覆盖用户设置）、提醒标题/正文、水量按钮、达标通知、文案池；偏好直接读 config_store.json。
 - **现状**：全端中英双语已打通。前端词典约 1100 键（中英对齐由 `satisfies` 保证）；原生侧通过各自 localization 模块按同一套 `zh* → 中文 / 其余 → 英文` 规则取词；桌面托盘菜单在语言切换后重建。
-- **验收补充**：`npx tsc --noEmit`、`node --test tests/*.test.cjs`（52 项）、`cargo test --lib` 均通过。真机待验：切到英文后杀进程重进，通知渠道名已变英文且横幅/声音设置未被重置。
+- **验收补充**：`npx tsc --noEmit`、`node --test tests/*.test.cjs`（52 项）、`cargo test --lib` 均通过。真机已验证：切到英文后杀进程重进，通知渠道名已变英文且横幅/声音设置未被重置。
 - **注意**：首帧固定 zh-CN 再在挂载后切到偏好，避免静态导出 hydration 不一致；桌面主窗口启动时隐藏、移动端先渲染骨架，因此没有可见闪烁。
+
+#### 1.2.1 后续扩展更多语言（P2，需先做结构改造）
+
+- **前提**：当前是按「中英两套」硬编码的，`Locale = "zh-CN" | "en-US"`，加第三种语言前要先去掉这两值假设。
+- **待办**：
+  - [ ] `src/lib/i18n/locales.ts`：`Locale` 改为从语言清单常量推导，`isLocale` / `localeFromLanguageTag` 改为匹配表（含 `pt-BR`、`es-ES`、`id-ID` 这类区域化标签），并保留「无匹配落 en-US」兜底。
+  - [ ] `src/lib/i18n/messages.ts`：新增词典，`satisfies` 会强制与新键对齐；缺失键的回落链（当前是 `dict[key] ?? zh-CN[key] ?? key`）需确认新语言的兜底目标是 en 还是 zh。
+  - [ ] `src/lib/rom.ts`：各品牌设置路径现在只有 `zh-CN` / `en-US` 两个键，需按新语言补齐，或改为「en-US 兜底 + 逐语言覆写」，避免每加一种语言就翻倍维护。
+  - [ ] 语言选择器（桌面 设置 → 通用、移动 我的 → 语言）：目前固定三档，改为按语言清单生成。
+  - [ ] Rust 原生：托盘菜单、桌面通知标题/按钮、文件对话框、提醒文案池的 `zh* / 其余` 判定，改成同一份清单。
+  - [ ] Kotlin 原生：通知渠道名/描述、提醒标题/正文、水量按钮、达标通知、文案池的语言分支。
+  - [ ] 首帧策略：`system` 模式下若探测到新语言，仍要保持静态导出 hydration 一致（当前固定 zh-CN 再切）。
+  - [ ] 测试：`tests/i18n.test.cjs` 增加新语言的键对齐与标签归一化用例。
+- **顺序建议**：先按商店主要市场确认目标语言（见「待决策」），再由英文版派生翻译；不要一次性铺开，先把「清单化」改造做完，之后加语言只加词典 + 路径。
+
+#### 1.2.2 英文版收尾：原生 / 安装器 / 内容层（P1）
+
+> 背景：UI 层中英双语已完成并关闭了 1.2，但「英文用户从下载到日常使用全程看到英文」还不够。以下为 2026-11-21 复盘结论。
+
+- **待办**：
+  - [ ] Kotlin 原生报错收口：`ReminderPlugin.kt` 里自启动、通知权限、侧载更新等 `invoke.reject("中文…")` 仍硬编码中文（455、628、652、670、689、706、711 行等），目前只有分享标题走了 `AppLocale.isEnglish`。结果是英文界面下 Toast 标题英文、详情中文。
+  - [ ] 桌面更新失败详情：`update-provider.tsx` 的 `description` 直接透传 `error.message`，需按错误类型（网络 / 404 / 验签）映射成词典文案。
+  - [ ] 安装器与系统集成：NSIS 未配置 `languages`，安装向导只有英文；卸载项显示名、Windows 通知的应用名也未本地化。
+  - [ ] 默认值：默认白名单是「腾讯会议 / Zoom」这类中文窗口标题，英文用户既看不懂，也可能匹配不到真实进程名，应按语言给不同默认。
+  - [ ] 内容层：官网 `website/index.html` 仍是 `lang="zh-CN"` 单语；Release notes 跟随 commit 语言；README 默认中文。
+- **更合理的 i18n 方案（建议加第三种语言前一并做）**：
+  - [ ] 单一词典源：把 `src/lib/i18n/messages.ts` 抽成 JSON，前端、Rust、Kotlin 在构建期读同一份，消除「前端约 1100 键 + 原生另写一套」的双份真相。
+  - [ ] 原生只返回错误码：Rust / Kotlin 的 `reject` 改为 `{ code, params }`，文案由前端词典渲染；通知、托盘、安装器这类系统级文案在构建期把同一份词典编译进原生资源。
+  - [ ] 防回退门禁：CI 增加检查——除白名单文件外，`src-tauri/src` 与 Android 源码中不得出现中文文案字面量。
+  - [ ] 验收：切英文后走「安装 → 首次引导 → 触发一次权限失败 → 检查更新失败」，全程不出现中文。
 
 ### 1.3 禁止横屏（P0，小改动）
 
 - **待办**：
   - [x] `MainActivity` 增加 `android:screenOrientation="portrait"`；同时在 `<application>` 声明 `PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY`，避免 targetSdk 36 在 ≥600dp 大屏上忽略方向锁定。
-  - [ ] 回归：旋转设备不触发界面重建 / 数据丢失；全屏提醒页与通知 Action 行为不变。
-- **现状**：已完成方向锁定；剩真机旋转回归。
+  - [x] 回归：旋转设备不触发界面重建 / 数据丢失；全屏提醒页与通知 Action 行为不变。
+- **现状**：方向锁定与真机旋转回归均已完成。
 - **验收**：手机与平板旋转后界面保持竖屏，无闪烁或重新加载。
 
 ### 1.4 桌面小组件（P1，留存最高优先）
@@ -105,6 +136,21 @@
   - [ ] 允许在设置里增删改快捷水量（2–4 个），首页、通知栏 Action、桌面小组件共用同一份配置。
 - **现状**：首页固定 50 / 100 / 200 / 300 ml，350 / 500 ml 的常见杯子记不准，用户就不记了。
 - **验收**：改配置后首页、通知、小组件三处水量一致。
+
+### 1.8 Play 包应用内更新提示（P2）
+
+- **现状**：Play AAB 包整条自更新链路被关掉——`canSelfUpdate()` 为 false，`useUpdate()` 的 `available` 恒为 false，tab 红点、版本行「新版本 x.y.z」、立即更新按钮都不会出现；应用内只剩「关于」里一行跳 Play 商品页的静态入口，真正提醒完全依赖 Play Store 自动更新与商店角标。
+- **方案**：接入 Google 官方 In-App Updates（`com.google.android.play:app-update`，即 Play Core）。这是 Google 允许的唯一应用内更新方式，不要自己抓 Play 页面，也不要复用 `android-latest.json`（Play 包既无安装权限，也不会去装侧载 APK）。
+- **待办**：
+  - [ ] `build.gradle.kts` 增加 `com.google.android.play:app-update` 依赖，仅 Play 变体引用（侧载包不需要）。
+  - [ ] 新增 Kotlin 插件（如 `PlayUpdatePlugin`，只在 play 变体编译）：`AppUpdateManagerFactory.create(...)` 后读 `appUpdateInfo.updateAvailability == UpdateAvailability.UPDATE_AVAILABLE`，返回 `available / versionCode / updatePriority / isImmediate`。
+  - [ ] Rust 桥接命令（与 sideload 命令并列，按 Play 变体门控），供前端 invoke；Kotlin 侧同样走后台线程 + 主线程 resolve，避免死锁。
+  - [ ] `UpdateProvider`：Play 包改用新命令驱动 `available`，复用现有红点与 `seen` 缓存；因为拿不到 versionName，文案改为「有新版本」或直接展示 Play 返回的 versionCode，不要继续用 `versionGt` 比对版本字符串。
+  - [ ] 「立即更新」走 `startUpdateFlow`：immediate 用全屏覆盖流程，flexible 在下载完成后调 `completeUpdate`；用户取消（`RESULT_CANCELED`）时静默回到原界面，不弹错误。
+  - [ ] 兜底：Play 服务不可用或非 Play 安装（`UPDATE_NOT_AVAILABLE` / `API_UNAVAILABLE`）时，保留现有「前往应用商店」入口。
+  - [ ] 埋点：`update_check` / `update_install` 区分 `channel: play | sideload | desktop`。
+- **注意**：In-App Updates 只在从 Play 安装的包上生效，侧载或本地安装会返回 `API_UNAVAILABLE`，不能当侧载自更新的替代；两端 `available` 语义不同（Play 是 versionCode，侧载是 versionName），红点缓存结构需要按渠道区分，避免互相覆盖。
+- **验收**：Play 内部测试轨道发一个更高 versionCode，旧版本冷启动后能看到红点与「立即更新」；走完 immediate 流程后版本已更新、红点归零；点取消不崩溃；非 Play 安装时按钮回落到商店入口。
 
 ---
 
@@ -245,6 +291,7 @@
 - [ ] 是否接 Health Connect（当前定位：第一版不做）。
 - [ ] 变现方式（当前：完全免费无广告，验证期先不做）。
 - [ ] 个人开发者账号封闭测试的 12 人名单。
+- [ ] 后续支持哪些语言（建议按商店主要市场排序，再英文派生翻译）。
 
 ---
 

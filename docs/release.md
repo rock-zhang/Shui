@@ -101,3 +101,11 @@ SHUI_VARIANT=sideload yarn tauri android build --apk -t aarch64 --ci \
 - **若启用了 Play App Signing**，Google 会用另一把「应用签名密钥」重签下发的安装包。此时用侧载 APK 去覆盖「从 Play 装的应用」会因签名不一致报 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`，必须先卸载（会丢本地数据）。
 
 因此两个渠道应视为**互不迁移**的分发通道：Play 用户靠商店更新，侧载用户靠应用内更新。若确实需要用户跨渠道迁移，只能另行设计数据导出/导入，不要指望直接覆盖安装。
+
+## 7. winget 分发
+
+以后发版不需要额外操作：把 release 从草稿点「发布」即可，[winget.yaml](../.github/workflows/winget.yaml) 会自动更新 `microsoft/winget-pkgs` 并发 PR。发布后不要在同一 tag 上重传安装包，否则清单里的 `InstallerSha256` 会失效。
+
+**一次性配置**：仓库 Secret `WINGET_TOKEN`（classic PAT，勾 `public_repo` + `workflow`）。首次上架还要在 Actions → `winget` → Run workflow 跑一次 `bootstrap`，因为 `winget-releaser` 只能更新已存在的包；仓库里的[首版 manifest](../.github/winget/manifests/r/rock-zhang/Shui/0.5.2) 就是给它用的。首次合并后跑一次 `winget install rock-zhang.Shui` 确认版本能被 `winget list` 识别。
+
+两点别动：`/CHANNEL=winget` 开关（渠道统计依赖它）；必须真正 publish 草稿（草稿资产匿名 404，会让 SHA256 校验失败）。
