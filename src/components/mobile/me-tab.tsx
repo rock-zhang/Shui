@@ -48,27 +48,6 @@ const GITHUB_URL = "https://github.com/rock-zhang/Shui";
 const STORE_URL = "https://play.google.com/store/apps/details?id=com.shui.app";
 const PRIVACY_URL = "https://shui-6d906.web.app/privacy-policy.html";
 
-/**
- * 【临时跳转验证 demo】「设置-应用」相关的全部候选入口，逐一点击在真机上
- * 确认实际落地页。验证完成后随 demo 区块一起删除。
- */
-const PROBE_TARGETS: { target: string; label: string }[] = [
-  { target: "application_settings", label: "系统 action：应用主页" },
-  { target: "manage_applications", label: "系统 action：应用管理（列表）" },
-  { target: "manage_all_applications", label: "系统 action：全部应用（列表）" },
-  { target: "app_details", label: "系统 action：本应用详情页" },
-  { target: "default_apps", label: "系统 action：默认应用" },
-  { target: "settings_root", label: "系统 action：设置首页" },
-  { target: "coloros_safecenter", label: "ColorOS 私有：手机管家自启动 ①" },
-  { target: "coloros_startup", label: "ColorOS 私有：手机管家自启动 ②" },
-  { target: "coloros_startup_app", label: "ColorOS 私有：自启动 App 列表" },
-  { target: "oplus_safecenter", label: "ColorOS 私有：oplus 管家自启动" },
-  { target: "oplus_startup_app", label: "ColorOS 私有：oplus 自启动 App 列表" },
-  { target: "oppo_safe", label: "ColorOS 私有：旧版 safe 自启动" },
-];
-
-type ProbeHit = { component: string; label: string; exported: boolean };
-
 type Notice = { key: MessageKey; params?: Record<string, string | number> };
 
 export function MeTab() {
@@ -86,8 +65,6 @@ export function MeTab() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [error, setError] = useState("");
   const [analyticsOn, setAnalyticsOn] = useState(true);
-  const [hits, setHits] = useState<ProbeHit[] | null>(null);
-  const [scanning, setScanning] = useState(false);
   const locked = useRef(false);
   const {
     available: updateAvailable,
@@ -120,37 +97,6 @@ export function MeTab() {
       await trackNow("analytics_opt_in");
     }
   }
-
-  // 【临时跳转验证 demo】逐个入口发起跳转，成功/失败都 toast 出来，
-  // 用户在真机上对照每个 target 的实际落地页。
-  const runProbe = async (target: string, component?: string) => {
-    try {
-      const result = await invoke<{ handler: string }>("open_settings_probe", {
-        target,
-        component: component ?? "",
-      });
-      toast.success(`${target} → ${result.handler}`, { duration: 8000 });
-    } catch (error) {
-      toast.error(`跳转失败 ${target}：${String(error)}`, { duration: 8000 });
-    }
-  };
-
-  // 【临时跳转验证 demo】扫描本机设置包里与应用/自启动相关的 Activity。
-  // ColorOS 上标准 action 被重映射，只能按真机实际存在的页面逐个试跳。
-  const scanSettings = async () => {
-    setScanning(true);
-    try {
-      const result = await invoke<{ items: ProbeHit[] }>("list_settings_activities");
-      setHits(result.items);
-      if (!result.items.length) {
-        toast.info("没有扫描到与应用相关的系统设置页");
-      }
-    } catch (error) {
-      toast.error(`扫描失败：${String(error)}`, { duration: 8000 });
-    } finally {
-      setScanning(false);
-    }
-  };
 
   async function run(operation: () => Promise<void>) {
     if (locked.current) return;
@@ -628,65 +574,6 @@ export function MeTab() {
             </span>
           </button>
         </div>
-      </MobileSection>
-
-      {/* 【临时跳转验证 demo】验证各「设置-应用」入口的实际落地页，验证后删除。 */}
-      <MobileSection
-        title="跳转验证 demo"
-        description="点击后 toast 会显示该入口实际解析到的组件；再回来看落在哪个页面。验证完成后整个区块会删除。"
-      >
-        <div className="overflow-hidden rounded-xl border border-dashed border-amber-500/60">
-          {PROBE_TARGETS.map(({ target, label }) => (
-            <button
-              key={target}
-              type="button"
-              onClick={() => void runProbe(target)}
-              className="flex min-h-12 w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-muted/50 active:bg-muted"
-            >
-              <span className="min-w-0 flex-1 text-[13px] text-muted-foreground">
-                {label}
-              </span>
-              <span className="shrink-0 font-mono text-[11px] text-amber-600 dark:text-amber-400">
-                {target}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          className="mt-3 min-h-10 w-full"
-          disabled={scanning}
-          onClick={() => void scanSettings()}
-        >
-          {scanning ? "扫描中…" : "扫描本机设置里与应用相关的页面"}
-        </Button>
-        {hits && (
-          <div className="mt-2 overflow-hidden rounded-xl border border-dashed border-amber-500/40">
-            {hits.length === 0 && (
-              <p className="px-3 py-3 text-[13px] text-muted-foreground">
-                本机设置里没有扫描到相关页面
-              </p>
-            )}
-            {hits.map((hit) => (
-              <button
-                key={hit.component}
-                type="button"
-                onClick={() => void runProbe("component", hit.component)}
-                className="flex min-h-12 w-full flex-col items-start gap-0.5 border-b border-border/50 px-3 py-2 text-left last:border-b-0 transition-colors hover:bg-muted/50 active:bg-muted"
-              >
-                <span className="w-full break-all font-mono text-[11px] text-amber-600 dark:text-amber-400">
-                  {hit.component}
-                </span>
-                <span className="text-[11px] text-muted-foreground">
-                  {hit.label}
-                  {hit.exported ? "" : " · 未导出（可能打不开）"}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
       </MobileSection>
     </>
   );

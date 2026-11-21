@@ -11,7 +11,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
-  HelpCircle,
+  Info,
   RefreshCw,
   RotateCcw,
   Wrench,
@@ -38,6 +38,14 @@ import { MobileSection } from "./ui";
 /** 跳系统设置后轮询确认结果的时长上限与间隔（与权限 Provider 保持一致）。 */
 const WATCH_TOTAL_MS = 30_000;
 const WATCH_INTERVAL_MS = 900;
+
+/**
+ * 兜底轮询：回前台的三个事件（visibilitychange / focus / 原生 shui:foreground）
+ * 在部分 ROM 上会全部丢失——ColorOS 实测从系统通知设置返回后页面一直停在旧快照，
+ * 既不派发 visibilitychange，也不执行原生的 evaluateJavascript。卡片在可见时
+ * 低频重读，任何触发丢失都能在几秒内自愈；读取只是本地查一次渠道状态，成本很低。
+ */
+const HEALTH_POLL_MS = 4_000;
 
 /** 闹钟超过这么久没触发才判定「被系统拦了」，避开发送瞬间的正常抖动。 */
 const OVERDUE_TOLERANCE_S = 90;
@@ -120,7 +128,7 @@ function ChannelChip({
       ) : state === "bad" ? (
         <AlertTriangle aria-hidden="true" className="h-3 w-3" />
       ) : (
-        <HelpCircle aria-hidden="true" className="h-3 w-3" />
+        <Info aria-hidden="true" className="h-3 w-3" />
       )}
       {label}
     </span>
@@ -266,7 +274,7 @@ export function NotificationHealthCard() {
   const refreshFromForeground = useCallback(() => {
     void read();
     clearFollowUps();
-    for (const delay of [400, 1200, 2500]) {
+    for (const delay of [300, 800, 1500, 3000, 5000]) {
       followUpTimers.current.push(
         window.setTimeout(() => {
           if (alive.current) void read();
@@ -289,16 +297,21 @@ export function NotificationHealthCard() {
     // 引导完成、权限变更、记录饮水等会发 shui:refresh；体检卡的状态全来自
     // read()，不订阅就一直停在旧快照（表现为「打开引导」按钮和检查项不更新）。
     const offRefresh = onRefresh(() => refreshFromForeground());
+    // 事件全丢时的兜底：只要卡片还挂在页面上就定期重读，避免状态永远停在旧值。
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === "visible") void read();
+    }, HEALTH_POLL_MS);
     return () => {
       alive.current = false;
       document.removeEventListener("visibilitychange", onForeground);
       window.removeEventListener("focus", onForeground);
       window.removeEventListener("shui:foreground", onNativeForeground);
       offRefresh();
+      window.clearInterval(poll);
       stopWatching();
       clearFollowUps();
     };
-  }, [refreshFromForeground, stopWatching, clearFollowUps]);
+  }, [refreshFromForeground, read, stopWatching, clearFollowUps]);
 
   const run = useCallback(
     async (command: string, successText?: string) => {
@@ -467,8 +480,9 @@ export function NotificationHealthCard() {
   }
 
   /**
-   * 通知样式的四项：横幅 / 铃声 / 振动读渠道状态，锁屏读不到（系统已废弃
-   * lockscreenVisibility），只能请用户自己确认。四项共用「去通知设置」入口。
+   * 通知样式里能自动判定的三项：横幅 / 铃声 / 振动读渠道状态。锁屏没有读取
+   * 接口（lockscreenVisibility 已废弃，多数 ROM 不再写入用户选择），单独用
+   * 一行文字引导用户自己去设置里确认，不参与对勾判定。
    */
   const styleChips: Array<{
     key: string;
@@ -480,12 +494,6 @@ export function NotificationHealthCard() {
       key: "banner",
       label: t("mobile.health.style.banner"),
       state: health.channelExists && health.headsUp ? "ok" : "bad",
-    },
-    {
-      key: "lockscreen",
-      label: t("mobile.health.style.lockscreen"),
-      state: "unknown",
-      title: t("mobile.health.style.selfCheck"),
     },
     {
       key: "ringtone",
@@ -569,6 +577,17 @@ export function NotificationHealthCard() {
               />
             ))}
           </div>
+          <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+            {t("mobile.health.style.lockscreenRow")}
+            <button
+              type="button"
+              className="ml-1 font-medium text-foreground underline underline-offset-2 disabled:opacity-50"
+              disabled={busy !== null}
+              onClick={() => void run("open_notification_settings")}
+            >
+              {t("mobile.health.goSettings")}
+            </button>
+          </p>
           {!channelOk && (
             <>
               <ul className="mt-1.5 space-y-0.5">
@@ -585,20 +604,24 @@ export function NotificationHealthCard() {
                   </li>
                 ))}
               </ul>
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                <Button
-                  size="sm"
-                  className="min-h-8 px-2.5 text-xs"
-                  disabled={busy !== null}
-                  onClick={() => void repair()}
-                >
-                  <Wrench className="mr-1 h-3.5 w-3.5" />
-                  {t("mobile.health.repair")}
-                </Button>
-                <span className="text-[10px] leading-4 text-muted-foreground">
-                  {t("mobile.health.repairNote")}
-                </span>
-              </div>
+              {/* 只有渠道确实丢失/损坏时才给「修复」：横幅、铃声、振动被关
+                  多半是用户自己关的，重建等于覆盖他的选择，只保留「去设置」。 */}
+              {!health.channelExists && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <Button
+                    size="sm"
+                    className="min-h-8 px-2.5 text-xs"
+                    disabled={busy !== null}
+                    onClick={() => void repair()}
+                  >
+                    <Wrench className="mr-1 h-3.5 w-3.5" />
+                    {t("mobile.health.repair")}
+                  </Button>
+                  <span className="text-[10px] leading-4 text-muted-foreground">
+                    {t("mobile.health.repairNote")}
+                  </span>
+                </div>
+              )}
             </>
           )}
         </div>
