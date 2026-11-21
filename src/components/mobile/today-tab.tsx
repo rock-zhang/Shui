@@ -875,4 +875,151 @@ function CupAmountEditor({
           </span>
         </p>
         <p className="mt-1.5 text-xs text-muted-foreground">
-         
+          {t(cupHintKey(amount))}
+        </p>
+      </div>
+
+      <div
+        ref={trackRef}
+        role="slider"
+        tabIndex={0}
+        aria-label={t("mobile.today.cup.editTitle")}
+        aria-valuemin={MIN_QUICK_AMOUNT}
+        aria-valuemax={MAX_QUICK_AMOUNT}
+        aria-valuenow={amount}
+        aria-valuetext={`${amount} ml`}
+        className="relative mt-5 h-12 touch-none overflow-hidden select-none focus-visible:outline-none"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerEnd}
+        onPointerCancel={onPointerEnd}
+        onKeyDown={onKeyDown}
+      >
+        {width > 0 && <CupScale offset={offset} animate={snapping} />}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-0 left-1/2 size-1.5 -translate-x-1/2 rounded-full bg-primary"
+        />
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-0 left-1/2 h-8 w-0.5 -translate-x-1/2 rounded-full bg-primary"
+        />
+      </div>
+
+      <div className="mt-1 grid grid-cols-3 px-1 text-[11px] tabular-nums text-muted-foreground">
+        <span className="text-left">{labels[0]}</span>
+        <span className="text-center font-medium text-foreground">
+          {labels[1]}
+        </span>
+        <span className="text-right">{labels[2]}</span>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {CUP_CHIPS.map((chip) => (
+          <Button
+            key={chip}
+            variant={amount === chip ? "default" : "outline"}
+            size="sm"
+            className="min-h-9 rounded-full tabular-nums"
+            onClick={() => animateTo(amountToTick(chip))}
+          >
+            {chip}
+          </Button>
+        ))}
+      </div>
+
+      <div className="mt-5 flex gap-2">
+        <Button variant="ghost" className="min-h-11 flex-1" onClick={onCancel}>
+          {t("common.cancel")}
+        </Button>
+        <Button className="min-h-11 flex-1" onClick={() => onSave(amount)}>
+          {t("mobile.today.cup.save")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** 与今日 tab 快捷卡片对齐的水量图标体系，明细里复用同一套视觉语义。 */
+const AMOUNT_ICONS: Array<{ max: number; Icon: LucideIcon }> = [
+  { max: 50, Icon: Droplet },
+  { max: 100, Icon: Droplets },
+  { max: 200, Icon: GlassWater },
+  { max: Number.POSITIVE_INFINITY, Icon: CupSoda },
+];
+
+function amountIcon(amount: number): LucideIcon {
+  return AMOUNT_ICONS.find((item) => amount <= item.max)!.Icon;
+}
+
+/** 明细条目列表（新→旧顺序），主页内联与抽屉共用。 */
+function TodayDetailList({
+  entries,
+  confirmUndo,
+  onRequestUndo,
+  onCancelUndo,
+  onUndo,
+  t,
+  locale,
+}: {
+  entries: DrinkEntry[];
+  confirmUndo: string | null;
+  onRequestUndo: (requestId: string) => void;
+  onCancelUndo: () => void;
+  onUndo: (requestId: string) => void;
+  t: Translate;
+  locale: ReturnType<typeof useI18n>["locale"];
+}) {
+  return (
+    <ul className="space-y-2">
+      {entries.map((entry, index) => {
+        const Icon = amountIcon(entry.amount);
+        return (
+          <li
+            key={entry.requestId ?? `${entry.timestamp}-${index}`}
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-border/60 bg-card px-3 py-2.5 shadow-sm"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+              <Icon className="h-4 w-4 text-primary" aria-hidden />
+            </span>
+            <span className="min-w-0 flex-1 truncate text-sm tabular-nums">
+              {formatTimeLabel(entry.timestamp, t("common.details.unknownTime"), locale)}
+            </span>
+            <span className="text-sm font-semibold tabular-nums text-primary">
+              {entry.amount} ml
+            </span>
+            {entry.requestId &&
+              (confirmUndo === entry.requestId ? (
+                <span className="flex w-full items-center justify-end gap-1 pt-1">
+                  <span className="mr-auto text-xs text-muted-foreground">
+                    {t("common.details.confirmUndo")}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="min-h-9"
+                    onClick={() => onUndo(entry.requestId!)}
+                  >
+                    {t("common.details.confirm")}
+                  </Button>
+                  <Button size="sm" variant="ghost" className="min-h-9" onClick={onCancelUndo}>
+                    {t("common.cancel")}
+                  </Button>
+                </span>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={t("mobile.today.details.undoAria")}
+                  className="h-9 w-9 p-0"
+                  onClick={() => onRequestUndo(entry.requestId!)}
+                >
+                  <Undo2 className="h-4 w-4" />
+                </Button>
+              ))}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
