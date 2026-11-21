@@ -86,6 +86,17 @@ test('empty weekday list turns weekly reminders off', () => {
   assert.equal(result.kind, 'none');
 });
 
+test('date-only schedules can jump to a future personal workday beyond the annual search window', () => {
+  const result = findNextReminder(base({ weekdays: [], dateOverrides: [
+    { date: '2028-02-29', remind: true },
+  ] }), new Date(2026, 10, 21, 10));
+  assert.equal(result.kind, 'time');
+  assert.equal(result.date.getFullYear(), 2028);
+  assert.equal(result.date.getMonth(), 1);
+  assert.equal(result.date.getDate(), 29);
+  assert.equal(result.date.getHours(), 9);
+});
+
 test('quiet hours are skipped', () => {
   const now = new Date(2026, 10, 15, 10, 0);
   const result = findNextReminder(

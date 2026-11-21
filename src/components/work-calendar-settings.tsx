@@ -50,7 +50,6 @@ export function WorkCalendarSettings({ config, onSave }: {
 }) {
   const { t } = useI18n();
   const [today, setToday] = useState(localCalendarDate);
-  useDayChange(() => setToday(localCalendarDate()));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [date, setDate] = useState(today);
@@ -61,6 +60,13 @@ export function WorkCalendarSettings({ config, onSave }: {
   const [pendingDates, setPendingDates] = useState<{ rules: DateOverride[]; count: number; conflicts: number }>();
   const [year, setYear] = useState(Number(today.slice(0, 4)));
   const [imported, setImported] = useState<HolidayCalendar>();
+  useDayChange(() => {
+    const next = localCalendarDate();
+    setToday(next);
+    if (!editing && !end && !name && !remind) {
+      setDate((value) => value === today ? next : value);
+    }
+  });
   const rules = config.dateOverrides ?? [];
   const calendars = config.holidayCalendars ?? [];
   const day = calendarDay(today, config);
@@ -115,6 +121,7 @@ export function WorkCalendarSettings({ config, onSave }: {
         <p className="text-xs text-muted-foreground">{t(`calendar.${day.reason}`)}{day.name && ` · ${day.name}`}</p>
       </div>
       <p className="text-xs text-muted-foreground">{t("calendar.gates")}</p>
+      <div data-onboarding="weekdays" className="space-y-3">
       <label className="flex flex-wrap items-center justify-between gap-2 text-sm">{t("calendar.mode")}
         <select name="schedule-mode" aria-label={t("calendar.mode")} className={selectClass} value={config.scheduleMode ?? "weekly"}
           onChange={(event) => save({ scheduleMode: event.target.value as "weekly" | "alternating",
@@ -125,6 +132,7 @@ export function WorkCalendarSettings({ config, onSave }: {
       {config.scheduleMode === "alternating" ? <Rotation key={JSON.stringify(config.alternatingWeeks)}
         value={config.alternatingWeeks ?? defaultAlternating(today)} onSave={(alternatingWeeks) => save({ alternatingWeeks })} /> :
         <Weekdays label={t("calendar.weekly")} value={config.weekdays ?? []} onChange={(weekdays) => save({ weekdays })} />}
+      </div>
       <details><summary className="cursor-pointer text-sm">{t("calendar.preview")}</summary>
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 text-xs max-h-72 overflow-y-auto" aria-label={t("calendar.preview")}>
           {dateRange(today, (() => { const date = new Date(`${today}T12:00:00`); date.setDate(date.getDate() + 27); return localCalendarDate(date); })()).map((date) => {

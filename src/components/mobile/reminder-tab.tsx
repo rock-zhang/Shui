@@ -141,7 +141,7 @@ export function ReminderTab() {
         </div>
       </MobileSection>
 
-      <div data-onboarding="weekdays"><WorkCalendarSettings config={alert} onSave={patchAlert} /></div>
+      <WorkCalendarSettings config={alert} onSave={patchAlert} />
 
       <MobileSection
         title={t("mobile.reminder.time.title")}

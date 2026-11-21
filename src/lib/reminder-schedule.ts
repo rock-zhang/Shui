@@ -96,10 +96,24 @@ export function findNextReminder(
   const end = parseTime(schedule.timeEnd);
   const quietStart = parseTime(schedule.quietStart);
   const quietEnd = parseTime(schedule.quietEnd);
+  if (schedule.quietEnabled && quietStart === quietEnd) return { kind: "none" };
+  const explicitDates = [
+    ...(schedule.dateOverrides ?? []),
+    ...(schedule.holidayCalendars ?? []).filter((calendar) => calendar.enabled).flatMap((calendar) => calendar.days),
+  ].map((rule) => rule.date).sort();
+  const hasWeeklyDays = schedule.scheduleMode === "alternating" && schedule.alternatingWeeks
+    ? schedule.alternatingWeeks.bigWeekdays.length + schedule.alternatingWeeks.smallWeekdays.length > 0
+    : (schedule.weekdays?.length ?? 0) > 0;
 
   const candidate = new Date(now.getTime() + gap * 60_000);
   const limit = new Date(now);
   limit.setDate(limit.getDate() + 400);
+  const lastDate = explicitDates[explicitDates.length - 1];
+  if (lastDate) {
+    const afterLastDate = new Date(`${lastDate}T12:00:00`);
+    afterLastDate.setDate(afterLastDate.getDate() + 14);
+    if (afterLastDate > limit) limit.setTime(afterLastDate.getTime());
+  }
   while (candidate < limit) {
     const minute = minutesOfDay(candidate);
     const inWorkTime = inWindow(minute, start, end);
@@ -110,7 +124,14 @@ export function findNextReminder(
       return { kind: "time", date: candidate };
     }
     if (!workday) {
-      candidate.setDate(candidate.getDate() + 1);
+      if (!hasWeeklyDays) {
+        const next = explicitDates.find((date) => date > localCalendarDate(candidate));
+        if (!next) return { kind: "none" };
+        const [year, month, day] = next.split("-").map(Number);
+        candidate.setFullYear(year, month - 1, day);
+      } else {
+        candidate.setDate(candidate.getDate() + 1);
+      }
       candidate.setHours(Math.floor(start / 60), start % 60, 0, 0);
     } else if (inWorkTime) {
       // Calendar.add(MINUTE, gap) on the native side.

@@ -180,6 +180,12 @@ fn perform(app: &tauri::AppHandle, probe: &Probe, action: &str) -> Result<(), St
         .get_webview_window("main")
         .ok_or("main window missing")?;
     match action {
+        "mobile-preview" => {
+            main.set_size(tauri::LogicalSize::new(390, 844))
+                .map_err(|e| e.to_string())?;
+            main.eval("localStorage.setItem('shui:onboarding-seen', '1'); window.location.assign('/?mobile=1')")
+                .map_err(|e| e.to_string())?;
+        }
         "calendar-check" => {
             let script = match std::env::var_os("SHUI_CALENDAR_SMOKE_SCRIPT") {
                 Some(path) => fs::read_to_string(path).map_err(|e| e.to_string())?,

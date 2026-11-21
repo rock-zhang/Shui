@@ -160,7 +160,7 @@ export default function Home() {
         </Select>
       </div>
 
-      <WorkCalendarSettings config={config} onSave={savePatch} />
+      {ready && <WorkCalendarSettings config={config} onSave={savePatch} />}
 
       <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
         <div>

@@ -19,7 +19,10 @@
     element.dispatchEvent(new Event("input", { bubbles: true }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
   };
-  const saved = (predicate) => wait(async () => query('[data-reminder-settings-ready="true"]') && predicate(await get()));
+  const saved = async (predicate) => {
+    await wait(async () => query('[data-reminder-settings-ready="true"]') && predicate(await get()));
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  };
   const check = (value, description) => { if (!value) throw new Error(description); checks.push(description); };
   let passed = false, error;
   try {

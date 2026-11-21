@@ -855,6 +855,26 @@ object ReminderScheduler {
         val quietEnabled = general.optBoolean("quietEnabled", false)
         val quietStart = parseTime(general.optString("quietStart", "22:00"))
         val quietEnd = parseTime(general.optString("quietEnd", "07:00"))
+        if (quietEnabled && quietStart == quietEnd) {
+            cancel(context)
+            return
+        }
+        val explicitDates = mutableSetOf<String>()
+        fun collectDates(days: JSONArray?) {
+            if (days != null) for (index in 0 until days.length()) {
+                days.optJSONObject(index)?.optString("date")?.takeIf { it.isNotEmpty() }?.let { explicitDates.add(it) }
+            }
+        }
+        collectDates(alert.optJSONArray("dateOverrides"))
+        val calendars = alert.optJSONArray("holidayCalendars")
+        if (calendars != null) for (index in 0 until calendars.length()) {
+            calendars.optJSONObject(index)?.takeIf { it.optBoolean("enabled") }?.let { collectDates(it.optJSONArray("days")) }
+        }
+        val dates = explicitDates.sorted()
+        val rotation = alert.optJSONObject("alternatingWeeks")
+        val hasWeeklyDays = if (alert.optString("scheduleMode") == "alternating" && rotation != null) {
+            (rotation.optJSONArray("bigWeekdays")?.length() ?: 0) + (rotation.optJSONArray("smallWeekdays")?.length() ?: 0) > 0
+        } else (alert.optJSONArray("weekdays")?.length() ?: 0) > 0
 
         val now = System.currentTimeMillis()
         val rawAnchor = (anchorMs ?: lastReminderAt(context)).takeIf { it > 0 } ?: now
@@ -865,13 +885,18 @@ object ReminderScheduler {
         while (candidateMs <= now) candidateMs += gap * 60_000L
         val candidate = Calendar.getInstance().apply { timeInMillis = candidateMs }
 
-        // gap==1 是测试档：完全绕过工作日/提醒时段/勿扰，让任意时刻都能
-        // 排到「now + 1 分钟」的闹钟，方便随时验证通知链路。否则当前时刻
-        // 已过 18:00 时，闹钟会被一路推到次日 09:xx，等不到任何通知。
+        // 1 分钟调试档可绕过时段，但仍遵守日期安排。
         val testMode = gap == 1
         var found = false
         // Annual imports and long custom vacations can skip more than one week.
         val limit = Calendar.getInstance().apply { add(Calendar.DAY_OF_MONTH, 400) }
+        dates.lastOrNull()?.let { date ->
+            val endOfDates = Calendar.getInstance().apply {
+                time = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).parse(date)!!
+                add(Calendar.DAY_OF_MONTH, 14)
+            }
+            if (endOfDates.after(limit)) limit.timeInMillis = endOfDates.timeInMillis
+        }
         while (candidate.before(limit)) {
             val minute = minutesOfDay(candidate)
             val inWorkTime = inWindow(minute, start, end)
@@ -882,7 +907,12 @@ object ReminderScheduler {
                 break
             }
             if (!workday) {
-                candidate.add(Calendar.DAY_OF_MONTH, 1)
+                if (!hasWeeklyDays) {
+                    val date = String.format(Locale.ROOT, "%04d-%02d-%02d", candidate.get(Calendar.YEAR), candidate.get(Calendar.MONTH) + 1, candidate.get(Calendar.DAY_OF_MONTH))
+                    val next = dates.firstOrNull { it > date } ?: break
+                    val parts = next.split("-").map { it.toInt() }
+                    candidate.set(parts[0], parts[1] - 1, parts[2])
+                } else candidate.add(Calendar.DAY_OF_MONTH, 1)
                 candidate.set(Calendar.HOUR_OF_DAY, start / 60)
                 candidate.set(Calendar.MINUTE, start % 60)
                 candidate.set(Calendar.SECOND, 0)
@@ -907,7 +937,7 @@ object ReminderScheduler {
         }
         if (!found) {
             // 当前配置下没有任何可提醒的时间：撤掉旧闹钟，也让今日页如实显示。
-            Log.w(TAG, "scheduleNext 跳过：未来 400 天内没有可提醒时刻")
+            Log.w(TAG, "scheduleNext 跳过：当前排期没有可提醒时刻")
             AnalyticsTracker.logScheduleFailed(context, "no_slot")
             cancel(context)
             return
