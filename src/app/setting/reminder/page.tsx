@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/select";
 import { useEffect, useState } from "react";
 import { load } from "@tauri-apps/plugin-store";
-import { useTray } from "@/hooks/use-tray";
 import { invoke } from "@tauri-apps/api/core";
 import { STORE_NAME } from "@/lib/constants";
 import { emitRefresh } from "@/lib/mobile";
@@ -68,8 +67,6 @@ export default function Home() {
       invoke<string[]>("get_installed_apps").then(setInstalledApps);
     }
   }, [isMacOS]);
-
-  useTray();
 
   useEffect(() => {
     async function loadConfig() {
@@ -147,7 +144,10 @@ export default function Home() {
         {t("settings.reminder.title")}
       </h3>
 
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
+      <div
+        data-desktop-onboarding="goal"
+        className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4"
+      >
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             {t("settings.reminder.goal.title")}
@@ -181,7 +181,10 @@ export default function Home() {
           </SelectContent>
         </Select>
       </div>
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
+      <div
+        data-desktop-onboarding="gap"
+        className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4"
+      >
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             {t("settings.reminder.gap.title")}
@@ -216,7 +219,10 @@ export default function Home() {
         </Select>
       </div>
 
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
+      <div
+        data-desktop-onboarding="weekdays"
+        className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4"
+      >
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             {t("settings.reminder.weekdays.title")}
@@ -253,7 +259,10 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
+      <div
+        data-desktop-onboarding="time"
+        className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4"
+      >
         <div>
           <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
             {t("settings.reminder.time.title")}

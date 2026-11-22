@@ -1,15 +1,19 @@
 "use client";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { Toaster } from "@/components/ui/sonner";
 import { usePlatform } from "@/hooks/use-platform";
+import { useTray } from "@/hooks/use-tray";
 import { sendReminderNotification, setupDesktopNotificationBridge } from "@/utils/notification";
 import { getGeneralConfig } from "@/utils/store";
 import { MobileApp } from "@/components/mobile/mobile-app";
+import { DesktopOnboardingTour } from "@/components/desktop/onboarding-tour";
+import { StreakMilestoneWatcher } from "@/components/streak-milestone";
+import { readDesktopOnboardingSeen } from "@/lib/desktop-onboarding";
 import { detectPlatform } from "@/lib/mobile";
 import {
   installErrorTracking,
@@ -17,6 +21,17 @@ import {
   syncAnalyticsProperties,
   track,
 } from "@/lib/analytics";
+
+/**
+ * 托盘菜单是应用级的，挂在设置区布局里初始化一次即可。
+ *
+ * 快捷杯量在「饮水记录」页编辑，若只在概览 / 提醒页初始化托盘，
+ * 其它页面保存后托盘仍显示旧档位；统一挂在布局里，配合 `emitRefresh` 才能做到改完即生效。
+ */
+function DesktopTray() {
+  useTray();
+  return null;
+}
 
 export default function RootLayout({
   children,
@@ -31,6 +46,9 @@ export default function RootLayout({
   // 首帧还不知道宿主类型时必须等检测完成再记 app_open，
   // 否则移动端会先误报一条桌面启动。
   const [ready, setReady] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
+  const tourBooted = useRef(false);
+  const tourPending = useRef(false);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -70,6 +88,26 @@ export default function RootLayout({
     };
   }, []);
 
+  // 桌面首次启动：先切到「提醒」页，再高亮真实设置项。只在挂载后判定一次，
+  // 用户之后自行导航时不再被拉回引导页。
+  useEffect(() => {
+    if (!ready || mobile || tourBooted.current) return;
+    tourBooted.current = true;
+    if (readDesktopOnboardingSeen()) return;
+    if (pathname !== "/setting/reminder/") {
+      tourPending.current = true;
+      router.replace("/setting/reminder/");
+    } else {
+      setTourOpen(true);
+    }
+  }, [ready, mobile, pathname, router]);
+
+  useEffect(() => {
+    if (!tourPending.current || pathname !== "/setting/reminder/") return;
+    tourPending.current = false;
+    setTourOpen(true);
+  }, [pathname]);
+
   useEffect(() => {
     if (!ready || mobile) return;
     track("app_open", { launch_source: "icon", cold_start: true });
@@ -105,6 +143,9 @@ export default function RootLayout({
       <AppSidebar />
       <main className="flex-1 p-10 pt-8 overflow-y-auto">{children}</main>
       <Toaster />
+      <DesktopTray />
+      <StreakMilestoneWatcher />
+      <DesktopOnboardingTour open={tourOpen} onDone={() => setTourOpen(false)} />
     </SidebarProvider>
   );
 }

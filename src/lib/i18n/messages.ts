@@ -18,6 +18,12 @@ export const zhCN = {
   "common.manualDrink.saving": "正在保存…",
   "common.manualDrink.uncertain":
     "未能确认保存结果，请点击重试；同一笔记录不会重复累加。",
+  "common.manualDrink.editQuickAmounts": "编辑快捷杯量",
+  "common.manualDrink.decrease": "减少",
+  "common.manualDrink.increase": "增加",
+  "common.manualDrink.resetQuickAmounts": "恢复默认",
+  "common.manualDrink.done": "完成",
+  "common.manualDrink.quickAmountsSaveFailed": "快捷杯量保存失败，请重试。",
 
   "common.details.title": "饮水明细",
   "common.details.description":
@@ -181,6 +187,7 @@ export const zhCN = {
   "mobile.data.today": "今日",
   "mobile.data.average": "日均",
   "mobile.data.completed": "达标",
+  "mobile.data.streak": "连续达标",
   "mobile.data.daysUnit": "天",
   "mobile.data.trend.title": "饮水量趋势",
   "mobile.data.trend.description": "每日累计饮水量 · 目标 {goal} ml",
@@ -388,6 +395,27 @@ export const zhCN = {
 
 
 
+  "desktop.onboarding.stepProgress": "第 {index} 步 · 共 {total} 步",
+  "desktop.onboarding.skip": "跳过引导",
+  "desktop.onboarding.next": "下一步",
+  "desktop.onboarding.finish": "完成设置",
+  "desktop.onboarding.completedToast": "设置完成，之后可在提醒页随时修改",
+  "desktop.onboarding.goal.title": "先定每日目标",
+  "desktop.onboarding.goal.body":
+    "在右侧选择一个每日目标；默认 1500 ml，之后可随时回来调整。",
+  "desktop.onboarding.gap.title": "再选提醒间隔",
+  "desktop.onboarding.gap.body":
+    "选择每隔多久提醒一次；建议 20–30 分钟，太频繁容易打断工作。",
+  "desktop.onboarding.weekdays.title": "哪些天需要提醒",
+  "desktop.onboarding.weekdays.body":
+    "点亮需要提醒的星期，可多选；默认每天都提醒。",
+  "desktop.onboarding.time.title": "设置提醒时段",
+  "desktop.onboarding.time.body":
+    "选择每天从几点提醒到几点；默认 09:00 至 18:00，其余时间保持安静。",
+
+  "streak.pill": "连续达标 {days} 天",
+  "streak.milestone": "连续 {days} 天达成目标，继续保持",
+
   "settings.reminder.title": "提醒",
   "settings.reminder.goal.title": "每日目标",
   "settings.reminder.goal.description": "完成目标前将定时提醒",
@@ -424,6 +452,8 @@ export const zhCN = {
   "settings.statistics.today": "今日饮水",
   "settings.statistics.average": "周期日均",
   "settings.statistics.completedDays": "达标天数",
+  "settings.statistics.streak": "连续达标",
+  "settings.statistics.streakBest": "最长连续 {days} 天",
   "settings.statistics.daysUnit": "天",
   "settings.statistics.chart.title": "饮水量趋势",
   "settings.statistics.chart.description": "每日累计饮水量（ml）",
@@ -705,7 +735,7 @@ export const zhCN = {
 export type MessageKey = keyof typeof zhCN;
 
 export const enUS = {
-  "common.system": "System",
+  "common.system": "System default",
   "common.light": "Light",
   "common.dark": "Dark",
   "common.cancel": "Cancel",
@@ -719,6 +749,13 @@ export const enUS = {
   "common.manualDrink.saving": "Saving...",
   "common.manualDrink.uncertain":
     "Could not confirm the save. Tap retry; the same drink will not be counted twice.",
+  "common.manualDrink.editQuickAmounts": "Edit quick amounts",
+  "common.manualDrink.decrease": "Decrease",
+  "common.manualDrink.increase": "Increase",
+  "common.manualDrink.resetQuickAmounts": "Reset to default",
+  "common.manualDrink.done": "Done",
+  "common.manualDrink.quickAmountsSaveFailed":
+    "Could not save quick amounts. Try again.",
 
   "common.details.title": "Drink details",
   "common.details.description":
@@ -739,7 +776,7 @@ export const enUS = {
   "language.title": "Language",
   "language.description":
     "Interface language. Follow system to use your device language",
-  "language.system": "Follow system",
+  "language.system": "System default",
   "language.zh": "中文",
   "language.en": "English",
 
@@ -895,6 +932,7 @@ export const enUS = {
   "mobile.data.today": "Today",
   "mobile.data.average": "Daily avg",
   "mobile.data.completed": "On goal",
+  "mobile.data.streak": "Streak",
   "mobile.data.daysUnit": "days",
   "mobile.data.trend.title": "Intake trend",
   "mobile.data.trend.description": "Daily total · goal {goal} ml",
@@ -1126,6 +1164,29 @@ export const enUS = {
 
 
 
+  "desktop.onboarding.stepProgress": "Step {index} of {total}",
+  "desktop.onboarding.skip": "Skip the tour",
+  "desktop.onboarding.next": "Next",
+  "desktop.onboarding.finish": "Finish setup",
+  "desktop.onboarding.completedToast":
+    "Setup complete. You can change these anytime on the Reminders page.",
+  "desktop.onboarding.goal.title": "Start with a daily goal",
+  "desktop.onboarding.goal.body":
+    "Pick a daily goal on the right. The default is 1500 ml, and you can come back anytime.",
+  "desktop.onboarding.gap.title": "Then choose an interval",
+  "desktop.onboarding.gap.body":
+    "Choose how often to be reminded. 20–30 minutes is recommended; more often tends to interrupt work.",
+  "desktop.onboarding.weekdays.title": "Which days to remind you",
+  "desktop.onboarding.weekdays.body":
+    "Turn on the weekdays you want reminders on — you can pick several. Every day is on by default.",
+  "desktop.onboarding.time.title": "Set active hours",
+  "desktop.onboarding.time.body":
+    "Choose the start and end time for reminders. The default is 09:00 to 18:00, and it stays quiet outside that range.",
+
+  "streak.pill": "{days}-day streak on goal",
+  "streak.milestone":
+    "{days} days in a row on goal. Keep it going!",
+
   "settings.reminder.title": "Reminders",
   "settings.reminder.goal.title": "Daily goal",
   "settings.reminder.goal.description":
@@ -1168,6 +1229,8 @@ export const enUS = {
   "settings.statistics.today": "Today",
   "settings.statistics.average": "Daily average",
   "settings.statistics.completedDays": "Days on goal",
+  "settings.statistics.streak": "Streak",
+  "settings.statistics.streakBest": "Longest streak: {days} days",
   "settings.statistics.daysUnit": "days",
   "settings.statistics.chart.title": "Intake trend",
   "settings.statistics.chart.description": "Daily total intake (ml)",

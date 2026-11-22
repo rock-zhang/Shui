@@ -12,22 +12,22 @@ import { getVersion } from "@tauri-apps/api/app";
 import { platform } from "@tauri-apps/plugin-os";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
-import { emitRefresh } from "@/lib/mobile";
+import {
+  DEFAULT_ALERT,
+  emitRefresh,
+  normalizeQuickAmounts,
+  onRefresh,
+  readConfig,
+  type AlertConfig,
+} from "@/lib/mobile";
 import { track, trackDrinkRecorded } from "@/lib/analytics";
 import { playConfirmSound } from "@/utils/sound";
 import type { DrinkReceipt } from "@/lib/drink-day";
 
 const TRAY_ID = "main-tray";
 
-/** 托盘快捷记水档位。 */
-const TRAY_DRINK_AMOUNTS = [50, 100] as const;
-
 export function useTray() {
-  const { t, locale } = useI18n();
-  // 语言切换后用当前语言重建托盘菜单。
-  useEffect(() => {
-    void setMenu();
-  }, [locale]);
+  const { t } = useI18n();
 
   const checkTauriAndInit = async () => {
     try {
@@ -73,8 +73,13 @@ export function useTray() {
 
     // 托盘快捷记水：与通知按钮同一条 `record_drink` 落盘链路（带幂等 requestId），
     // 成功后广播刷新（饮水记录页、统计等监听者自行重读）并播确认音，对齐通知记水。
+    // 档位读 `alert.quickAmounts`，重复值只保留一项，避免菜单出现多个相同条目。
+    const alert = await readConfig<AlertConfig>("alert", DEFAULT_ALERT);
+    const amounts = Array.from(
+      new Set(normalizeQuickAmounts(alert.quickAmounts))
+    );
     const drinkSubmenu = await Submenu.new({ text: t("tray.recordDrink") });
-    for (const amount of TRAY_DRINK_AMOUNTS) {
+    for (const amount of amounts) {
       await drinkSubmenu.append(
         await MenuItem.new({
           text: `+${amount}ml`,
@@ -165,4 +170,10 @@ export function useTray() {
       console.error("创建托盘失败:", error);
     }
   }, [getMenu]);
+
+  // 语言切换或快捷杯量变更后（emitRefresh）用当前配置重建托盘菜单。
+  useEffect(() => {
+    void setMenu();
+    return onRefresh(() => void setMenu());
+  }, [setMenu]);
 }

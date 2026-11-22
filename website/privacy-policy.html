@@ -1,0 +1,367 @@
+<!doctype html>
+<!--
+  Shui 隐私政策 / Privacy Policy
+  ---------------------------------------------------------------
+  托管：Firebase Hosting（firebase.json 的 public 指向 docs/play-store）
+  部署：firebase deploy --only hosting --project shui-6d906
+  要求：URL 无需登录即可访问，不能是 PDF 下载链接。
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shui 隐私政策 / Privacy Policy</title>
+<link rel="icon" type="image/png" sizes="32x32" href="./assets/icon-32.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png" />
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #0b1f33;
+    --muted: #5a7184;
+    --line: #e3edf6;
+    --accent: #1573c4;
+    --soft: #f4f9fe;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #020618;
+      --fg: #e8f1f9;
+      --muted: #93a7ba;
+      --line: #1c2b3f;
+      --accent: #61b0f2;
+      --soft: #0a1424;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.75;
+    font-size: 16px;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 56px 24px 96px; }
+  header { border-bottom: 1px solid var(--line); padding-bottom: 28px; margin-bottom: 36px; }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .mark {
+    width: 40px; height: 40px; border-radius: 12px; background: var(--soft);
+    display: grid; place-items: center; font-size: 22px; font-weight: 600;
+    color: var(--fg); border: 1px solid var(--line);
+  }
+  .brand-name { font-size: 18px; font-weight: 600; letter-spacing: .02em; }
+  h1 { font-size: 30px; line-height: 1.3; margin: 0 0 10px; letter-spacing: -.01em; }
+  .meta { color: var(--muted); font-size: 14px; margin: 0; }
+  .switch { display: flex; gap: 8px; margin: 24px 0 0; }
+  .switch button {
+    appearance: none; border: 1px solid var(--line); background: transparent;
+    color: var(--muted); font: inherit; font-size: 13px; padding: 6px 14px;
+    border-radius: 999px; cursor: pointer;
+  }
+  .switch button[aria-pressed="true"] {
+    background: var(--soft); color: var(--accent); border-color: transparent; font-weight: 600;
+  }
+  h2 { font-size: 19px; margin: 40px 0 12px; letter-spacing: -.005em; }
+  h3 { font-size: 16px; margin: 24px 0 8px; }
+  p { margin: 0 0 14px; }
+  ul { margin: 0 0 16px; padding-left: 22px; }
+  li { margin: 0 0 8px; }
+  a { color: var(--accent); text-decoration: none; word-break: break-word; }
+  a:hover { text-decoration: underline; }
+  .callout {
+    background: var(--soft); border-radius: 14px; padding: 18px 20px;
+    margin: 24px 0; border: 1px solid var(--line);
+  }
+  .callout p:last-child { margin-bottom: 0; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 20px; font-size: 15px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; letter-spacing: .02em; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px;
+    background: var(--soft); padding: 2px 6px; border-radius: 6px;
+  }
+  footer { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="mark">水</div>
+      <div class="brand-name">Shui</div>
+    </div>
+    <h1 id="title">Privacy Policy</h1>
+    <p class="meta" id="meta">Effective: November 21, 2026 · Applies to: Shui for Android (package com.shui.app)</p>
+    <div class="switch" role="group" aria-label="Language">
+      <button type="button" id="btn-en" aria-pressed="true">English</button>
+      <button type="button" id="btn-zh" aria-pressed="false">简体中文</button>
+    </div>
+  </header>
+
+  <!-- ===================== 中文 ===================== -->
+  <main id="doc-zh" hidden>
+    <div class="callout">
+      <p><strong>一句话概括：你的饮水记录和设置默认只保存在本机。</strong>Play 商店版本默认关闭匿名统计，只有你在「我的 → 隐私与统计」主动开启后才会向 Google Firebase 发送不含饮水明细的匿名事件与崩溃信息；通过其他渠道安装的 APK 可能默认开启，同样可以随时关掉，且不影响任何功能。</p>
+    </div>
+
+    <h2>1. 存储在本机的数据</h2>
+    <p>为了提供喝水提醒与记录功能，Shui 会在你的设备本地保存以下内容：</p>
+    <ul>
+      <li>饮水记录：每一杯的时间、水量、当日目标与撤销标记；</li>
+      <li>提醒设置：提醒间隔、重复日、生效时段、勿扰时段、暂停状态；</li>
+      <li>功能偏好：全屏提醒或系统通知、提醒音效开关、每日目标、外观主题；</li>
+      <li>提醒记录：提醒触发、确认、跳过、超时的时间与展示时长；</li>
+      <li>你主动创建的 JSON 备份文件或导出的 CSV 文件（仅在你操作时生成）。</li>
+    </ul>
+    <p>以上数据均存放在 Android 应用私有存储区（<code>files/</code> 等目录）中，其他应用无法读取。开发者没有用于接收这些数据的服务器，也无法查看你的饮水记录。</p>
+
+    <h2>2. 匿名使用统计（可随时关闭）</h2>
+    <p>为了解哪些功能真正有用、并定位崩溃，应用会在「匿名使用统计」开启时，通过 Google Firebase Analytics 与 Firebase Crashlytics 发送以下信息。Play 商店版本默认关闭该开关；通过其他渠道安装的 APK 可能默认开启。无论哪种版本，关闭期间都不会发送任何分析或崩溃数据：</p>
+    <ul>
+      <li><strong>功能使用事件</strong>：页面切换、提醒展示/打开/关闭、通知按钮点击、记水操作、引导流程是否完成、通知权限状态。记水事件只包含<strong>水量区间</strong>（≤100 / ≤200 / ≤300 / &gt;300 ml）和<strong>当日进度区间</strong>（如 25%–50%），不包含具体毫升数、饮水时刻或单条记录内容；</li>
+      <li><strong>应用与设备信息</strong>：应用版本、Android 版本、设备厂商、ROM 家族、界面语言，以及 Firebase 自动生成的应用实例 ID；</li>
+      <li><strong>设置项的分桶值</strong>：例如提醒间隔所属区间（15 分钟内 / 15–60 分钟 / 1–6 小时等），不上报具体设置数值；</li>
+      <li><strong>崩溃与错误信息</strong>：崩溃堆栈、发生页面、设备与系统状态，由 Crashlytics 收集；</li>
+      <li><strong>大致位置</strong>：Firebase 可能根据网络请求的 IP 地址推断到城市级别。应用不申请定位权限，也不采集精确位置。</li>
+    </ul>
+    <p>Shui <strong>不会</strong>向分析平台发送：姓名、邮箱、电话号码或任何账号信息；通讯录、短信、通话记录、照片或文件；精确地理位置；Android 广告 ID；已安装应用列表；以及你的具体饮水量、饮水时刻或饮水明细。</p>
+
+    <h2>3. 第三方服务</h2>
+    <p>匿名统计与崩溃上报由 Google 的 Firebase 提供。Google 作为数据处理方，按照其隐私政策处理这些数据：</p>
+    <table>
+      <thead><tr><th>服务</th><th>提供方</th><th>用途</th><th>数据类别</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Firebase Analytics</td>
+          <td>Google LLC</td>
+          <td>了解功能使用情况、改进产品</td>
+          <td>应用活动、设备信息、应用实例 ID、由 IP 推断的大致位置</td>
+        </tr>
+        <tr>
+          <td>Firebase Crashlytics</td>
+          <td>Google LLC</td>
+          <td>收集崩溃与错误，修复稳定性问题</td>
+          <td>崩溃堆栈、错误信息、设备与系统状态、应用实例 ID</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>相关隐私政策：<a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Firebase Privacy and Security</a>、<a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy</a>。</p>
+    <p>应用<strong>不集成</strong>广告、推送或社交登录 SDK，并已关闭 Android 广告 ID 的采集与广告个性化信号。除上述 Firebase 服务外，应用不向其他第三方发送数据。</p>
+
+    <h2>4. 你的选择</h2>
+    <ul>
+      <li>Play 商店版本默认关闭匿名统计，侧载 APK 可能默认开启；无论默认值如何，你都可以在「我的 → 隐私与统计」随时开关；</li>
+      <li>在「我的 → 隐私与统计」关闭「匿名使用统计」后，应用会立即停止向 Firebase 发送使用事件与崩溃信息；</li>
+      <li>关闭统计不影响提醒、记水、统计与导出等核心功能；</li>
+      <li>如需删除已经上报的匿名数据，可通过下方邮箱联系我们。由于这些数据不与账号或身份关联，我们可能需要你提供应用实例 ID 等信息以便定位。</li>
+    </ul>
+
+    <h2>5. 法律依据与你的权利</h2>
+    <p><strong>法律依据：</strong>对于适用同意要求的地区，Play 商店版本仅在你主动开启「匿名使用统计」后处理上述数据（GDPR 第 6(1)(a) 条）；通过其他渠道安装的 APK 可能默认开启，你可以随时关闭。本机数据不会离开设备，不构成我们对你个人数据的收集。关闭统计不影响提醒、记水、统计与导出功能。</p>
+    <p><strong>数据控制者：</strong>Shui 开发者，联系方式见文末。应用不进行自动化决策或用户画像，也不基于统计数据进行广告投放。</p>
+    <p><strong>你的权利：</strong>在适用法律范围内，你有权访问、更正、删除、限制处理、反对处理、获取数据副本（可携带），并有权随时撤回同意。撤回同意与给出同意同样容易：在「我的 → 隐私与统计」关闭开关即可立即生效。</p>
+    <p>如需行使上述权利，或希望删除已经上报的匿名数据，请通过文末邮箱联系我们。我们会在核实后于合理期限内处理。</p>
+    <p><strong>投诉：</strong>你有权向你所在国家或地区的数据保护监管机构投诉。我们希望在联系监管机构之前，先给我们一个解释和处理的机会。</p>
+    <p><strong>欧盟代表：</strong>开发者目前未在欧盟设立机构。正式面向欧盟用户分发期间，我们会按 GDPR 第 27 条指定欧盟代表，并在本页公示其名称与联系方式；在此之前，你可以直接通过文末邮箱与我们联系。</p>
+
+    <h2>6. 数据保留</h2>
+    <ul>
+      <li>本机数据：保留到你删除记录、清除应用数据或卸载应用为止；</li>
+      <li>Firebase Analytics 事件：默认保留 2 个月，最长不超过 14 个月；</li>
+      <li>Firebase Crashlytics 崩溃数据：保留 90 天。</li>
+    </ul>
+
+    <h2>7. 权限及用途</h2>
+    <p>Shui 申请的 Android 权限均有明确、单一用途，且只在实现对应功能时使用：</p>
+    <table>
+      <thead><tr><th>权限</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td>通知（POST_NOTIFICATIONS）</td><td>应用退到后台时，用系统通知提醒你喝水，并在通知栏提供「记一杯水」按钮。</td></tr>
+        <tr><td>精确闹钟（SCHEDULE_EXACT_ALARM）</td><td>按照你设置的间隔，准时触发提醒。非精确闹钟可能延迟 15 分钟以上，会让提醒节奏失效。</td></tr>
+        <tr><td>开机自启（RECEIVE_BOOT_COMPLETED）</td><td>手机重启后重建你已有的提醒闹钟，避免重启后不再提醒。</td></tr>
+        <tr><td>振动（VIBRATE）</td><td>提醒时按你的设置提供振动反馈。</td></tr>
+        <tr><td>忽略电池优化（REQUEST_IGNORE_BATTERY_OPTIMIZATIONS）</td><td>仅在你在应用内主动点击「改善后台提醒」时跳转系统设置页，避免系统省电策略拦截提醒。应用不会读取你的电池设置内容。</td></tr>
+        <tr><td>网络（INTERNET）</td><td>渲染本地界面，并在匿名统计开启时与 Firebase 通信。应用没有自建后端服务。</td></tr>
+      </tbody>
+    </table>
+    <p>应用不申请定位、通讯录、短信、存储、相机或麦克风权限。应用还会在「改善后台提醒」引导中打开系统设置页或厂商的自启动管理页，这只是跳转，不会读取这些页面中的任何信息。</p>
+
+    <h2>8. 数据导出与备份</h2>
+    <p>CSV 导出与 JSON 备份都由你主动触发。生成的文件会通过 Android 系统分享面板交给你选择的其他应用或存储位置。文件内容只包含你自己的饮水记录与设置，不包含任何设备标识或个人信息。开发者无法得知你导出了什么、导给了谁。</p>
+
+    <h2>9. 儿童隐私</h2>
+    <p>Shui 面向成年人设计，商店受众为 18 岁及以上，不面向 13 岁以下儿童，也不会主动收集儿童的个人信息。如果监护人发现儿童在未经同意的情况下使用了本应用，可通过下方邮箱联系我们处理。</p>
+
+    <h2>10. 数据删除</h2>
+    <p>你的饮水数据只存在于设备本地，删除方式完全由你掌控：</p>
+    <ul>
+      <li>在应用内删除单条饮水记录；</li>
+      <li>清除应用数据（系统设置 → 应用 → Shui → 存储 → 清除数据）；</li>
+      <li>卸载应用，所有本地数据随之删除。</li>
+    </ul>
+    <p>匿名统计数据的删除方式见第 4 节。</p>
+
+    <h2>11. 国际数据传输</h2>
+    <p>Firebase 由 Google 运营，数据可能被传输到你所在国家或地区以外的服务器处理。Google 通过其公布的数据处理条款与标准合同条款等机制提供保护，详情见上文链接的 Firebase 隐私说明。</p>
+
+    <h2>12. 政策变更</h2>
+    <p>如果本政策发生实质性变更，我们会更新本页面顶部的生效日期，并在应用更新说明中注明。继续使用应用即表示你接受更新后的政策。</p>
+
+    <h2>13. 联系我们</h2>
+    <p>对本政策有任何疑问，或希望删除已上报的匿名数据，请联系：<a href="mailto:hey47_zhang@163.com">hey47_zhang@163.com</a></p>
+  </main>
+
+  <!-- ===================== English ===================== -->
+  <main id="doc-en">
+    <div class="callout">
+      <p><strong>In one sentence: your drink records and settings stay on your device by default.</strong> The Google Play build has anonymous analytics off by default; only after you turn it on in Me → Privacy &amp; analytics does the app send anonymous events and crash information — never your drink details — to Google Firebase. APKs installed from other channels may have it on by default. Either way, you can turn it off anytime and no feature is affected.</p>
+    </div>
+
+    <h2>1. Data stored on your device</h2>
+    <p>To provide hydration reminders and tracking, Shui stores the following locally on your device:</p>
+    <ul>
+      <li>Drink records: time, volume, daily goal and undo flags;</li>
+      <li>Reminder settings: interval, repeat days, active hours, do-not-disturb window, pause state;</li>
+      <li>Preferences: full-screen reminder or system notification, sound on/off, daily goal, theme;</li>
+      <li>Reminder history: when reminders fired, were confirmed, skipped or timed out, and how long they were shown;</li>
+      <li>JSON backups and CSV exports — created only when you explicitly ask for them.</li>
+    </ul>
+    <p>All of this lives in Android's app-private storage (e.g. the <code>files/</code> directory). Other apps cannot read it. The developer has no server that receives this data and cannot see your drink records.</p>
+
+    <h2>2. Anonymous analytics (can be turned off)</h2>
+    <p>To learn which features are useful and to diagnose crashes, the app sends the following through Google Firebase Analytics and Firebase Crashlytics while "Anonymous usage analytics" is on. The Google Play build has it off by default; APKs installed from other channels may have it on by default. In either build, no analytics or crash data is sent while the setting is off:</p>
+    <ul>
+      <li><strong>Feature events</strong>: screen changes, reminders shown/opened/dismissed, notification button taps, drink logging, whether onboarding was completed, and notification permission state. Drink events contain only a <strong>volume bucket</strong> (≤100 / ≤200 / ≤300 / &gt;300 ml) and a <strong>daily progress bucket</strong> (e.g. 25%–50%). They never include exact millilitres, drink times, or individual entries;</li>
+      <li><strong>App and device info</strong>: app version, Android version, device manufacturer, ROM family, interface language, and a Firebase-generated app instance ID;</li>
+      <li><strong>Bucketed settings</strong>: for example, which interval range your reminder setting falls into (within 15 minutes / 15–60 minutes / 1–6 hours). Exact setting values are not sent;</li>
+      <li><strong>Crashes and errors</strong>: stack traces, the screen where an error occurred, and device/system state, collected by Crashlytics;</li>
+      <li><strong>Approximate location</strong>: Firebase may derive a city-level location from the IP address of network requests. The app does not request location permission and does not collect precise location.</li>
+    </ul>
+    <p>Shui does <strong>not</strong> send to analytics: your name, email, phone number, or any account information; contacts, SMS, call logs, photos, or files; precise location; the Android advertising ID; your installed-app list; or your exact drink volumes, drink times, or drink entries.</p>
+
+    <h2>3. Third-party services</h2>
+    <p>Anonymous analytics and crash reporting are provided by Google Firebase. Google acts as a data processor and handles this data under its privacy terms:</p>
+    <table>
+      <thead><tr><th>Service</th><th>Provider</th><th>Purpose</th><th>Data categories</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Firebase Analytics</td>
+          <td>Google LLC</td>
+          <td>Understand feature usage and improve the product</td>
+          <td>App activity, device information, app instance ID, approximate location derived from IP</td>
+        </tr>
+        <tr>
+          <td>Firebase Crashlytics</td>
+          <td>Google LLC</td>
+          <td>Collect crashes and errors to improve stability</td>
+          <td>Crash stack traces, error details, device and system state, app instance ID</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>See <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Firebase Privacy and Security</a> and the <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy</a>.</p>
+    <p>The app integrates <strong>no</strong> advertising, push, or social-login SDKs, and advertising ID collection and ad personalization signals are disabled. Apart from the Firebase services above, the app sends no data to third parties.</p>
+
+    <h2>4. Your choices</h2>
+    <ul>
+      <li>The Google Play build has anonymous analytics off by default; APKs from other channels may have it on by default. Either way, you can turn it on or off anytime in Me → Privacy &amp; analytics;</li>
+      <li>Turning off "Anonymous usage analytics" in Me → Privacy &amp; analytics immediately stops usage events and crash reports from being sent to Firebase;</li>
+      <li>Turning it off does not affect reminders, drink logging, statistics, or exports;</li>
+      <li>To delete analytics data already sent, contact us at the email below. Because this data is not linked to an account or identity, we may ask for your app instance ID to locate it.</li>
+    </ul>
+
+    <h2>5. Legal basis and your rights</h2>
+    <p><strong>Legal basis:</strong> where consent is required, the Google Play build processes the data above only after you turn on "Anonymous usage analytics" (GDPR Article 6(1)(a)); APKs installed from other channels may have it on by default, and you can turn it off at any time. On-device data never leaves your device and is not personal data collected by us. Turning analytics off does not affect reminders, drink logging, statistics, or exports.</p>
+    <p><strong>Data controller:</strong> the Shui developer, reachable at the email below. The app performs no automated decision-making or profiling, and no analytics data is used for advertising.</p>
+    <p><strong>Your rights:</strong> where applicable law provides them, you have the right to access, rectify, erase, restrict, or object to processing, to receive a copy of your data (portability), and to withdraw consent at any time. Withdrawing consent is as easy as giving it: turn off the switch in Me → Privacy &amp; analytics and it takes effect immediately.</p>
+    <p>To exercise these rights, or to request deletion of analytics data already sent, email us at the address below. We will respond within a reasonable period after verification.</p>
+    <p><strong>Complaints:</strong> you have the right to lodge a complaint with the data protection authority in your country or region. We would appreciate the chance to explain and resolve the issue before you contact them.</p>
+    <p><strong>EU representative:</strong> the developer is not established in the EU. While distributing to EU users, we will appoint an EU representative under GDPR Article 27 and publish their name and contact details on this page. Until then, you can reach us directly at the email below.</p>
+
+    <h2>6. Data retention</h2>
+    <ul>
+      <li>On-device data: kept until you delete records, clear app data, or uninstall the app;</li>
+      <li>Firebase Analytics events: retained for 2 months by default, up to 14 months at most;</li>
+      <li>Firebase Crashlytics crash data: retained for 90 days.</li>
+    </ul>
+
+    <h2>7. Permissions and why we need them</h2>
+    <table>
+      <thead><tr><th>Permission</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>Notifications (POST_NOTIFICATIONS)</td><td>Deliver hydration reminders as system notifications while the app is in the background, including a "log a glass" action.</td></tr>
+        <tr><td>Exact alarms (SCHEDULE_EXACT_ALARM)</td><td>Fire reminders at the exact interval you configure. Inexact alarms can drift by 15 minutes or more, which would break the reminder cadence.</td></tr>
+        <tr><td>Boot completed (RECEIVE_BOOT_COMPLETED)</td><td>Rebuild your scheduled reminders after the device restarts.</td></tr>
+        <tr><td>Vibrate (VIBRATE)</td><td>Provide haptic feedback for reminders, according to your settings.</td></tr>
+        <tr><td>Ignore battery optimizations (REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)</td><td>Only opened when you tap "improve background reliability" inside the app, so system power saving does not drop reminder alarms. The app never reads your battery settings.</td></tr>
+        <tr><td>Internet (INTERNET)</td><td>Render the local interface and communicate with Firebase when anonymous analytics is on. The app has no backend of its own.</td></tr>
+      </tbody>
+    </table>
+    <p>The app does not request location, contacts, SMS, storage, camera, or microphone permissions. Our in-app guidance may open system settings or a manufacturer auto-start screen. This is only a navigation shortcut; the app does not read any information from those screens.</p>
+
+    <h2>8. Exports and backups</h2>
+    <p>CSV exports and JSON backups are triggered only by you. The resulting file is handed to the app or storage location you choose through the Android share sheet. It contains only your own drink records and settings — no device identifiers, no personal information. The developer cannot see what you export or where it goes.</p>
+
+    <h2>9. Children's privacy</h2>
+    <p>Shui is designed for adults, targets an audience of 18 and over, is not directed to children under 13, and does not knowingly collect any information from children. If a guardian believes a child has used the app without consent, please contact us at the email below.</p>
+
+    <h2>10. Deleting your data</h2>
+    <p>Your drink data exists only on your device, so you are in full control:</p>
+    <ul>
+      <li>Delete individual drink records inside the app;</li>
+      <li>Clear app data (Settings → Apps → Shui → Storage → Clear data);</li>
+      <li>Uninstall the app — all local data is removed.</li>
+    </ul>
+    <p>For deleting analytics data, see section 4.</p>
+
+    <h2>11. International transfers</h2>
+    <p>Firebase is operated by Google, and data may be processed on servers outside your country or region. Google provides safeguards through its data processing terms and standard contractual clauses; see the Firebase privacy links above.</p>
+
+    <h2>12. Changes to this policy</h2>
+    <p>If this policy changes materially, we will update the effective date at the top of this page and note the change in the app's release notes. Continued use of the app means you accept the updated policy.</p>
+
+    <h2>13. Contact</h2>
+    <p>Questions about this policy, or requests to delete analytics data already sent? Email <a href="mailto:hey47_zhang@163.com">hey47_zhang@163.com</a>.</p>
+  </main>
+
+  <footer>
+    <p>Shui · <span id="footer-note">This page is available in Chinese and English. In case of conflict, the Chinese version prevails.</span></p>
+  </footer>
+</div>
+
+<script>
+  (function () {
+    var zh = document.getElementById('doc-zh');
+    var en = document.getElementById('doc-en');
+    var bz = document.getElementById('btn-zh');
+    var be = document.getElementById('btn-en');
+    var title = document.getElementById('title');
+    var meta = document.getElementById('meta');
+    var note = document.getElementById('footer-note');
+
+    function select(lang) {
+      var isZh = lang === 'zh';
+      zh.hidden = !isZh;
+      en.hidden = isZh;
+      bz.setAttribute('aria-pressed', String(isZh));
+      be.setAttribute('aria-pressed', String(!isZh));
+      title.textContent = isZh ? '隐私政策' : 'Privacy Policy';
+      meta.textContent = isZh
+        ? '生效日期：2026 年 11 月 21 日 · 适用应用：Shui（Android，包名 com.shui.app）'
+        : 'Effective: November 21, 2026 · Applies to: Shui for Android (package com.shui.app)';
+      note.textContent = isZh
+        ? '本页面同时提供中文与英文版本，如有歧义以中文版本为准。'
+        : 'This page is available in Chinese and English. In case of conflict, the Chinese version prevails.';
+      document.documentElement.lang = isZh ? 'zh-CN' : 'en';
+    }
+
+    bz.addEventListener('click', function () { select('zh'); });
+    be.addEventListener('click', function () { select('en'); });
+
+    select('en');
+  })();
+</script>
+</body>
+</html>

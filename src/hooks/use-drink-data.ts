@@ -13,6 +13,7 @@ import {
 } from "@/lib/drink-history";
 import { summarizeReminders, type ReminderSummary } from "@/lib/reminder-history";
 import type { DrinkDayRecord, DrinkHistoryValue } from "@/lib/drink-day";
+import { getStreak, type StreakInfo } from "@/lib/streak";
 import { isDemoPreview, isMobilePreview, onRefresh } from "@/lib/mobile";
 import { useDayChange } from "@/hooks/use-day-change";
 
@@ -23,6 +24,7 @@ interface Snapshot {
   entries: Array<[string, DrinkHistoryValue]>;
   reminders: ReminderSummary;
   reminderError: boolean;
+  streak: StreakInfo | null;
 }
 
 const EMPTY: Snapshot = {
@@ -32,6 +34,7 @@ const EMPTY: Snapshot = {
   entries: [],
   reminders: summarizeReminders([]),
   reminderError: false,
+  streak: null,
 };
 
 /** Fake but internally consistent data for the `?demo=1` desktop preview. */
@@ -82,6 +85,7 @@ function buildDemoSnapshot(period: 7 | 30): Snapshot {
       displaySeconds: 412,
     },
     reminderError: false,
+    streak: { current: 6, best: 9, todayCompleted: false, milestone: 0 },
   };
 }
 
@@ -147,6 +151,9 @@ export function useDrinkData(period: 7 | 30 = 7) {
         reminderError = true;
       }
 
+      // 连续达标由 Rust 统一计算，避免各端口径漂移；浏览器预览没有该命令。
+      const streak = await getStreak();
+
       if (!cancelled) {
         setSnapshot({
           goal,
@@ -158,6 +165,7 @@ export function useDrinkData(period: 7 | 30 = 7) {
           ),
           reminders,
           reminderError,
+          streak,
         });
       }
     })()

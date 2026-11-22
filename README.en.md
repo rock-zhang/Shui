@@ -72,6 +72,7 @@ Download the latest version from the [Releases](https://github.com/rock-zhang/Sh
 
 #### Windows
 
+- Package manager (recommended): `winget install rock-zhang.Shui`
 - 64-bit System: Download `Shui_x.x.x_x64-setup.exe`
 - 32-bit System: Download `Shui_x.x.x_x86-setup.exe`
 - ARM64 Architecture: Download `Shui_x.x.x_arm64-setup.exe`

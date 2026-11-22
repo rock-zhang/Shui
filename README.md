@@ -74,6 +74,7 @@
 
 #### Windows
 
+- 包管理器（推荐）：`winget install rock-zhang.Shui`
 - 64 位系统：下载 `Shui_x.x.x_x64-setup.exe`
 - 32 位系统：下载 `Shui_x.x.x_x86-setup.exe`
 - ARM64 架构：下载 `Shui_x.x.x_arm64-setup.exe`

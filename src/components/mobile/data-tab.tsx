@@ -257,6 +257,7 @@ export function DataTab() {
     loading,
     error,
     goal,
+    streak,
   } = useDrinkData(period);
   // 全新安装每天都会写入当天目标；只有从桌面导入的旧格式数字总量才缺少它。
   const hasLegacyData = days.some(
@@ -280,12 +281,17 @@ export function DataTab() {
           }}
           label={t("mobile.data.period.label")}
         />
-        <div className="mt-3 grid grid-cols-3 gap-2">
+        <div className="mt-3 grid grid-cols-2 gap-2">
           <MobileStat label={t("mobile.data.today")} value={loading ? "--" : summary.today} unit="ml" />
           <MobileStat label={t("mobile.data.average")} value={loading ? "--" : summary.average} unit="ml" />
           <MobileStat
             label={t("mobile.data.completed")}
             value={loading ? "--" : summary.completedDays}
+            unit={t("mobile.data.daysUnit")}
+          />
+          <MobileStat
+            label={t("mobile.data.streak")}
+            value={loading || !streak ? "--" : streak.current}
             unit={t("mobile.data.daysUnit")}
           />
         </div>

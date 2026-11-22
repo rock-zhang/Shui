@@ -1,24 +1,28 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { PLATFORM_OS } from "@/lib/constants";
-import { detectPlatform, emitRefresh } from "@/lib/mobile";
+import {
+  DEFAULT_ALERT,
+  detectPlatform,
+  emitRefresh,
+  normalizeQuickAmounts,
+  readConfig,
+  type AlertConfig,
+} from "@/lib/mobile";
 import { playConfirmSound } from "@/utils/sound";
 
 /** Rust 侧记水成功后广播的事件，payload 是 `Receipt`。 */
 export const DRINK_RECORDED_EVENT = "shui:drink-recorded";
 
 /**
- * 桌面通知的水量档位，升序。
+ * 桌面通知的水量档位来自 `alert.quickAmounts`（与「饮水记录」页共用）。
  *
  * 各端用法不同（见 `src-tauri/src/desktop_notification.rs`）：
- * - macOS 只取其中**最小**的一档（50ml）做成单按钮。macOS 把两个以上动作折叠成
+ * - macOS 只取其中**最小**的一档做成单按钮。macOS 把两个以上动作折叠成
  *   下拉，点下拉按钮本身还会被上报成第一个动作；单按钮一次点击就完成，没有误点空间；
- * - Windows / Linux 三个按钮 + 「稍后再说」并列展示；
- * - Android 的 `ReminderScheduler.drinkActions` 按钮文案格式相同（`+Xml`）；
- *   Android 允许用户在今日页长按卡片自定义杯量（取最小三档），桌面保持这组
- *   静态档位不变，因此两端在自定义后允许不同。
+ * - Windows / Linux 四个按钮 + 「稍后再说」并列展示；
+ * - Android 的 `ReminderScheduler.drinkActions` 读原生配置快照，同样用这份档位。
  */
-export const DRINK_ACTION_AMOUNTS = [50, 100, 200] as const;
 
 /**
  * 桌面端记水事件的桥：Rust 已经把水记进库里了，这里只补界面层——
@@ -88,9 +92,12 @@ export const sendReminderNotification = async () => {
   // macOS 只发一个动作避免被折叠成下拉；标题、正文与进度副标题都在 Rust 侧
   // 按今日完成度生成，点击后的记水同样在 Rust 落盘，不依赖这条 WebView 通道。
   try {
-    await invoke("send_desktop_reminder_notification", {
-      amounts: DRINK_ACTION_AMOUNTS,
-    });
+    // 通知按钮去重：快捷杯量允许重复，但同一档位在通知里出现多次没有意义。
+    const alert = await readConfig<AlertConfig>("alert", DEFAULT_ALERT);
+    const amounts = Array.from(
+      new Set(normalizeQuickAmounts(alert.quickAmounts))
+    );
+    await invoke("send_desktop_reminder_notification", { amounts });
   } catch (error) {
     // 以前这里静默吞掉，表现为「到点没通知、也查不到原因」。
     console.error("系统通知发送失败", error);

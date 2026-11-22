@@ -1,0 +1,2163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>饮品类型区分 · 交互式方案</title>
+<style>
+  :root {
+    --bg: #f4f7fb;
+    --panel: #ffffff;
+    --ink: #0f172a;
+    --ink-2: #334155;
+    --muted: #6b7a90;
+    --line: #e3e9f2;
+    --line-2: #eef2f8;
+    --primary: #0ea5e9;
+    --primary-deep: #0369a1;
+    --primary-soft: #e0f2fe;
+    --green: #10b981;
+    --green-soft: #d1fae5;
+    --orange: #f97316;
+    --orange-soft: #ffedd5;
+    --violet: #7c3aed;
+    --violet-soft: #ede9fe;
+    --amber: #b45309;
+    --amber-soft: #fef3c7;
+    --shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 10px 30px -16px rgba(15, 23, 42, .22);
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button { font-family: inherit; }
+
+  /* ---------- 顶栏 ---------- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 22px;
+    height: 58px;
+    background: rgba(255, 255, 255, .86);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .topbar-title { font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+  .topbar-sub { font-size: 12px; color: var(--muted); }
+  .topbar-spacer { flex: 1; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 550;
+    background: var(--orange-soft);
+    color: #9a3412;
+  }
+
+  .mode-switch {
+    display: inline-flex;
+    padding: 3px;
+    background: var(--line-2);
+    border-radius: 999px;
+  }
+
+  .mode-switch button {
+    border: 0;
+    background: transparent;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 12.5px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: .18s;
+  }
+
+  .mode-switch button.active {
+    background: #fff;
+    color: var(--ink);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, .12);
+  }
+
+  /* ---------- 布局 ---------- */
+  .layout {
+    display: grid;
+    grid-template-columns: 432px minmax(0, 1fr);
+    gap: 26px;
+    max-width: 1560px;
+    margin: 0 auto;
+    padding: 22px;
+    align-items: start;
+  }
+
+  .proto-pane {
+    position: sticky;
+    top: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .view-switch {
+    display: inline-flex;
+    padding: 3px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+  }
+
+  .view-switch button {
+    border: 0;
+    background: transparent;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: .18s;
+  }
+
+  .view-switch button.active {
+    background: var(--primary-soft);
+    color: var(--primary-deep);
+    font-weight: 600;
+  }
+
+  /* ---------- 手机框 ---------- */
+  .phone {
+    position: relative;
+    width: 394px;
+    height: calc(100vh - 172px);
+    min-height: 620px;
+    max-height: 812px;
+    border: 10px solid #111827;
+    border-radius: 46px;
+    background: #111827;
+    box-shadow: 0 24px 60px -24px rgba(15, 23, 42, .45), 0 2px 0 rgba(255, 255, 255, .5) inset;
+    overflow: hidden;
+  }
+
+  .phone-screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 36px;
+    background: #f6f9fc;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .statusbar {
+    flex: 0 0 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 26px;
+    font-size: 11.5px;
+    font-weight: 650;
+    color: var(--ink);
+    letter-spacing: .01em;
+  }
+
+  .statusbar .sb-right { display: flex; align-items: center; gap: 5px; }
+  .sb-bar { width: 3px; border-radius: 2px; background: var(--ink); }
+
+  .phone-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 2px 16px 26px;
+    scrollbar-width: none;
+  }
+
+  .phone-body::-webkit-scrollbar { display: none; }
+
+  .app-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 2px 2px 10px;
+  }
+
+  .app-date { font-size: 17px; font-weight: 680; letter-spacing: -.015em; }
+  .app-sub { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--muted);
+    cursor: pointer;
+    transition: .18s;
+  }
+
+  .icon-btn:hover { color: var(--primary-deep); border-color: var(--primary); }
+
+  /* 圆环 */
+  .ring-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 0 12px;
+  }
+
+  .streak-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    margin-bottom: 14px;
+    border-radius: 999px;
+    background: #fff;
+    border: 1px solid #fed7aa;
+    color: #c2410c;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: 0 4px 12px -6px rgba(249, 115, 22, .5);
+  }
+
+  .ring {
+    position: relative;
+    width: 178px;
+    height: 178px;
+    border-radius: 50%;
+    background: conic-gradient(var(--primary) calc(var(--p) * 1%), var(--line-2) 0);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: --p .4s ease;
+  }
+
+  .ring-inner {
+    width: 138px;
+    height: 138px;
+    border-radius: 50%;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 10px -4px rgba(15, 23, 42, .12) inset;
+  }
+
+  .ring-total { font-size: 30px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .ring-goal { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .ring-pct {
+    margin-top: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--primary-deep);
+    background: var(--primary-soft);
+    padding: 1px 8px;
+    border-radius: 999px;
+  }
+
+  .tip-line { margin: 12px 0 0; text-align: center; font-size: 11.5px; color: var(--muted); }
+
+  /* 快捷卡片 */
+  .quick-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .quick-card {
+    position: relative;
+    overflow: hidden;
+    text-align: left;
+    min-height: 104px;
+    padding: 13px;
+    border-radius: 18px;
+    border: 1px solid var(--line);
+    background: #fff;
+    cursor: pointer;
+    transition: border-color .16s, box-shadow .16s, transform .12s;
+  }
+
+  .quick-card:hover { border-color: #7dd3fc; box-shadow: 0 10px 22px -16px rgba(14, 165, 233, .8); }
+  .quick-card:active { transform: scale(.975); }
+
+  .quick-card .blob {
+    position: absolute;
+    right: -20px;
+    top: -26px;
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    background: rgba(14, 165, 233, .09);
+  }
+
+  .quick-top { position: relative; display: flex; align-items: flex-start; justify-content: space-between; }
+  .quick-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: var(--primary-soft);
+    color: var(--primary-deep);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .quick-plus { color: #9aa8bb; }
+  .quick-amount { position: relative; display: block; margin-top: 9px; font-size: 22px; font-weight: 680; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .quick-amount small { margin-left: 3px; font-size: 11px; font-weight: 550; color: var(--muted); letter-spacing: 0; }
+  .quick-hint { position: relative; display: block; margin-top: 2px; font-size: 11px; color: var(--muted); }
+
+  .celebrate {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    animation: pop .2s ease;
+  }
+
+  @keyframes pop { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+
+  .celebrate .tick {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--green-soft);
+    color: #047857;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .celebrate .done-text { margin-top: 6px; font-size: 11.5px; font-weight: 600; color: #047857; }
+
+  /* 更多饮品入口 */
+  .more-drink {
+    width: 100%;
+    margin-top: 10px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border-radius: 14px;
+    border: 1px dashed #bae6fd;
+    background: rgba(224, 242, 254, .45);
+    color: var(--primary-deep);
+    font-size: 12.5px;
+    font-weight: 560;
+    cursor: pointer;
+    transition: .18s;
+  }
+
+  .more-drink:hover { background: var(--primary-soft); border-color: #7dd3fc; }
+
+  /* 卡片区 */
+  .section-card {
+    margin-top: 12px;
+    padding: 14px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+  }
+
+  .section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .section-title { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 640; }
+
+  .info-btn {
+    width: 19px;
+    height: 19px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 0;
+    background: transparent;
+    color: #b6c2d2;
+    cursor: pointer;
+    padding: 0;
+    transition: .16s;
+  }
+
+  .info-btn:hover { color: var(--primary); background: var(--primary-soft); }
+
+  .link-text {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    font-size: 11.5px;
+    color: var(--primary-deep);
+    cursor: pointer;
+  }
+
+  .link-text:hover { text-decoration: underline; }
+
+  .rhythm-row { display: flex; align-items: center; gap: 11px; }
+  .rhythm-icon {
+    width: 40px; height: 40px; flex: none;
+    border-radius: 12px;
+    background: var(--line-2);
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--muted);
+  }
+  .rhythm-main { font-size: 12.5px; font-weight: 560; }
+  .rhythm-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+  /* 明细 */
+  .entry-list { list-style: none; margin: 0; padding: 0; }
+  .entry-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line-2);
+  }
+  .entry-item:last-child { border-bottom: 0; }
+
+  .entry-icon {
+    width: 30px; height: 30px; flex: none;
+    border-radius: 9px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--line-2);
+    color: var(--muted);
+  }
+
+  .entry-time { flex: 1; min-width: 0; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .entry-type-tag { font-size: 10px; color: var(--muted); margin-left: 5px; }
+  .entry-amount { font-size: 12.5px; font-weight: 650; color: var(--primary-deep); font-variant-numeric: tabular-nums; }
+
+  .icon-btn-sm {
+    width: 30px; height: 30px; flex: none;
+    border: 0; background: transparent; color: #a8b5c6;
+    border-radius: 8px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .icon-btn-sm:hover { background: #fee2e2; color: #dc2626; }
+
+  .empty-hint { padding: 14px 0; text-align: center; font-size: 12px; color: var(--muted); }
+
+  /* 底部抽屉 */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    background: rgba(15, 23, 42, .34);
+    display: flex;
+    align-items: flex-end;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+  }
+
+  .overlay.open { opacity: 1; pointer-events: auto; }
+
+  .sheet-panel {
+    width: 100%;
+    max-height: 88%;
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 24px 24px 0 0;
+    padding: 10px 18px 20px;
+    transform: translateY(100%);
+    transition: transform .26s cubic-bezier(.22, 1, .36, 1);
+    scrollbar-width: none;
+  }
+  .sheet-panel::-webkit-scrollbar { display: none; }
+  .overlay.open .sheet-panel { transform: translateY(0); }
+
+  .grip { width: 40px; height: 4px; border-radius: 999px; background: #cbd5e1; margin: 4px auto 14px; }
+
+  .sheet-title { margin: 0; font-size: 16px; font-weight: 680; letter-spacing: -.01em; }
+  .sheet-desc { margin: 3px 0 14px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+
+  .type-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
+
+  .type-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 11px 2px 9px;
+    border-radius: 13px;
+    border: 1.5px solid var(--line);
+    background: #fff;
+    color: var(--ink-2);
+    font-size: 11px;
+    cursor: pointer;
+    transition: .16s;
+  }
+
+  .type-chip:hover { border-color: #cbd5e1; background: #fafcff; }
+  .type-chip.active { border-color: var(--primary); background: var(--primary-soft); color: var(--primary-deep); font-weight: 640; }
+  .type-chip .chip-icon { display: inline-flex; }
+
+  .amount-block { margin-top: 20px; text-align: center; }
+  .amount-value { font-size: 40px; font-weight: 700; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+  .amount-value small { margin-left: 4px; font-size: 13px; font-weight: 550; color: var(--muted); letter-spacing: 0; }
+  .amount-note { margin-top: 3px; font-size: 11px; color: var(--muted); }
+
+  .stepper { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 14px; }
+  .step-btn {
+    width: 46px; height: 46px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: .16s;
+  }
+  .step-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary-deep); background: var(--primary-soft); }
+  .step-btn:disabled { opacity: .38; cursor: not-allowed; }
+
+  .sheet-actions { display: flex; gap: 10px; margin-top: 20px; }
+
+  .btn {
+    height: 48px;
+    flex: 1;
+    border-radius: 14px;
+    border: 1px solid transparent;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: .16s;
+  }
+  .btn-ghost { background: #f1f5f9; color: var(--ink-2); }
+  .btn-ghost:hover { background: #e8eef6; }
+  .btn-primary { background: var(--primary); color: #fff; box-shadow: 0 8px 18px -10px rgba(14, 165, 233, .9); }
+  .btn-primary:hover { background: #0284c7; }
+
+  .count-hint { margin-top: 10px; text-align: center; font-size: 11px; color: var(--muted); }
+
+  /* 数据页 */
+  .seg { display: flex; padding: 3px; background: var(--line-2); border-radius: 11px; }
+  .seg button {
+    flex: 1; border: 0; background: transparent;
+    padding: 7px 0; border-radius: 9px;
+    font-size: 12px; color: var(--muted); cursor: pointer; transition: .16s;
+  }
+  .seg button.active { background: #fff; color: var(--ink); font-weight: 620; box-shadow: 0 1px 3px rgba(15, 23, 42, .1); }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .stat-cell { background: #f8fafc; border-radius: 12px; padding: 10px 11px; }
+  .stat-label { font-size: 10.5px; color: var(--muted); }
+  .stat-value { margin-top: 2px; font-size: 17px; font-weight: 680; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .stat-value small { margin-left: 2px; font-size: 10.5px; font-weight: 550; color: var(--muted); letter-spacing: 0; }
+
+  .trend { display: flex; align-items: flex-end; gap: 5px; height: 108px; padding-top: 6px; }
+  .trend-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
+  .trend-bar { width: 100%; border-radius: 4px 4px 2px 2px; background: #38bdf8; }
+  .trend-bar.done { background: var(--green); }
+  .trend-label { margin-top: 5px; font-size: 9px; color: var(--muted); white-space: nowrap; }
+
+  .mix-bar { display: flex; height: 13px; border-radius: 999px; overflow: hidden; background: var(--line-2); }
+  .mix-seg { height: 100%; transition: width .3s ease; }
+
+  .mix-legend { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 7px; }
+  .mix-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .mix-name { flex: 1; }
+  .mix-amount { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .mix-pct { width: 42px; text-align: right; font-weight: 620; font-variant-numeric: tabular-nums; }
+
+  /* 桌面视图 */
+  .browser {
+    width: 640px;
+    max-width: 100%;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    background: #fff;
+  }
+
+  .browser-bar {
+    height: 38px;
+    background: #f1f5f9;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 14px;
+  }
+
+  .browser-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .browser-url {
+    flex: 1;
+    margin-left: 8px;
+    height: 22px;
+    border-radius: 7px;
+    background: #fff;
+    border: 1px solid var(--line);
+    font-size: 10.5px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    padding: 0 9px;
+  }
+
+  .browser-body {
+    height: calc(100vh - 292px);
+    min-height: 480px;
+    overflow-y: auto;
+    background: #f8fafc;
+    padding: 22px;
+    scrollbar-width: thin;
+  }
+
+  .d-title { font-size: 18px; font-weight: 680; letter-spacing: -.02em; }
+  .d-sub { margin-top: 2px; font-size: 11.5px; color: var(--muted); }
+
+  .d-card {
+    margin-top: 14px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  .d-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .d-card-title { font-size: 13.5px; font-weight: 640; }
+  .d-progress-track { margin-top: 12px; height: 8px; border-radius: 999px; background: var(--line-2); overflow: hidden; }
+  .d-progress-fill { height: 100%; border-radius: 999px; background: var(--primary); transition: width .3s; }
+
+  .d-type-row { display: flex; gap: 7px; margin-top: 14px; }
+  .d-type {
+    padding: 7px 13px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: #fff;
+    font-size: 12px;
+    color: var(--ink-2);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: .16s;
+  }
+  .d-type:hover { border-color: #cbd5e1; }
+  .d-type.active { border-color: var(--primary); background: var(--primary-soft); color: var(--primary-deep); font-weight: 620; }
+
+  .d-quick-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+  .d-quick {
+    padding: 8px 15px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: #fff;
+    font-size: 12.5px;
+    font-weight: 560;
+    cursor: pointer;
+    transition: .16s;
+    font-variant-numeric: tabular-nums;
+  }
+  .d-quick:hover { border-color: var(--primary); color: var(--primary-deep); background: var(--primary-soft); }
+
+  .d-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--line-2);
+    font-size: 12.5px;
+  }
+  .d-row:last-child { border-bottom: 0; }
+  .d-row .entry-icon { width: 28px; height: 28px; border-radius: 8px; }
+  .d-row .d-time { flex: 1; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .d-row .d-tag { font-size: 10px; color: var(--muted); border: 1px solid var(--line); padding: 0 6px; border-radius: 999px; }
+
+  /* ---------- 文档 ---------- */
+  .doc-pane { min-width: 0; }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    position: sticky;
+    top: 80px;
+    z-index: 30;
+    overflow-x: auto;
+  }
+
+  .tabs button {
+    flex: 1;
+    min-width: 78px;
+    border: 0;
+    background: transparent;
+    padding: 9px 12px;
+    border-radius: 9px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: .16s;
+  }
+
+  .tabs button.active { background: var(--primary-soft); color: var(--primary-deep); font-weight: 640; }
+
+  .panel { display: none; padding: 24px 4px 60px; }
+  .panel.active { display: block; }
+
+  .panel h2 {
+    margin: 0 0 4px;
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -.02em;
+  }
+
+  .panel-lead { margin: 0 0 22px; font-size: 13px; color: var(--muted); }
+
+  .doc-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .03);
+  }
+
+  .doc-card h3 { margin: 0 0 8px; font-size: 14.5px; font-weight: 660; }
+  .doc-card p { margin: 0 0 10px; font-size: 13.2px; color: var(--ink-2); }
+  .doc-card p:last-child { margin-bottom: 0; }
+  .doc-card ul, .doc-card ol { margin: 6px 0 10px; padding-left: 20px; font-size: 13.2px; color: var(--ink-2); }
+  .doc-card li { margin: 4px 0; }
+
+  .feature-section {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    margin-bottom: 16px;
+    scroll-margin-top: 92px;
+    transition: border-color .2s, box-shadow .2s;
+  }
+
+  .feature-section:hover { border-left-color: #bae6fd; }
+  .feature-section.highlight { border-left-color: var(--primary); box-shadow: 0 0 0 3px rgba(14, 165, 233, .12); }
+
+  .feature-section h3 { margin: 0 0 3px; font-size: 15.5px; font-weight: 680; letter-spacing: -.01em; }
+  .feature-meta { font-size: 11px; color: var(--muted); margin-bottom: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--line-2);
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 550;
+  }
+  .tag.p0 { background: #fef2f2; color: #b91c1c; }
+  .tag.p1 { background: var(--amber-soft); color: #92400e; }
+
+  .feature-section h4 { margin: 14px 0 5px; font-size: 12.5px; font-weight: 650; color: var(--ink); }
+  .feature-section p { margin: 0 0 9px; font-size: 13.2px; color: var(--ink-2); }
+  .feature-section ul { margin: 4px 0 9px; padding-left: 20px; font-size: 13.2px; color: var(--ink-2); }
+  .feature-section li { margin: 3px 0; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.6px;
+    margin: 8px 0 12px;
+  }
+
+  th {
+    text-align: left;
+    background: #f8fafc;
+    color: var(--ink-2);
+    font-weight: 620;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line-2);
+    color: var(--ink-2);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: 0; }
+
+  .table-wrap { overflow-x: auto; }
+
+  .callout {
+    display: flex;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: var(--primary-soft);
+    border: 1px solid #bae6fd;
+    font-size: 12.8px;
+    color: #075985;
+    margin: 12px 0;
+  }
+
+  .callout.warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+  .callout.plain { background: #f8fafc; border-color: var(--line); color: var(--ink-2); }
+
+  .callout strong { font-weight: 660; }
+
+  .decision-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+
+  .decision {
+    padding: 14px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: #fff;
+  }
+
+  .decision .k { font-size: 10.5px; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; font-weight: 600; }
+  .decision .v { margin-top: 5px; font-size: 12.8px; color: var(--ink-2); }
+
+  .flow { display: flex; flex-direction: column; gap: 0; }
+
+  .flow-step {
+    display: flex;
+    gap: 12px;
+    padding-bottom: 16px;
+    position: relative;
+  }
+
+  .flow-step:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    left: 13px;
+    top: 28px;
+    bottom: 0;
+    width: 2px;
+    background: var(--line);
+  }
+
+  .flow-num {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--primary-soft);
+    color: var(--primary-deep);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 680;
+    z-index: 1;
+  }
+
+  .flow-body { padding-top: 2px; }
+  .flow-body b { font-size: 13px; font-weight: 650; display: block; }
+  .flow-body span { font-size: 12.5px; color: var(--muted); }
+
+  .doc-foot {
+    margin-top: 28px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    font-size: 11.5px;
+    color: #9aa8bb;
+  }
+
+  /* ---------- toast ---------- */
+  .toast {
+    position: absolute;
+    left: 50%;
+    bottom: 96px;
+    z-index: 60;
+    transform: translate(-50%, 10px);
+    background: #0f172a;
+    color: #fff;
+    padding: 9px 16px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 550;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s, transform .2s;
+    white-space: nowrap;
+    box-shadow: 0 12px 24px -12px rgba(15, 23, 42, .7);
+  }
+
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- 文本模式 ---------- */
+  body.text-mode .layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 960px;
+  }
+
+  body.text-mode .proto-pane {
+    position: static;
+    width: 100%;
+    padding-bottom: 8px;
+  }
+
+  body.text-mode .view-switch { display: none; }
+
+  body.text-mode .doc-pane { width: 100%; }
+  body.text-mode .tabs { display: none; }
+
+  body.text-mode .panel {
+    display: block !important;
+    padding: 18px 0 10px;
+  }
+
+  body.text-mode .panel:not(:first-child) {
+    border-top: 1px solid var(--line);
+    margin-top: 20px;
+  }
+
+  body.text-mode .panel h2 { font-size: 19px; }
+
+  /* ---------- 响应式 ---------- */
+  @media (max-width: 1080px) {
+    .layout { grid-template-columns: 1fr; }
+    .proto-pane { position: static; }
+    .tabs { position: static; }
+    .phone { height: 720px; }
+    .browser-body { height: auto; min-height: 520px; }
+  }
+
+  @media (max-width: 520px) {
+    .topbar { padding: 0 12px; gap: 8px; }
+    .topbar-sub { display: none; }
+    .layout { padding: 12px; gap: 16px; }
+    .phone { width: 100%; max-width: 394px; height: 660px; }
+    .browser { width: 100%; }
+    .panel { padding: 18px 0 40px; }
+    .doc-card, .feature-section { padding: 15px 14px; }
+  }
+
+  @media print {
+    .topbar, .proto-pane, .tabs, .toast { display: none !important; }
+    body { background: #fff; }
+    .layout { display: block; padding: 0; }
+    .panel { display: block !important; }
+    .feature-section, .doc-card { break-inside: avoid; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="topbar-title">饮品类型区分</div>
+    <div class="topbar-sub">饮水打卡 · 交互式产品方案</div>
+  </div>
+  <span class="badge">v0.1 草案 · 待排期</span>
+  <div class="topbar-spacer"></div>
+  <div class="mode-switch" role="group" aria-label="视图模式">
+    <button type="button" id="modeProto" class="active">原型 + 文档</button>
+    <button type="button" id="modeText">纯文档</button>
+  </div>
+</div>
+
+<div class="layout">
+
+  <!-- ============ 左侧原型 ============ -->
+  <div class="proto-pane">
+    <div class="view-switch" role="group" aria-label="设备视图">
+      <button type="button" id="viewPhone" class="active">手机</button>
+      <button type="button" id="viewDesktop">桌面</button>
+    </div>
+
+    <!-- 手机壳 -->
+    <div class="phone" id="phoneFrame">
+      <div class="phone-screen">
+        <div class="statusbar">
+          <span>9:41</span>
+          <span class="sb-right">
+            <span class="sb-bar" style="height:5px"></span>
+            <span class="sb-bar" style="height:8px"></span>
+            <span class="sb-bar" style="height:11px"></span>
+            <svg width="20" height="11" viewBox="0 0 20 11" fill="none" aria-hidden="true">
+              <rect x=".5" y=".5" width="16" height="10" rx="3" stroke="#0f172a" opacity=".35"/>
+              <rect x="2" y="2" width="11" height="7" rx="1.6" fill="#0f172a"/>
+              <rect x="18" y="3.4" width="2" height="4.2" rx="1" fill="#0f172a" opacity=".4"/>
+            </svg>
+          </span>
+        </div>
+
+        <div class="phone-body" id="phoneBody">
+          <!-- 今日页 -->
+          <div id="screenToday">
+            <div class="app-header">
+              <div>
+                <div class="app-date">11月22日 周六</div>
+                <div class="app-sub">今天也要记得补水</div>
+              </div>
+              <button type="button" class="icon-btn" id="btnAllEntries" aria-label="查看全部明细">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+              </button>
+            </div>
+
+            <div class="ring-wrap">
+              <div class="streak-pill">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M12 2c1 3 4 4.5 4 8a4 4 0 1 1-8 0c0-1.4.6-2.3 1.4-3.2C10.2 5.4 12 4 12 2Z"/><path d="M12 22c3.9 0 7-2.6 7-6.5 0-2.6-1.4-4.3-2.5-5.5"/></svg>
+                <span>连续达标 12 天</span>
+              </div>
+              <div class="ring" id="ring" style="--p:0">
+                <div class="ring-inner">
+                  <span class="ring-total" id="ringTotal">0</span>
+                  <span class="ring-goal" id="ringGoal">/ 2000 ml</span>
+                  <span class="ring-pct" id="ringPct">0%</span>
+                </div>
+              </div>
+              <p class="tip-line">所有饮品都按实际毫升计入目标</p>
+            </div>
+
+            <div class="quick-grid" id="quickGrid"></div>
+
+            <button type="button" class="more-drink" id="btnMoreDrink">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              记其他饮品（咖啡 / 茶 / 果汁）
+            </button>
+
+            <div class="section-card">
+              <div class="section-head">
+                <div class="section-title">
+                  提醒节奏
+                  <button type="button" class="info-btn" data-link="feature-reminder-channel" aria-label="查看规则">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="rhythm-row">
+                <div class="rhythm-icon">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                </div>
+                <div>
+                  <div class="rhythm-main">每 60 分钟 · 09:00–21:00</div>
+                  <div class="rhythm-sub">预计下一杯 17:20</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-card">
+              <div class="section-head">
+                <div class="section-title">
+                  今日明细
+                  <button type="button" class="info-btn" data-link="feature-entry-list" aria-label="查看规则">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+                  </button>
+                </div>
+                <button type="button" class="link-text" id="btnAllEntries2">全部</button>
+              </div>
+              <ul class="entry-list" id="inlineEntries"></ul>
+            </div>
+          </div>
+
+          <!-- 数据页 -->
+          <div id="screenData" hidden>
+            <div class="app-header">
+              <div>
+                <div class="app-date">数据</div>
+                <div class="app-sub">近 7 天 · 含饮品构成</div>
+              </div>
+            </div>
+
+            <div class="seg" id="periodSeg">
+              <button type="button" class="active" data-period="7">近 7 天</button>
+              <button type="button" data-period="30">近 30 天</button>
+            </div>
+
+            <div class="stat-grid">
+              <div class="stat-cell">
+                <div class="stat-label">今日饮水</div>
+                <div class="stat-value" id="statToday">0<small>ml</small></div>
+              </div>
+              <div class="stat-cell">
+                <div class="stat-label">日均</div>
+                <div class="stat-value">1580<small>ml</small></div>
+              </div>
+              <div class="stat-cell">
+                <div class="stat-label">达标天数</div>
+                <div class="stat-value">4<small>天</small></div>
+              </div>
+              <div class="stat-cell">
+                <div class="stat-label">连续达标</div>
+                <div class="stat-value">12<small>天</small></div>
+              </div>
+            </div>
+
+            <div class="section-card">
+              <div class="section-head">
+                <div class="section-title">饮水趋势</div>
+              </div>
+              <div class="trend" id="trendChart"></div>
+            </div>
+
+            <div class="section-card" id="mixCard">
+              <div class="section-head">
+                <div class="section-title">
+                  饮品构成
+                  <button type="button" class="info-btn" data-link="feature-drink-mix" aria-label="查看规则">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+                  </button>
+                </div>
+                <span class="link-text" style="cursor:default">近 7 天</span>
+              </div>
+              <div class="mix-bar" id="mixBar"></div>
+              <ul class="mix-legend" id="mixLegend"></ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- 记录抽屉 -->
+        <div class="overlay" id="recordOverlay">
+          <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="recordTitle">
+            <div class="grip"></div>
+            <h3 class="sheet-title" id="recordTitle">记一杯</h3>
+            <p class="sheet-desc">选好饮品类型和杯量。所有饮品都按实际毫升计入今日目标。</p>
+
+            <div class="type-grid" id="typeGrid"></div>
+
+            <div class="amount-block">
+              <div class="amount-value"><span id="sheetAmount">200</span><small>ml</small></div>
+              <div class="amount-note" id="sheetTypeNote">水 · 按实际杯量计入</div>
+            </div>
+
+            <div class="stepper">
+              <button type="button" class="step-btn" id="btnMinus" aria-label="减少 50 毫升">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"/></svg>
+              </button>
+              <button type="button" class="step-btn" id="btnPlus" aria-label="增加 50 毫升">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              </button>
+            </div>
+
+            <div class="sheet-actions">
+              <button type="button" class="btn btn-ghost" id="btnCancelRecord">取消</button>
+              <button type="button" class="btn btn-primary" id="btnSaveRecord">记录</button>
+            </div>
+            <div class="count-hint" id="countHint">今日已记录 6 次</div>
+          </div>
+        </div>
+
+        <!-- 全部明细抽屉 -->
+        <div class="overlay" id="detailOverlay">
+          <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+            <div class="grip"></div>
+            <h3 class="sheet-title" id="detailTitle">今日全部明细</h3>
+            <p class="sheet-desc">按时间从新到旧排列，可以撤销任意一条。</p>
+            <ul class="entry-list" id="allEntries"></ul>
+            <div class="sheet-actions">
+              <button type="button" class="btn btn-ghost" id="btnCloseDetail">关闭</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="toast" id="toast"></div>
+      </div>
+    </div>
+
+    <!-- 桌面视图 -->
+    <div class="browser" id="browserFrame" hidden>
+      <div class="browser-bar">
+        <span class="browser-dot" style="background:#fca5a5"></span>
+        <span class="browser-dot" style="background:#fcd34d"></span>
+        <span class="browser-dot" style="background:#86efac"></span>
+        <span class="browser-url">设置 › 历史记录</span>
+      </div>
+      <div class="browser-body">
+        <div class="d-title">历史记录</div>
+        <div class="d-sub">桌面端与手机共用同一份记录，饮品类型同样适用</div>
+
+        <div class="d-card">
+          <div class="d-card-head">
+            <span class="d-card-title">今日进度</span>
+            <span class="d-sub" id="dProgressText" style="margin:0">0 / 2000 ml</span>
+          </div>
+          <div class="d-progress-track"><div class="d-progress-fill" id="dProgressFill" style="width:0%"></div></div>
+        </div>
+
+        <div class="d-card">
+          <div class="d-card-head">
+            <span class="d-card-title">手动记录</span>
+            <span class="d-sub" style="margin:0">选择类型后点杯量</span>
+          </div>
+          <div class="d-type-row" id="dTypeRow"></div>
+          <div class="d-quick-row" id="dQuickRow"></div>
+        </div>
+
+        <div class="d-card">
+          <div class="d-card-head">
+            <span class="d-card-title">最近记录</span>
+            <button type="button" class="link-text" id="dRefresh">刷新</button>
+          </div>
+          <div id="dEntryList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 右侧文档 ============ -->
+  <div class="doc-pane">
+    <div class="tabs" role="tablist" aria-label="文档章节">
+      <button type="button" class="active" data-tab="overview" role="tab">概览</button>
+      <button type="button" data-tab="design" role="tab">设计</button>
+      <button type="button" data-tab="detail" role="tab">功能详述</button>
+      <button type="button" data-tab="rules" role="tab">规则</button>
+    </div>
+
+    <!-- 概览 -->
+    <section class="panel active" id="panel-overview" role="tabpanel">
+      <h2>概览</h2>
+      <p class="panel-lead">在不增加记录摩擦的前提下，让「今天喝了什么」这件事被看见。</p>
+
+      <div class="doc-card">
+        <h3>问题</h3>
+        <p>当前应用把所有液体都当成同一种「水」：快捷卡片、通知栏、托盘、全屏提醒都只记毫升数，历史明细只显示时间和容量。</p>
+        <p>但用户的一天并不只有水。咖啡、茶、果汁同样是日常补水来源，用户会想知道「今天喝了 3 杯咖啡」「水只喝了 800ml」。现在这个信息完全丢失，统计也只能给出一个总量。</p>
+        <p>如果直接加「每次记录都选类型」，记录会从一次点击变成两到三次点击，通知栏快捷记录的按钮数量也会被挤爆。这是饮水类应用最不能接受的代价。</p>
+      </div>
+
+      <div class="doc-card">
+        <h3>目标用户与核心工作</h3>
+        <p><strong>主要用户：</strong>已经在用提醒保持喝水习惯的人，日常会喝茶、咖啡或含糖饮料，希望回顾时能区分「真正的白水」和「其他饮品」。</p>
+        <p><strong>核心工作：</strong>在不打断原有快捷记录的前提下，随手记下一杯非水饮品，并在回顾时看到饮品构成。</p>
+        <p><strong>完成条件：</strong>记录成功后，今日总量、进度环、明细里的类型标签同步更新；数据页出现按类型拆分的构成。撤销一条记录时，对应类型与总量一起回退。</p>
+      </div>
+
+      <div class="doc-card">
+        <h3>P0 范围</h3>
+        <ul>
+          <li>快捷卡片保持一键记水，不增加任何选择步骤。</li>
+          <li>新增「记其他饮品」入口，底部抽屉内选择类型与杯量后记录。</li>
+          <li>今日明细展示每条记录的类型，支持撤销。</li>
+          <li>数据页新增「饮品构成」模块，按类型展示总量与占比。</li>
+          <li>历史记录（无类型）统一按水处理，统计与连续达标不受影响。</li>
+          <li>桌面端手动记录区同步支持类型选择。</li>
+        </ul>
+      </div>
+
+      <div class="doc-card">
+        <h3>已确定的产品判断</h3>
+        <div class="decision-grid">
+          <div class="decision">
+            <div class="k">计数口径</div>
+            <div class="v">所有饮品按实际毫升 1:1 计入每日目标与连续达标，不做水分系数折算。</div>
+          </div>
+          <div class="decision">
+            <div class="k">默认类型</div>
+            <div class="v">所有快捷通道默认记为「水」，且不记忆上次选择，避免误记。</div>
+          </div>
+          <div class="decision">
+            <div class="k">类型粒度</div>
+            <div class="v">水、咖啡、茶、果汁、其他，共 5 类。牛奶、气泡水、运动饮料归入「其他」。</div>
+          </div>
+          <div class="decision">
+            <div class="k">实施时点</div>
+            <div class="v">当前上架事项收尾后再排期，本次只交付方案与原型。</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="doc-card">
+        <h3>假设与待确认</h3>
+        <ul>
+          <li><span class="tag">假设</span> 用户能理解「咖啡按 1:1 计入目标」这件事，不需要额外解释页。若上线后出现集中疑问，再补充说明文案。</li>
+          <li><span class="tag">待确认</span> 是否需要给「酒」单独留类型。本方案暂不纳入，因为酒不属于补水来源，单独记录会与目标口径冲突。</li>
+          <li><span class="tag">待确认</span> 是否需要在趋势图上做类型堆叠。本方案暂不做，保持柱状总量，降低信息密度。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 设计 -->
+    <section class="panel" id="panel-design" role="tabpanel">
+      <h2>设计</h2>
+      <p class="panel-lead">核心取舍：记录不变重，回顾变丰富。</p>
+
+      <div class="doc-card">
+        <h3>核心旅程</h3>
+        <div class="flow">
+          <div class="flow-step">
+            <div class="flow-num">1</div>
+            <div class="flow-body">
+              <b>照常喝水</b>
+              <span>用户点今日页的快捷卡片，仍然一次点击完成记录，系统默认记为水。</span>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-num">2</div>
+            <div class="flow-body">
+              <b>想记一杯咖啡</b>
+              <span>点快捷卡片下方的「记其他饮品」，底部抽屉打开，默认选中水。</span>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-num">3</div>
+            <div class="flow-body">
+              <b>选类型、调杯量</b>
+              <span>点选咖啡，用加减或刻度尺调整杯量，点「记录」。</span>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-num">4</div>
+            <div class="flow-body">
+              <b>就地反馈</b>
+              <span>抽屉关闭，进度环与今日明细立即更新，新记录带咖啡图标与类型标签。</span>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-num">5</div>
+            <div class="flow-body">
+              <b>回顾构成</b>
+              <span>数据页的「饮品构成」按类型展示近 7 天或 30 天的总量与占比。</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="doc-card">
+        <h3>为什么坚持默认水</h3>
+        <p>饮水类产品的记录频率以每天 5 到 10 次计，每一次多出的选择都会累积成放弃的理由。通知栏、托盘、全屏提醒这类「不方便操作」的场景尤其脆弱：用户此时只想要一键完成。</p>
+        <p>因此类型选择只放在主动打开的记录抽屉里。用户真的想区分时，多一步是合理的；不想区分时，永远不会被追问。这也让安卓通知栏的三个操作按钮保持原样，不触发系统丢弃。</p>
+        <div class="callout">
+          <div><strong>判断依据：</strong>现有产品把「一键记录」作为核心体验，快捷卡片、通知栏、托盘、全屏提醒四条通道都指向同一个 record 调用。任何新增必填项都会同时影响这四条通道。</div>
+        </div>
+      </div>
+
+      <div class="doc-card">
+        <h3>类型清单的取舍</h3>
+        <p>五个类型覆盖了绝大多数日常场景，同时又能塞进一行等宽选择器。再细分会带来两类成本：选择器的可点击面积变小，多语言文案变长后更容易截断；统计图例也会变得冗长。</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>类型</th><th>覆盖范围</th><th>视觉标识</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>水</td><td>白水、矿泉水、气泡水之外的所有纯水</td><td>蓝色水滴</td></tr>
+              <tr><td>咖啡</td><td>美式、拿铁、冷萃等含咖啡因咖啡饮品</td><td>琥珀色咖啡杯</td></tr>
+              <tr><td>茶</td><td>绿茶、红茶、乌龙、花草茶</td><td>绿色茶杯</td></tr>
+              <tr><td>果汁</td><td>鲜榨与包装果汁、果味饮品</td><td>橙色果汁杯</td></tr>
+              <tr><td>其他</td><td>牛奶、豆浆、运动饮料、气泡水等</td><td>紫色通用杯</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="panel-lead" style="margin:10px 0 0;font-size:12px">气泡水在部分用户认知里属于水，若上线后反馈集中，可将「气泡水」并入水并保留原有类型不变。</p>
+      </div>
+
+      <div class="doc-card">
+        <h3>界面落点</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>界面</th><th>改动</th><th>理由</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>今日页快捷卡片</td><td>不变，仍记水</td><td>保护最高频路径</td></tr>
+              <tr><td>今日页入口</td><td>新增「记其他饮品」一行</td><td>让非水记录有自然入口</td></tr>
+              <tr><td>记录抽屉</td><td>类型选择器 + 杯量</td><td>主动记录时给出完整控制</td></tr>
+              <tr><td>今日明细</td><td>每条增加类型图标与标签</td><td>让记录可被读回</td></tr>
+              <tr><td>数据页</td><td>新增饮品构成模块</td><td>回顾维度是主要价值</td></tr>
+              <tr><td>桌面手动记录</td><td>类型选择器</td><td>与移动端保持一致</td></tr>
+              <tr><td>通知栏 / 托盘 / 全屏提醒</td><td>不变，记水</td><td>零摩擦优先</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 功能详述 -->
+    <section class="panel" id="panel-detail" role="tabpanel">
+      <h2>功能详述</h2>
+      <p class="panel-lead">每一条需求都对应左侧原型中的可见行为，点击原型里的信息图标可跳转到对应章节。</p>
+
+      <section class="feature-section" id="feature-quick-record" data-proto="quickGrid">
+        <h3>今日快捷记录（保持默认水）</h3>
+        <div class="feature-meta"><span class="tag p0">P0</span><span>今日页</span></div>
+        <p><strong>目的：</strong>让最高频的喝水动作保持零变化，类型功能不侵入这条路径。</p>
+        <h4>触发与处理</h4>
+        <ul>
+          <li>用户点击任一快捷卡片，直接以该杯量记录一笔「水」，不弹任何选择。</li>
+          <li>记录成功后播放原有水位上涨与勾选动画，进度环更新。</li>
+          <li>同金额连点仍在原冷却窗口内复用同一记录标识，由记账层幂等去重。</li>
+        </ul>
+        <h4>状态变化</h4>
+        <p>今日总量增加、进度环比例更新、明细顶部插入一条带水滴图标的新记录。若该笔让总量达到目标，照常触发达标提示与达标通知。</p>
+        <h4>边界</h4>
+        <ul>
+          <li>记录失败时保留卡片可用状态，提示保存未确认，用户可重试。</li>
+          <li>撤销最后一条后，今日明细回到空态文案。</li>
+        </ul>
+      </section>
+
+      <section class="feature-section" id="feature-record-sheet" data-proto="btnMoreDrink">
+        <h3>记录其他饮品（类型 + 杯量）</h3>
+        <div class="feature-meta"><span class="tag p0">P0</span><span>今日页 · 底部抽屉</span></div>
+        <p><strong>目的：</strong>当用户喝了咖啡、茶或果汁时，用最少的步骤记录，并保留类型信息。</p>
+        <h4>入口</h4>
+        <p>今日页快捷卡片下方新增一行「记其他饮品（咖啡 / 茶 / 果汁）」。入口始终可见，不做首次引导气泡，避免遮挡快捷卡片。</p>
+        <h4>抽屉内容与顺序</h4>
+        <ol>
+          <li>类型选择器：水、咖啡、茶、果汁、其他，五列等宽，默认选中水。</li>
+          <li>杯量展示：大号数字 + 单位，默认沿用当前快捷卡片中的第一档杯量。</li>
+          <li>杯量调整：沿用现有刻度尺交互，拖动吸附到 10ml 档位，提供加减按钮作为辅助。</li>
+          <li>底部操作：取消、记录。记录按钮始终可用，杯量非法时置灰。</li>
+        </ol>
+        <h4>记录规则</h4>
+        <ul>
+          <li>记录后写入一条包含类型、杯量、时间的明细，并按实际杯量计入今日总量。</li>
+          <li>抽屉关闭时重置为水与默认杯量，不记忆上一次的类型，避免下一次误记。</li>
+          <li>连续记录同一类型时，用户需要重新打开抽屉，这是有意的摩擦，用来防止误记。</li>
+        </ul>
+        <h4>边界</h4>
+        <ul>
+          <li>杯量范围 10 至 1000 ml，步长 10 ml，与现有自定义杯量校验保持一致。</li>
+          <li>保存失败时抽屉保持打开，已选类型与杯量不丢失，并提供重试。</li>
+          <li>点击遮罩或取消关闭抽屉，不产生记录。</li>
+        </ul>
+        <h4>桌面端差异</h4>
+        <p>桌面端手动记录区把类型选择器放在杯量按钮上方，选择类型后点击任意杯量按钮即记录该类型。桌面端没有抽屉，也不改变原有快捷按钮排布。</p>
+      </section>
+
+      <section class="feature-section" id="feature-entry-list" data-proto="inlineEntries">
+        <h3>今日明细与撤销</h3>
+        <div class="feature-meta"><span class="tag p0">P0</span><span>今日页 · 明细抽屉</span></div>
+        <p><strong>目的：</strong>让用户能读回「这一杯是什么」，并在记错时精确撤销。</p>
+        <h4>展示规则</h4>
+        <ul>
+          <li>每条记录展示类型图标、时间、类型名称、杯量。首页内联最多 3 条，更早的收进底部抽屉。</li>
+          <li>首页内联的顺序为从新到旧，与现有实现一致。</li>
+          <li>历史遗留记录没有类型，统一按水展示，不额外标注「未知」。</li>
+        </ul>
+        <h4>撤销规则</h4>
+        <ul>
+          <li>点击撤销后出现二次确认，确认后删除该条记录。</li>
+          <li>撤销同时回退今日总量与饮品构成，不区分类型，任何类型都可撤销。</li>
+          <li>撤销后若总量低于目标，达标状态取消，下一杯提醒按新的总量重新排期。</li>
+        </ul>
+      </section>
+
+      <section class="feature-section" id="feature-drink-mix" data-proto="mixCard">
+        <h3>数据页饮品构成</h3>
+        <div class="feature-meta"><span class="tag p0">P0</span><span>数据页</span></div>
+        <p><strong>目的：</strong>回答「我这一周到底喝了什么」，这是类型功能最主要的价值出口。</p>
+        <h4>展示规则</h4>
+        <ul>
+          <li>在趋势图下方新增「饮品构成」卡片，跟随页面右上角的 7 天 / 30 天切换。</li>
+          <li>顶部为一根按占比分段的横条，下方为图例，每行展示类型名、总量、占比。</li>
+          <li>占比按总量计算，保留整数，合计不为 100% 时以最大项吸收舍入误差。</li>
+          <li>只统计有类型的记录；历史遗留记录计入水。</li>
+        </ul>
+        <h4>空态与边界</h4>
+        <ul>
+          <li>周期内没有任何记录时不展示构成卡片，沿用数据页原有的空态。</li>
+          <li>某类型为 0 时不出现在图例中，避免列表被零值撑长。</li>
+          <li>总占比为 0 时不渲染分段条，只显示提示。</li>
+        </ul>
+        <h4>明确不做</h4>
+        <p>趋势图仍以总量单色柱展示，不做类型堆叠。堆叠柱在手机宽度下每段过窄，且会与达标线叠加产生歧义。</p>
+      </section>
+
+      <section class="feature-section" id="feature-reminder-channel" data-proto="section-card">
+        <h3>提醒与快捷通道</h3>
+        <div class="feature-meta"><span class="tag p0">P0</span><span>全屏提醒 · 通知栏 · 托盘</span></div>
+        <p><strong>目的：</strong>明确哪些通道参与类型功能，防止实现时顺手扩展导致摩擦回归。</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>通道</th><th>行为</th><th>说明</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>今日页快捷卡片</td><td>记水</td><td>零选择</td></tr>
+              <tr><td>全屏提醒</td><td>记水</td><td>保持一键，不跳转记录抽屉</td></tr>
+              <tr><td>安卓通知栏快捷记录</td><td>记水</td><td>操作按钮数量不变，避免被系统丢弃</td></tr>
+              <tr><td>桌面托盘菜单</td><td>记水</td><td>菜单项不增加</td></tr>
+              <tr><td>桌面通知</td><td>记水</td><td>不新增操作</td></tr>
+              <tr><td>手动记录入口</td><td>可选类型</td><td>唯一支持类型选择的位置</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>提醒节奏、下一杯时间、暂停与勿扰逻辑完全不受影响：它们只关心总量与目标，不关心饮品类型。</p>
+      </section>
+
+      <section class="feature-section" id="feature-legacy" data-proto="mixLegend">
+        <h3>历史数据与兼容</h3>
+        <div class="feature-meta"><span class="tag p0">P0</span><span>数据层</span></div>
+        <p><strong>目的：</strong>升级后已有用户的数据、统计和连续达标不能出现任何变化。</p>
+        <h4>兼容规则</h4>
+        <ul>
+          <li>升级前的记录没有类型，读取时统一按水解释，不写回、不改写原始数据。</li>
+          <li>今日总量、达标判断、连续达标、提醒排期全部沿用原有计算，只多出一个可选的类型维度。</li>
+          <li>升级后新记录才带类型；同一张图表里新旧数据可以共存。</li>
+          <li>从旧版本导入的备份数据同样按水处理。</li>
+        </ul>
+        <h4>验收要点</h4>
+        <ul>
+          <li>升级前后的今日总量与历史总量逐日一致。</li>
+          <li>升级前后的连续达标天数与里程碑奖励不重复触发。</li>
+          <li>旧记录撤销、旧备份恢复均不报错。</li>
+        </ul>
+      </section>
+    </section>
+
+    <!-- 规则 -->
+    <section class="panel" id="panel-rules" role="tabpanel">
+      <h2>规则</h2>
+      <p class="panel-lead">所有跨页面共用的定义集中在这里，避免实现时各写一套。</p>
+
+      <div class="doc-card">
+        <h3>类型定义</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>展示名</th><th>键值</th><th>英文文案</th><th>计入目标</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>水</td><td>water</td><td>Water</td><td>是，默认类型</td></tr>
+              <tr><td>咖啡</td><td>coffee</td><td>Coffee</td><td>是，不因咖啡因扣减</td></tr>
+              <tr><td>茶</td><td>tea</td><td>Tea</td><td>是，不因茶多酚扣减</td></tr>
+              <tr><td>果汁</td><td>juice</td><td>Juice</td><td>是，不因含糖扣减</td></tr>
+              <tr><td>其他</td><td>other</td><td>Other</td><td>是</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>类型集合固定为以上五项，不开放用户自定义，避免统计维度失控与多语言成本。</p>
+      </div>
+
+      <div class="doc-card">
+        <h3>计数与统计规则</h3>
+        <ul>
+          <li>每日目标、达标判断、达标通知、连续达标全部使用所有类型的合计毫升数。</li>
+          <li>任何类型都不做水分系数折算，避免出现「喝了 300ml 只加 240ml」的解释成本。</li>
+          <li>饮品构成按类型分别合计，只用于展示，不参与目标计算。</li>
+          <li>无类型的遗留记录在统计中归入水。</li>
+          <li>撤销时按记录逐条回退，总量与构成同步变化。</li>
+        </ul>
+      </div>
+
+      <div class="doc-card">
+        <h3>边界与异常</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>场景</th><th>行为</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>未选择类型</td><td>默认水</td></tr>
+              <tr><td>杯量低于 10 ml 或高于 1000 ml</td><td>记录按钮置灰，加减按钮在边界处禁用</td></tr>
+              <tr><td>杯量不是 10 的倍数</td><td>刻度尺松手后自动吸附到最近的 10 ml 档位</td></tr>
+              <tr><td>保存失败</td><td>抽屉保持打开，已选类型与杯量保留，提供重试</td></tr>
+              <tr><td>网络或原生调用无响应</td><td>显示保存未确认，同一笔重试复用记录标识，避免重复记账</td></tr>
+              <tr><td>跨零点记录</td><td>按记录发生的本地时间归入当天</td></tr>
+              <tr><td>撤销后总量归零</td><td>今日明细显示空态，进度环归零，下一杯提醒按零总量重排</td></tr>
+              <tr><td>历史记录无类型</td><td>按水展示与统计，不提示、不迁移</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="doc-card">
+        <h3>文案与多语言</h3>
+        <ul>
+          <li>五个类型名需要补齐所有已支持语言，英文分别为 Water、Coffee、Tea、Juice、Other。</li>
+          <li>抽屉标题「记一杯」与说明「所有饮品都按实际毫升计入今日目标」需要同步翻译。</li>
+          <li>明细中的类型标签在窄屏下允许省略，只保留图标与杯量。</li>
+          <li>「其他」的英文使用 Other，不使用 Miscellaneous，保持简短。</li>
+        </ul>
+      </div>
+
+      <div class="doc-card">
+        <h3>埋点</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>事件</th><th>触发时机</th><th>关键维度</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>drink_recorded（扩展）</td><td>任意记录成功</td><td>drink_type、record_surface、amount</td></tr>
+              <tr><td>drink_type_selected</td><td>抽屉内切换类型</td><td>drink_type、previous_type</td></tr>
+              <tr><td>drink_type_sheet_opened</td><td>打开记录抽屉</td><td>surface</td></tr>
+              <tr><td>drink_mix_viewed</td><td>饮品构成卡片进入可视区</td><td>period</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>record_surface 用于区分 quick_card、record_sheet、desktop_manual、notification 等来源，沿用现有记录链路的来源字段。</p>
+      </div>
+
+      <div class="doc-card">
+        <h3>验收清单</h3>
+        <ul>
+          <li>快捷卡片、通知栏、托盘、全屏提醒的记录流程与升级前完全一致，没有任何新增点击。</li>
+          <li>抽屉内选择咖啡并记录后，今日总量增加对应毫升，明细显示咖啡图标与类型名。</li>
+          <li>撤销该条记录后，总量、进度环、饮品构成同时回退。</li>
+          <li>升级后历史总量、达标天数、连续达标与升级前逐项一致。</li>
+          <li>安卓通知栏操作按钮数量保持不变。</li>
+          <li>所有新增文案在中英文下均无截断与溢出。</li>
+        </ul>
+      </div>
+
+      <div class="doc-foot">本文件为产品方案草案，不含实现细节。实施前请与设计、客户端确认类型图标与刻度尺复用方式。</div>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- 图标 ---------- */
+  var ICONS = {
+    water: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
+    coffee: '<path d="M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Z"/><path d="M17 9h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M7 3v2M11 3v2"/>',
+    tea: '<path d="M5 8h12v5a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5V8Z"/><path d="M9 21h4"/><path d="M17 10h1a2 2 0 0 1 0 4h-1"/><path d="M9 3c0 1-1 1.5-1 2.5"/>',
+    juice: '<path d="M7 7h10l-1.3 12.2a2 2 0 0 1-2 1.8H10.3a2 2 0 0 1-2-1.8L7 7Z"/><path d="M8 4l7-2"/><path d="M6.6 7h10.8"/>',
+    other: '<path d="M6 8h12l-1.2 11.3a2 2 0 0 1-2 1.7H9.2a2 2 0 0 1-2-1.7L6 8Z"/><path d="M5 8h14"/><path d="M8.5 12h7"/>',
+    droplet: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>',
+    droplets: '<path d="M7 16.3c2.2 0 4-1.8 4-4 0-1.1-.5-2.2-1.6-3.2C8.4 8.2 7.9 7.3 7.7 6.2c-.2 1.1-.7 2-1.7 3.1C5 10.3 4.5 11.4 4.5 12.5c0 2.2 1.8 3.8 2.5 3.8Z"/><path d="M16 22c3 0 5.5-2.4 5.5-5.4 0-1.5-.7-3-2.2-4.4-1.4-1.3-2-2.5-2.3-4-.3 1.5-1 2.7-2.3 4-1.5 1.4-2.2 2.9-2.2 4.4C12.5 19.6 13 22 16 22Z"/>',
+    glass: '<path d="M6 3h12l-1.2 15.2a3 3 0 0 1-3 2.8H10.2a3 3 0 0 1-3-2.8L6 3Z"/><path d="M6.5 10h11"/>',
+    cup: '<path d="M6 8h12l-1.2 11.3a2 2 0 0 1-2 1.7H9.2a2 2 0 0 1-2-1.7L6 8Z"/><path d="M5 8h14"/><path d="M8 4l8-2"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    minus: '<path d="M5 12h14"/>',
+    undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    flame: '<path d="M12 2c1 3 4 4.5 4 8a4 4 0 1 1-8 0c0-1.4.6-2.3 1.4-3.2C10.2 5.4 12 4 12 2Z"/><path d="M12 22c3.9 0 7-2.6 7-6.5 0-2.6-1.4-4.3-2.5-5.5"/>',
+    list: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    check: '<path d="M20 6 9 17l-5-5"/>'
+  };
+
+  function icon(name, size, stroke) {
+    return '<svg viewBox="0 0 24 24" width="' + (size || 18) + '" height="' + (size || 18) + '" fill="none" stroke="currentColor" stroke-width="' + (stroke || 1.8) + '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || ICONS.other) + '</svg>';
+  }
+
+  /* ---------- 类型定义 ---------- */
+  var TYPES = {
+    water: { name: "水", color: "#0ea5e9", soft: "#e0f2fe", icon: "water", note: "水 · 按实际杯量计入" },
+    coffee: { name: "咖啡", color: "#b45309", soft: "#fef3c7", icon: "coffee", note: "咖啡 · 按实际杯量计入" },
+    tea: { name: "茶", color: "#059669", soft: "#d1fae5", icon: "tea", note: "茶 · 按实际杯量计入" },
+    juice: { name: "果汁", color: "#d97706", soft: "#ffedd5", icon: "juice", note: "果汁 · 按实际杯量计入" },
+    other: { name: "其他", color: "#7c3aed", soft: "#ede9fe", icon: "other", note: "其他饮品 · 按实际杯量计入" }
+  };
+
+  var TYPE_ORDER = ["water", "coffee", "tea", "juice", "other"];
+
+  /* 近 6 天的历史合计，用于构成演示 */
+  var HISTORY = { water: 9200, coffee: 850, tea: 1450, juice: 380, other: 160 };
+  var TREND = [1720, 2050, 1380, 2260, 1490, 1810];
+
+  /* ---------- 状态 ---------- */
+  var state = {
+    goal: 2000,
+    quick: [200, 300, 400, 600],
+    entries: [
+      { id: "e1", type: "water", amount: 250, time: "08:12" },
+      { id: "e2", type: "coffee", amount: 150, time: "09:40" },
+      { id: "e3", type: "tea", amount: 300, time: "11:05" },
+      { id: "e4", type: "water", amount: 300, time: "13:20" },
+      { id: "e5", type: "juice", amount: 200, time: "15:10" },
+      { id: "e6", type: "water", amount: 250, time: "16:30" }
+    ],
+    sheetOpen: false,
+    sheetType: "water",
+    sheetAmount: 200,
+    desktopType: "water",
+    celebrateIdx: null,
+    period: 7
+  };
+
+  function total() {
+    return state.entries.reduce(function (sum, e) { return sum + e.amount; }, 0);
+  }
+
+  function entriesNewestFirst() {
+    return state.entries.slice().reverse();
+  }
+
+  /* ---------- 元素引用 ---------- */
+  var $ = function (id) { return document.getElementById(id); };
+  var ring = $("ring"), ringTotal = $("ringTotal"), ringGoal = $("ringGoal"), ringPct = $("ringPct");
+  var quickGrid = $("quickGrid"), inlineEntries = $("inlineEntries"), allEntries = $("allEntries");
+  var typeGrid = $("typeGrid"), sheetAmount = $("sheetAmount"), sheetTypeNote = $("sheetTypeNote");
+  var recordOverlay = $("recordOverlay"), detailOverlay = $("detailOverlay");
+  var toastEl = $("toast");
+  var mixBar = $("mixBar"), mixLegend = $("mixLegend");
+  var dTypeRow = $("dTypeRow"), dQuickRow = $("dQuickRow"), dEntryList = $("dEntryList");
+
+  var toastTimer = null;
+  function toast(text) {
+    toastEl.textContent = text;
+    toastEl.classList.add("show");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 1800);
+  }
+
+  /* ---------- 渲染：进度环 ---------- */
+  function renderRing() {
+    var t = total();
+    var ratio = state.goal > 0 ? Math.min(t / state.goal, 1) : 0;
+    ring.style.setProperty("--p", String(ratio * 100));
+    ringTotal.textContent = String(t);
+    ringGoal.textContent = "/ " + state.goal + " ml";
+    ringPct.textContent = Math.round(ratio * 100) + "%";
+    $("statToday").innerHTML = t + "<small>ml</small>";
+    $("dProgressText").textContent = t + " / " + state.goal + " ml";
+    $("dProgressFill").style.width = (ratio * 100) + "%";
+    $("countHint").textContent = "今日已记录 " + state.entries.length + " 次";
+  }
+
+  /* ---------- 渲染：快捷卡片 ---------- */
+  var QUICK_ICONS = ["droplet", "droplets", "glass", "cup"];
+  var QUICK_HINTS = ["一杯淡水", "小杯补水", "随手一杯", "大杯畅饮"];
+
+  function renderQuick() {
+    quickGrid.innerHTML = state.quick.map(function (amount, idx) {
+      var celebrating = state.celebrateIdx === idx;
+      var inner = celebrating
+        ? '<div class="celebrate"><span class="tick">' + icon("check", 18, 2.6) + '</span><span class="done-text">已记录 +' + amount + 'ml</span></div>'
+        : '<span class="blob"></span>' +
+          '<span class="quick-top"><span class="quick-icon">' + icon(QUICK_ICONS[idx], 17) + '</span><span class="quick-plus">' + icon("plus", 15) + '</span></span>' +
+          '<span class="quick-amount">+' + amount + '<small>ml</small></span>' +
+          '<span class="quick-hint">' + QUICK_HINTS[idx] + '</span>';
+      return '<button type="button" class="quick-card" data-quick="' + idx + '" aria-label="记录 ' + amount + ' 毫升水">' + inner + '</button>';
+    }).join("");
+  }
+
+  /* ---------- 渲染：明细 ---------- */
+  function entryHTML(entry, compact) {
+    var type = TYPES[entry.type] || TYPES.water;
+    return '<li class="entry-item">' +
+      '<span class="entry-icon" style="background:' + type.soft + ';color:' + type.color + '">' + icon(type.icon, 16) + '</span>' +
+      '<span class="entry-time">' + entry.time + (compact ? '' : '<span class="entry-type-tag">' + type.name + '</span>') + '</span>' +
+      '<span class="entry-amount">' + entry.amount + ' ml</span>' +
+      '<button type="button" class="icon-btn-sm" data-undo="' + entry.id + '" aria-label="撤销这条记录">' + icon("undo", 15) + '</button>' +
+      '</li>';
+  }
+
+  function renderEntries() {
+    var list = entriesNewestFirst();
+    if (list.length === 0) {
+      inlineEntries.innerHTML = '<li class="empty-hint">今天还没有记录，点上面的卡片开始吧</li>';
+    } else {
+      inlineEntries.innerHTML = list.slice(0, 3).map(function (e) { return entryHTML(e, true); }).join("");
+    }
+    allEntries.innerHTML = list.length
+      ? list.map(function (e) { return entryHTML(e, false); }).join("")
+      : '<li class="empty-hint">今天还没有记录</li>';
+    $("btnAllEntries2").textContent = "全部 " + list.length;
+  }
+
+  /* ---------- 渲染：饮品构成 ---------- */
+  function mixTotals() {
+    var base = { water: HISTORY.water, coffee: HISTORY.coffee, tea: HISTORY.tea, juice: HISTORY.juice, other: HISTORY.other };
+    state.entries.forEach(function (e) {
+      base[e.type] = (base[e.type] || 0) + e.amount;
+    });
+    return base;
+  }
+
+  function renderMix() {
+    var totals = mixTotals();
+    var sum = TYPE_ORDER.reduce(function (s, k) { return s + (totals[k] || 0); }, 0);
+    if (sum <= 0) {
+      mixBar.innerHTML = "";
+      mixLegend.innerHTML = '<li class="empty-hint">所选周期内还没有记录</li>';
+      return;
+    }
+    mixBar.innerHTML = TYPE_ORDER.filter(function (k) { return (totals[k] || 0) > 0; }).map(function (k) {
+      var pct = (totals[k] / sum) * 100;
+      return '<span class="mix-seg" style="width:' + pct.toFixed(2) + '%;background:' + TYPES[k].color + '"></span>';
+    }).join("");
+
+    /* 占比取整，最大项吸收舍入误差 */
+    var rows = TYPE_ORDER.filter(function (k) { return (totals[k] || 0) > 0; })
+      .map(function (k) { return { key: k, value: totals[k], raw: (totals[k] / sum) * 100 }; })
+      .sort(function (a, b) { return b.value - a.value; });
+    var rounded = rows.map(function (r) { return Math.round(r.raw); });
+    var diff = 100 - rounded.reduce(function (s, v) { return s + v; }, 0);
+    if (rounded.length && diff !== 0) rounded[0] += diff;
+
+    mixLegend.innerHTML = rows.map(function (r, i) {
+      return '<li class="mix-row">' +
+        '<span class="dot" style="background:' + TYPES[r.key].color + '"></span>' +
+        '<span class="mix-name">' + TYPES[r.key].name + '</span>' +
+        '<span class="mix-amount">' + r.value + ' ml</span>' +
+        '<span class="mix-pct">' + rounded[i] + '%</span>' +
+        '</li>';
+    }).join("");
+  }
+
+  /* ---------- 渲染：趋势图 ---------- */
+  function renderTrend() {
+    var days = TREND.concat([total()]);
+    var max = Math.max.apply(null, days.concat([state.goal])) || 1;
+    $("trendChart").innerHTML = days.map(function (v, i) {
+      var h = Math.max((v / max) * 100, 3);
+      var done = v >= state.goal;
+      var label = i === days.length - 1 ? "今天" : "11/" + (16 + i);
+      return '<div class="trend-col">' +
+        '<div class="trend-bar' + (done ? ' done' : '') + '" style="height:' + h + '%" title="' + label + ' · ' + v + ' ml"></div>' +
+        '<span class="trend-label">' + label + '</span>' +
+        '</div>';
+    }).join("");
+  }
+
+  /* ---------- 渲染：抽屉类型选择 ---------- */
+  function renderTypeGrid() {
+    typeGrid.innerHTML = TYPE_ORDER.map(function (key) {
+      var t = TYPES[key];
+      var active = state.sheetType === key;
+      return '<button type="button" class="type-chip' + (active ? ' active' : '') + '" data-type="' + key + '" aria-pressed="' + active + '">' +
+        '<span class="chip-icon">' + icon(t.icon, 19) + '</span>' +
+        '<span>' + t.name + '</span>' +
+        '</button>';
+    }).join("");
+  }
+
+  function renderSheet() {
+    renderTypeGrid();
+    sheetAmount.textContent = String(state.sheetAmount);
+    sheetTypeNote.textContent = TYPES[state.sheetType].note;
+    $("btnMinus").disabled = state.sheetAmount <= 10 ? true : false;
+    $("btnPlus").disabled = state.sheetAmount >= 1000 ? true : false;
+  }
+
+  /* ---------- 渲染：桌面 ---------- */
+  function renderDesktop() {
+    dTypeRow.innerHTML = TYPE_ORDER.map(function (key) {
+      var t = TYPES[key];
+      var active = state.desktopType === key;
+      return '<button type="button" class="d-type' + (active ? ' active' : '') + '" data-dtype="' + key + '" aria-pressed="' + active + '">' +
+        icon(t.icon, 14) + t.name + '</button>';
+    }).join("");
+
+    dQuickRow.innerHTML = state.quick.map(function (amount) {
+      return '<button type="button" class="d-quick" data-dquick="' + amount + '">+' + amount + ' ml</button>';
+    }).join("");
+
+    var list = entriesNewestFirst().slice(0, 6);
+    dEntryList.innerHTML = list.length ? list.map(function (e) {
+      var t = TYPES[e.type] || TYPES.water;
+      return '<div class="d-row">' +
+        '<span class="entry-icon" style="background:' + t.soft + ';color:' + t.color + '">' + icon(t.icon, 15) + '</span>' +
+        '<span class="d-time">' + e.time + '</span>' +
+        '<span class="d-tag">' + t.name + '</span>' +
+        '<span class="entry-amount">' + e.amount + ' ml</span>' +
+        '<button type="button" class="icon-btn-sm" data-undo="' + e.id + '" aria-label="撤销">' + icon("undo", 14) + '</button>' +
+        '</div>';
+    }).join("") : '<div class="empty-hint">今天还没有记录</div>';
+  }
+
+  /* ---------- 统一渲染 ---------- */
+  function renderAll() {
+    renderRing();
+    renderQuick();
+    renderEntries();
+    renderMix();
+    renderTrend();
+    renderSheet();
+    renderDesktop();
+  }
+
+  /* ---------- 行为 ---------- */
+  function nowLabel() {
+    var d = new Date();
+    return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+
+  function addEntry(type, amount) {
+    state.entries.push({
+      id: "e" + Date.now() + "-" + Math.floor(Math.random() * 1000),
+      type: type,
+      amount: amount,
+      time: nowLabel()
+    });
+    renderAll();
+    toast("已记录 " + amount + " ml " + TYPES[type].name);
+  }
+
+  function removeEntry(id) {
+    var idx = -1;
+    for (var i = 0; i < state.entries.length; i++) {
+      if (state.entries[i].id === id) { idx = i; break; }
+    }
+    if (idx < 0) return;
+    state.entries.splice(idx, 1);
+    renderAll();
+    toast("已撤销这条记录");
+  }
+
+  /* 快捷卡片：记录水 + 就地庆祝 */
+  quickGrid.addEventListener("click", function (event) {
+    var btn = event.target.closest("[data-quick]");
+    if (!btn) return;
+    var idx = Number(btn.getAttribute("data-quick"));
+    var amount = state.quick[idx];
+    addEntry("water", amount);
+    state.celebrateIdx = idx;
+    renderQuick();
+    setTimeout(function () {
+      if (state.celebrateIdx === idx) {
+        state.celebrateIdx = null;
+        renderQuick();
+      }
+    }, 1300);
+  });
+
+  /* 明细撤销（两个列表共用委托） */
+  function handleUndo(event) {
+    var btn = event.target.closest("[data-undo]");
+    if (!btn) return;
+    removeEntry(btn.getAttribute("data-undo"));
+  }
+  inlineEntries.addEventListener("click", handleUndo);
+  allEntries.addEventListener("click", handleUndo);
+  dEntryList.addEventListener("click", handleUndo);
+
+  /* 打开记录抽屉 */
+  function openSheet() {
+    state.sheetOpen = true;
+    state.sheetType = "water";
+    state.sheetAmount = state.quick[0];
+    renderSheet();
+    recordOverlay.classList.add("open");
+  }
+  function closeSheet() {
+    state.sheetOpen = false;
+    recordOverlay.classList.remove("open");
+  }
+
+  $("btnMoreDrink").addEventListener("click", openSheet);
+  $("btnCancelRecord").addEventListener("click", closeSheet);
+  recordOverlay.addEventListener("click", function (event) {
+    if (event.target === recordOverlay) closeSheet();
+  });
+
+  typeGrid.addEventListener("click", function (event) {
+    var btn = event.target.closest("[data-type]");
+    if (!btn) return;
+    state.sheetType = btn.getAttribute("data-type");
+    renderSheet();
+  });
+
+  $("btnMinus").addEventListener("click", function () {
+    state.sheetAmount = Math.max(10, state.sheetAmount - 50);
+    renderSheet();
+  });
+
+  $("btnPlus").addEventListener("click", function () {
+    state.sheetAmount = Math.min(1000, state.sheetAmount + 50);
+    renderSheet();
+  });
+
+  $("btnSaveRecord").addEventListener("click", function () {
+    if (state.sheetAmount < 10 || state.sheetAmount > 1000) return;
+    addEntry(state.sheetType, state.sheetAmount);
+    closeSheet();
+  });
+
+  /* 明细抽屉 */
+  function openDetails() { detailOverlay.classList.add("open"); }
+  function closeDetails() { detailOverlay.classList.remove("open"); }
+  $("btnAllEntries").addEventListener("click", openDetails);
+  $("btnAllEntries2").addEventListener("click", openDetails);
+  $("btnCloseDetail").addEventListener("click", closeDetails);
+  detailOverlay.addEventListener("click", function (event) {
+    if (event.target === detailOverlay) closeDetails();
+  });
+
+  /* 桌面视图交互 */
+  dTypeRow.addEventListener("click", function (event) {
+    var btn = event.target.closest("[data-dtype]");
+    if (!btn) return;
+    state.desktopType = btn.getAttribute("data-dtype");
+    renderDesktop();
+  });
+
+  dQuickRow.addEventListener("click", function (event) {
+    var btn = event.target.closest("[data-dquick]");
+    if (!btn) return;
+    addEntry(state.desktopType, Number(btn.getAttribute("data-dquick")));
+  });
+
+  $("dRefresh").addEventListener("click", function () {
+    renderAll();
+    toast("已刷新");
+  });
+
+  /* 设备视图切换 */
+  $("viewPhone").addEventListener("click", function () {
+    $("viewPhone").classList.add("active");
+    $("viewDesktop").classList.remove("active");
+    $("phoneFrame").hidden = false;
+    $("browserFrame").hidden = true;
+  });
+
+  $("viewDesktop").addEventListener("click", function () {
+    $("viewDesktop").classList.add("active");
+    $("viewPhone").classList.remove("active");
+    $("browserFrame").hidden = false;
+    $("phoneFrame").hidden = true;
+  });
+
+  /* ---------- 文档 tab ---------- */
+  var tabs = document.querySelectorAll(".tabs button");
+  var panels = {
+    overview: $("panel-overview"),
+    design: $("panel-design"),
+    detail: $("panel-detail"),
+    rules: $("panel-rules")
+  };
+
+  function activateTab(name) {
+    tabs.forEach(function (btn) {
+      btn.classList.toggle("active", btn.getAttribute("data-tab") === name);
+    });
+    Object.keys(panels).forEach(function (key) {
+      panels[key].classList.toggle("active", key === name);
+    });
+  }
+
+  tabs.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      activateTab(btn.getAttribute("data-tab"));
+    });
+  });
+
+  /* 原型 info 按钮 → 跳到对应需求 */
+  document.addEventListener("click", function (event) {
+    var link = event.target.closest("[data-link]");
+    if (!link) return;
+    event.preventDefault();
+    var id = link.getAttribute("data-link");
+    activateTab("detail");
+    var section = document.getElementById(id);
+    if (!section) return;
+    setTimeout(function () {
+      section.scrollIntoView({ behavior: "smooth", block: "start" });
+      section.classList.add("highlight");
+      setTimeout(function () { section.classList.remove("highlight"); }, 2200);
+    }, 60);
+  });
+
+  /* 文档章节 → 高亮对应原型 */
+  Object.keys(panels).forEach(function (key) {
+    panels[key].addEventListener("click", function (event) {
+      var section = event.target.closest(".feature-section");
+      if (!section) return;
+      if (!event.target.closest("h3")) return;
+      var selector = section.getAttribute("data-proto");
+      if (!selector) return;
+      var target = document.getElementById(selector);
+      if (!target) return;
+      if (document.body.classList.contains("text-mode")) return;
+      target.style.transition = "box-shadow .2s";
+      target.style.boxShadow = "0 0 0 3px rgba(14,165,233,.55)";
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(function () { target.style.boxShadow = ""; }, 1600);
+    });
+  });
+
+  /* ---------- 视图模式 ---------- */
+  $("modeText").addEventListener("click", function () {
+    document.body.classList.add("text-mode");
+    $("modeText").classList.add("active");
+    $("modeProto").classList.remove("active");
+    Object.keys(panels).forEach(function (key) { panels[key].classList.add("active"); });
+  });
+
+  $("modeProto").addEventListener("click", function () {
+    document.body.classList.remove("text-mode");
+    $("modeProto").classList.add("active");
+    $("modeText").classList.remove("active");
+    var first = document.querySelector(".tabs button.active");
+    activateTab(first ? first.getAttribute("data-tab") : "overview");
+  });
+
+  /* ---------- 周期切换（演示） ---------- */
+  $("periodSeg").addEventListener("click", function (event) {
+    var btn = event.target.closest("[data-period]");
+    if (!btn) return;
+    Array.prototype.forEach.call(this.querySelectorAll("button"), function (b) {
+      b.classList.toggle("active", b === btn);
+    });
+    state.period = Number(btn.getAttribute("data-period"));
+    toast("已切换到近 " + state.period + " 天");
+  });
+
+  /* 数据页切换：手机内两个屏幕通过底部导航切换 */
+  /* 为保持原型聚焦，用双击标题区的方式在今日/数据间切换 */
+  var screenToday = $("screenToday"), screenData = $("screenData");
+  $("statToday").addEventListener("dblclick", function () { });
+  screenToday.addEventListener("dblclick", function (event) {
+    if (event.target.closest("button")) return;
+  });
+
+  /* 底部 tab 切换：今日 / 数据，注入到手机内 */
+  var nav = document.createElement("div");
+  nav.style.cssText = "position:absolute;left:0;right:0;bottom:0;height:58px;background:rgba(255,255,255,.94);border-top:1px solid #e3e9f2;display:flex;align-items:center;justify-content:space-around;backdrop-filter:blur(10px);z-index:35;";
+  nav.innerHTML = '<button type="button" data-nav="today" style="border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:#0ea5e9;cursor:pointer;font-weight:600;">' + icon("droplet", 19) + '今日</button>' +
+    '<button type="button" data-nav="data" style="border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:#94a3b8;cursor:pointer;font-weight:600;">' + icon("list", 19) + '数据</button>';
+  $("phoneFrame").querySelector(".phone-screen").appendChild(nav);
+  $("phoneBody").style.paddingBottom = "76px";
+
+  nav.addEventListener("click", function (event) {
+    var btn = event.target.closest("[data-nav]");
+    if (!btn) return;
+    var target = btn.getAttribute("data-nav");
+    Array.prototype.forEach.call(nav.querySelectorAll("button"), function (b) {
+      var on = b === btn;
+      b.style.color = on ? "#0ea5e9" : "#94a3b8";
+    });
+    if (target === "today") {
+      screenToday.hidden = false;
+      screenData.hidden = true;
+    } else {
+      screenToday.hidden = true;
+      screenData.hidden = false;
+      renderMix();
+      renderTrend();
+    }
+    $("phoneBody").scrollTop = 0;
+  });
+
+  /* ---------- 启动 ---------- */
+  renderAll();
+})();
+</script>
+</body>
+</html>

@@ -959,6 +959,11 @@ class ReminderReceiver : BroadcastReceiver() {
                     ReminderScheduler.appendPendingDrink(context, amount)
                     // 先出声再撤通知：声音和「通知消失」几乎同时发生，反馈才连贯。
                     ReminderScheduler.playConfirmTone(context)
+                    // 这一杯正好达标时立即补一条达标通知。否则要等下一个闹钟
+                    // 周期才由兜底补发，最长会延迟一整个提醒间隔。
+                    if (notifyGoalReached(context, "notification_action")) {
+                        Log.i(ReminderScheduler.TAG, "通知栏记水达标：已发送达标通知")
+                    }
                 }
                 cancelNotification(context)
                 ReminderScheduler.scheduleNext(context)
@@ -1033,12 +1038,12 @@ class ReminderReceiver : BroadcastReceiver() {
      * WebView 根本没启动，前端那条 goalReached 分支永远走不到；全屏提醒、通知
      * Action 两条路径都必须由原生兜住。
      */
-    private fun notifyGoalReached(context: Context): Boolean {
+    private fun notifyGoalReached(context: Context, trigger: String = "alarm_fallback"): Boolean {
         if (!ReminderScheduler.alertsEnabled(context)) return false
         if (ReminderScheduler.goalNotifiedToday(context)) return false
         val progress = ReminderScheduler.goalProgress(context) ?: return false
         if (!ReminderScheduler.canPostNotifications(context)) return false
-        if (!showGoalNotification(context, progress.first, progress.second, "alarm_fallback")) return false
+        if (!showGoalNotification(context, progress.first, progress.second, trigger)) return false
         ReminderScheduler.markGoalNotified(context)
         return true
     }

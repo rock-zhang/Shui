@@ -39,7 +39,14 @@ async function settingsAction({ minimized = false, missing = false } = {}) {
     '@tauri-apps/api/app': { getVersion: async () => '0.2.32' },
     '@tauri-apps/plugin-os': { platform: () => 'macos' },
     'sonner': { toast: { error: () => {} } },
-    '@/lib/mobile': { emitRefresh: () => {} },
+    '@/lib/mobile': {
+      emitRefresh: () => {},
+      onRefresh: () => () => {},
+      readConfig: async (_key, fallback) => fallback,
+      normalizeQuickAmounts: amounts =>
+        Array.isArray(amounts) && amounts.length ? amounts : [50, 100, 200, 300],
+      DEFAULT_ALERT: { quickAmounts: [50, 100, 200, 300] },
+    },
     '@/lib/analytics': { track: () => {}, trackDrinkRecorded: () => {} },
     '@/utils/sound': { playConfirmSound: async () => {} },
     '@/lib/i18n': {

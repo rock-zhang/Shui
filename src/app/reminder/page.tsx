@@ -1,10 +1,6 @@
 "use client";
 import { invoke } from "@tauri-apps/api/core";
-import {
-  isRegistered,
-  register,
-  unregisterAll,
-} from "@tauri-apps/plugin-global-shortcut";
+
 import { useEffect, useRef, useState } from "react";
 import { listen, TauriEvent } from "@tauri-apps/api/event";
 import { Progress } from "@/components/ui/progress";
@@ -20,6 +16,7 @@ import { currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 import { STORE_NAME } from "@/lib/constants";
 import { usePlatform } from "@/hooks/use-platform";
 import { normalizeDrinkDay, type DrinkHistoryValue, type DrinkReceipt } from "@/lib/drink-day";
+import { DEFAULT_QUICK_AMOUNTS, normalizeQuickAmounts } from "@/lib/mobile";
 import { amountBucket, progressBucket, track, trackDrinkRecorded } from "@/lib/analytics";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 
@@ -30,17 +27,10 @@ async function hideWindowAction(outcome: "confirmed" | "skipped" = "confirmed", 
   }
   try {
     await invoke("hide_reminder_windows", { outcome, expectedSession: expectedSession ?? null });
-  } finally {
-    // 关闭失败或 IPC 异常时也要释放全局 Esc，避免系统级按键被永久占用
-    await unregisterAll();
+  } catch (error) {
+    // Esc 的注册与注销都由 Rust 侧管理，这里只记录关闭失败，避免页面异常阻塞。
+    console.error("关闭提醒窗口失败:", error);
   }
-}
-
-async function registerEscShortcut() {
-  if (await isRegistered("Esc")) return;
-  register("Esc", async () => {
-    hideWindowAction("skipped");
-  });
 }
 
 // 添加音效播放函数
@@ -74,8 +64,6 @@ function getTodayDate() {
   )}${String(today.getDate()).padStart(2, "0")}`;
 }
 
-const waterOptions = [{ ml: 50 }, { ml: 100 }, { ml: 200 }, { ml: 300 }];
-
 const REMINDER_TEXT_KEYS: MessageKey[] = [
   "desktop.reminder.tip1",
   "desktop.reminder.tip2",
@@ -104,6 +92,10 @@ export default function ReminderPage() {
     drink: 0,
   });
   const [countdown, setCountdown] = useState(30);
+  // 快捷杯量在每次显示提醒时重新读取（与「饮水记录」页编辑的是同一份配置）。
+  const [quickAmounts, setQuickAmounts] = useState<number[]>([
+    ...DEFAULT_QUICK_AMOUNTS,
+  ]);
   const [monitorName, setMonitorName] = useState("");
   const { isLinux } = usePlatform();
   const saving = useRef(false);
@@ -124,21 +116,8 @@ export default function ReminderPage() {
   }, [water.drink]);
 
   useEffect(() => {
-    registerEscShortcut();
-
     const countdownListener = listen("countdown", (event) => {
-      const countdownValue = event.payload as number;
-      setCountdown(countdownValue);
-      // 提醒窗口会被复用，新一次提醒要靠倒计时事件重新注册 Esc。
-      // 不要监听 WINDOW_FOCUS：关闭提醒时窗口隐藏会让焦点转移到另一个提醒窗口，
-      // 可能在前端 unregisterAll() 之后重新注册 Esc，造成关闭后全局 Esc 失效。
-      if (countdownValue > 0) registerEscShortcut();
-    });
-
-    // TODO:被其他窗口隐藏时，注销快捷键
-    // 待确认多屏场景下，是否需要注销快捷键
-    listen("reminder_already_hidden", () => {
-      unregisterAll();
+      setCountdown(event.payload as number);
     });
 
     currentMonitor().then((mo) => {
@@ -147,7 +126,6 @@ export default function ReminderPage() {
 
     return () => {
       countdownListener.then(unlisten => unlisten());
-      unregisterAll();
     };
   }, []);
 
@@ -194,9 +172,18 @@ export default function ReminderPage() {
       const [goldSetting, drink = 0] = await Promise.all([
         config_store.get<{
           gold: number;
+          quickAmounts?: unknown;
         }>("alert"),
         drinkHistory.get<DrinkHistoryValue>(todayDate),
       ]);
+
+      const amounts = normalizeQuickAmounts(goldSetting?.quickAmounts);
+      setQuickAmounts((previous) =>
+        previous.length === amounts.length &&
+        previous.every((value, index) => value === amounts[index])
+          ? previous
+          : amounts
+      );
 
       setWater({
         gold: Number(goldSetting?.gold) || 0,
@@ -285,15 +272,15 @@ export default function ReminderPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          {waterOptions.map((option) => (
+          {quickAmounts.map((ml, index) => (
             <button
-              key={option.ml}
+              key={index}
               tabIndex={-1}
-              onClick={() => handleWaterSelection(option.ml)}
+              onClick={() => handleWaterSelection(ml)}
               className="group relative p-6 rounded-xl transition-all duration-300 cursor-pointer bg-blue-50 hover:bg-blue-100 hover:scale-105 active:scale-95 text-blue-700 flex items-center justify-center"
             >
               <div className="flex items-baseline gap-1">
-                <span className="text-3xl font-medium">{option.ml}</span>
+                <span className="text-3xl font-medium">{ml}</span>
                 <span className="text-lg text-blue-600/90">ml</span>
               </div>
             </button>

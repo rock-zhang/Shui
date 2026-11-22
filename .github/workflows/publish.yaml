@@ -206,6 +206,21 @@ jobs:
 
       - name: install frontend dependencies
         run: yarn install # change this to npm, pnpm or bun depending on which one you use.
+
+      # 桌面端 GA4 凭据只保存在仓库 Secrets 里，构建前写入已被 .gitignore 的
+      # src-tauri/ga4.local.json；build.rs 在编译期读取并注入二进制。
+      # 未配置时 build.rs 会跳过，桌面端统计静默 no-op。
+      - name: Write desktop GA4 credentials
+        env:
+          GA4_MEASUREMENT_ID: ${{ secrets.SHUI_GA4_MEASUREMENT_ID }}
+          GA4_API_SECRET: ${{ secrets.SHUI_GA4_API_SECRET }}
+        run: >
+          node -e "const fs=require('fs');
+          const measurement_id=process.env.GA4_MEASUREMENT_ID||'';
+          const api_secret=process.env.GA4_API_SECRET||'';
+          if(!measurement_id||!api_secret){console.log('::warning::SHUI_GA4_MEASUREMENT_ID / SHUI_GA4_API_SECRET 未配置，桌面端统计将跳过')}
+          fs.writeFileSync('src-tauri/ga4.local.json',JSON.stringify({measurement_id,api_secret},null,2)+'\n')"
+
       # 使用tauri actions
       - name: Build the app
         id: build

@@ -6,6 +6,7 @@ import {
   Clock3,
   Download,
   Droplets,
+  Flame,
   Target,
   TimerReset,
   TrendingUp,
@@ -30,6 +31,7 @@ import {
 } from "@/lib/drink-history";
 import { useI18n, type Locale, type MessageKey } from "@/lib/i18n";
 import { track } from "@/lib/analytics";
+import { getStreak, type StreakInfo } from "@/lib/streak";
 
 const PERIODS = [7, 30] as const;
 
@@ -293,6 +295,7 @@ export default function StatisticsPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(false);
+  const [streak, setStreak] = useState<StreakInfo | null>(null);
 
   // 系统通知里点「+Xml」由 Rust 落盘后广播，桥接层转成 emitRefresh；
   // 桌面端订阅后统计才会跟着更新。
@@ -332,8 +335,10 @@ export default function StatisticsPage() {
             historyStore.get<DrinkHistoryValue>(getLocalDateKey(date))
           )
         );
+        const streakInfo = await getStreak();
 
         if (!cancelled) {
+          setStreak(streakInfo);
           const periodEntries = dates.map(
             (date, index) =>
               [getLocalDateKey(date), values[index]] as [
@@ -473,7 +478,7 @@ export default function StatisticsPage() {
         </div>
       ) : (
         <>
-          <div className="mb-4 grid grid-cols-3 gap-3">
+          <div className="mb-4 grid grid-cols-2 gap-3">
             <div className="rounded-lg border p-3 shadow-xs">
               <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
                 <Droplets className="h-4 w-4 text-blue-500" />
@@ -505,6 +510,23 @@ export default function StatisticsPage() {
                   {t("settings.statistics.daysUnit")}
                 </span>
               </p>
+            </div>
+            <div className="rounded-lg border p-3 shadow-xs">
+              <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <Flame className="h-4 w-4 text-orange-500" />
+                {t("settings.statistics.streak")}
+              </div>
+              <p className="text-xl font-semibold">
+                {loading || !streak ? "--" : streak.current}
+                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                  {t("settings.statistics.daysUnit")}
+                </span>
+              </p>
+              {!loading && streak && streak.best > 0 && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {t("settings.statistics.streakBest", { days: streak.best })}
+                </p>
+              )}
             </div>
           </div>
 

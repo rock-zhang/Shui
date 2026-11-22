@@ -9,6 +9,7 @@ mod drink_recording;
 mod drink_store;
 mod reminder_history;
 mod reminder_session;
+mod streak;
 mod timer;
 
 #[cfg(not(target_os = "android"))]
@@ -219,6 +220,8 @@ pub fn run() {
         commands::hide_reminder_window,
         crate::reminder_session::get_reminder_session,
         crate::reminder_session::record_reminder_drink,
+        crate::streak::get_streak,
+        crate::streak::ack_streak,
         commands::reset_timer,
         commands::pause_timer,
         crate::data_backup::export_drink_backup,
@@ -249,6 +252,8 @@ pub fn run() {
         commands::hide_reminder_window,
         crate::reminder_session::get_reminder_session,
         crate::reminder_session::record_reminder_drink,
+        crate::streak::get_streak,
+        crate::streak::ack_streak,
         mobile::reset_timer,
         mobile::pause_timer,
         mobile::start_timer,

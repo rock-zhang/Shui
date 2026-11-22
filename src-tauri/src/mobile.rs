@@ -337,7 +337,7 @@ pub fn send_mobile_notification(app: tauri::AppHandle) -> Result<(), String> {
     native::<Value>(&app, "showNotification", json!({})).map(|_| ())
 }
 
-/// 达成每日目标后的系统通知：前台记录走这条，后台/通知 Action 记录由闹钟回调补发。
+/// 达成每日目标后的系统通知：前台记录走这条；通知栏 Action 与后台闹钟由原生即时补发。
 #[tauri::command]
 pub fn show_goal_notification(
     app: tauri::AppHandle,

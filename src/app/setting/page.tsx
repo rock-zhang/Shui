@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle, ExternalLink, SendHorizontal } from "lucide-react";
 import { useEffect, useCallback, useState } from "react";
 import { load } from "@tauri-apps/plugin-store";
-import { useTray } from "@/hooks/use-tray";
 import { isEnabled, disable } from "@tauri-apps/plugin-autostart";
 import { invoke } from "@tauri-apps/api/core";
 import { STORE_NAME } from "@/lib/constants";
@@ -130,7 +129,6 @@ export default function Home() {
   const { theme, setTheme } = useTheme();
   const [themeMounted, setThemeMounted] = useState(false);
   const [autoStartPending, setAutoStartPending] = useState(true);
-  useTray();
 
   useEffect(() => setThemeMounted(true), []);
 
@@ -315,27 +313,6 @@ export default function Home() {
         />
       </div>
 
-      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
-        <div>
-          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            {t("settings.general.sound.title")}
-          </label>
-          <p
-            id=":r233:-form-item-description"
-            className="text-[0.8rem] text-muted-foreground"
-          >
-            {t("settings.general.sound.description")}
-          </p>
-        </div>
-        <Switch
-          checked={config.isSound}
-          aria-label={t("settings.general.sound.title")}
-          onCheckedChange={async (checked) => {
-            await saveConfig("isSound", checked);
-          }}
-        />
-      </div>
-
       {!autoStartPending &&
         !config.isFullScreen &&
         notificationStatus !== "granted" && (
@@ -374,6 +351,27 @@ export default function Home() {
             </div>
           </div>
         )}
+
+      <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs mb-4">
+        <div>
+          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+            {t("settings.general.sound.title")}
+          </label>
+          <p
+            id=":r233:-form-item-description"
+            className="text-[0.8rem] text-muted-foreground"
+          >
+            {t("settings.general.sound.description")}
+          </p>
+        </div>
+        <Switch
+          checked={config.isSound}
+          aria-label={t("settings.general.sound.title")}
+          onCheckedChange={async (checked) => {
+            await saveConfig("isSound", checked);
+          }}
+        />
+      </div>
 
       <div className="mb-4 flex flex-row items-center justify-between rounded-lg border p-3 shadow-xs">
         <div>

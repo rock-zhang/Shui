@@ -6,6 +6,7 @@
     "tauri": "tauri",
     "dev": "cross-env NEXT_PRIVATE_LOCAL_WEBPACK=1 next dev --turbo",
     "dev:prod": "cross-env NODE_ENV=production NEXT_PRIVATE_LOCAL_WEBPACK=1 next dev --turbo",
+    "prebuild": "rm -rf .next/ dist/",
     "build": "cross-env NEXT_PRIVATE_LOCAL_WEBPACK=1 next build",
     "build:dmg": "tauri build",
     "start": "next start",

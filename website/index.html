@@ -3,543 +3,1515 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Shui · 喝水提醒助手 — 让喝水变成一件自然的事</title>
-<meta name="description" content="Shui 是一款专注喝水提醒的跨平台桌面应用：自定义提醒间隔、全屏休息提醒、饮水记录与统计分析，帮你养成喝水好习惯。" />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%92%A7%3C/text%3E%3C/svg%3E" />
+<title>Shui · 喝水提醒 — 让喝水自然发生</title>
+<meta name="description" content="Shui 是一款跨平台喝水提醒应用：桌面端常驻菜单栏与托盘，手机端一键记录。开会自动安静，息屏自动暂停，数据只保存在本地。免费、无广告、无订阅、无账号。" />
+<meta name="theme-color" content="#05080f" />
+<link rel="icon" type="image/png" sizes="32x32" href="./assets/icon-32.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="./assets/icon-512.png" />
+<link rel="apple-touch-icon" sizes="180x180" href="./assets/apple-touch-icon.png" />
+<link rel="alternate" hreflang="zh-CN" href="./?lang=zh" />
+<link rel="alternate" hreflang="en" href="./?lang=en" />
+<link rel="alternate" hreflang="x-default" href="./" />
+<script>document.documentElement.classList.add('i18n-pending')</script>
 <style>
   :root{
-    --bg:#f5faff;
-    --surface:#ffffff;
-    --ink:#0a1e30;
-    --muted:#5a7186;
-    --line:rgba(10,30,48,.08);
-    --brand:#0ea5e9;
-    --brand-deep:#0369a1;
-    --accent:#14b8a6;
-    --deep:#04182b;
-    --radius:22px;
-    --shadow-sm:0 2px 10px rgba(8,47,73,.06);
-    --shadow-md:0 18px 40px -18px rgba(3,105,161,.35);
-    --shadow-lg:0 40px 80px -30px rgba(3,105,161,.45);
-    --maxw:1160px;
+    --bg:#08070a;
+    --bg-soft:#0c0a07;
+    --surface:rgba(255,255,255,.042);
+    --surface-2:rgba(255,255,255,.075);
+    --ink:#f6f1e7;
+    --muted:#a79c8a;
+    --faint:#857a68;
+    --line:rgba(208,176,116,.13);
+    --line-strong:rgba(208,176,116,.26);
+    --brand:#e8c98a;
+    --brand-2:#d4af6a;
+    --brand-deep:#c9a45c;
+    --accent:#f3e3bd;
+    --violet:#c79a55;
+    --deep:#060506;
+    --radius:20px;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --shadow-sm:inset 0 1px 0 rgba(255,255,255,.05),0 20px 40px -30px rgba(0,0,0,.95);
+    --shadow-md:inset 0 1px 0 rgba(255,255,255,.08),0 40px 80px -50px rgba(0,0,0,1),0 0 44px -26px rgba(232,201,138,.55);
+    --shadow-lg:0 70px 140px -60px rgba(0,0,0,1);
+    --maxw:1140px;
   }
   *{box-sizing:border-box}
-  html{scroll-behavior:smooth}
+  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;color-scheme:dark}
+  html.i18n-pending body{visibility:hidden}
   body{
-    margin:0;
-    background:var(--bg);
-    color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",Roboto,sans-serif;
-    line-height:1.65;
-    -webkit-font-smoothing:antialiased;
-    overflow-x:hidden;
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.65;-webkit-font-smoothing:antialiased;overflow-x:hidden;position:relative;
   }
+  ::selection{background:rgba(232,201,138,.32);color:#fff}
+  header,main,footer{position:relative;z-index:1}
   img{max-width:100%;display:block}
   a{color:inherit;text-decoration:none}
+  button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+  :focus-visible{outline:2px solid #e8c98a;outline-offset:3px;border-radius:6px}
   .wrap{width:min(100% - 48px,var(--maxw));margin:0 auto}
+  .skip{position:absolute;left:-9999px;top:0;background:#12100c;color:var(--ink);padding:12px 18px;border-radius:0 0 12px 0;z-index:99;border:1px solid var(--line)}
+  .skip:focus{left:0}
   .eyebrow{
-    display:inline-flex;align-items:center;gap:8px;
-    font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
-    color:var(--brand-deep);
+    display:inline-flex;align-items:center;gap:10px;
+    font-family:var(--mono);font-size:11.5px;font-weight:700;letter-spacing:.24em;text-transform:uppercase;color:#f0dcb4;
   }
-  .eyebrow::before{content:"";width:22px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--brand),var(--accent))}
+  .eyebrow::before{content:"";width:28px;height:1px;background:linear-gradient(90deg,#e8c98a,rgba(232,201,138,0))}
+  h1,h2,h3{letter-spacing:-.03em;line-height:1.16;margin:0}
 
-  /* ---------- Nav ---------- */
-  .nav{
-    position:fixed;inset:0 0 auto 0;z-index:50;
-    transition:background .35s ease,box-shadow .35s ease,backdrop-filter .35s;
-    padding:16px 0;
+  /* ---------------- ambient background ---------------- */
+  .fx{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .fx-grid{
+    position:absolute;inset:-2px;
+    background-image:linear-gradient(rgba(208,176,116,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(208,176,116,.055) 1px,transparent 1px);
+    background-size:64px 64px;
+    mask-image:radial-gradient(ellipse 92% 62% at 50% 0%,#000 18%,transparent 76%);
+    -webkit-mask-image:radial-gradient(ellipse 92% 62% at 50% 0%,#000 18%,transparent 76%);
   }
-  .nav.scrolled{
-    background:rgba(255,255,255,.82);
-    backdrop-filter:blur(18px) saturate(1.4);
-    box-shadow:0 1px 0 rgba(10,30,48,.06),0 10px 30px -20px rgba(10,30,48,.4);
-    padding:10px 0;
+  .fx-aurora{position:absolute;width:58vw;height:58vw;border-radius:50%;filter:blur(90px);opacity:.55}
+  .fx-aurora.a1{top:-22vw;right:-16vw;background:radial-gradient(circle,rgba(232,201,138,.28),transparent 64%);animation:drift1 26s ease-in-out infinite alternate}
+  .fx-aurora.a2{top:26vh;left:-26vw;background:radial-gradient(circle,rgba(168,118,58,.22),transparent 64%);animation:drift2 32s ease-in-out infinite alternate}
+  .fx-noise{
+    position:absolute;inset:0;opacity:.03;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E");
   }
-  .nav .wrap{display:flex;align-items:center;justify-content:space-between;gap:24px}
-  .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;letter-spacing:.01em;color:#fff;transition:color .35s}
-  .nav.scrolled .brand{color:var(--ink)}
+  @keyframes drift1{to{transform:translate3d(-6vw,4vh,0) scale(1.12)}}
+  @keyframes drift2{to{transform:translate3d(5vw,-3vh,0) scale(1.08)}}
+  .scroll-line{position:fixed;top:0;left:0;height:2px;width:0;z-index:100;background:linear-gradient(90deg,#e8c98a,#f3e3bd 60%,#c79a55);box-shadow:0 0 14px rgba(232,201,138,.9);transition:width .1s linear}
+
+  /* ---------------- nav ---------------- */
+  .nav{position:fixed;inset:0 0 auto 0;z-index:50;padding:16px 0;border-bottom:1px solid transparent;transition:background .35s,box-shadow .35s,padding .35s,border-color .35s}
+  .nav.scrolled{background:rgba(8,7,10,.74);backdrop-filter:blur(20px) saturate(1.4);border-bottom-color:rgba(208,176,116,.12);box-shadow:0 24px 60px -48px rgba(0,0,0,1);padding:10px 0}
+  .nav .wrap{display:flex;align-items:center;justify-content:space-between;gap:20px}
+  .brand{display:flex;align-items:center;gap:11px;font-weight:800;font-size:18px;color:#fff;transition:color .3s}
   .brand-mark{
-    width:36px;height:36px;border-radius:12px;display:grid;place-items:center;
-    background:linear-gradient(140deg,#38bdf8,#0ea5e9 55%,#0284c7);
-    box-shadow:0 8px 20px -8px rgba(14,165,233,.9);
-    font-size:19px;
+    width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:0 0 auto;overflow:hidden;
+    background:#fff;
+    box-shadow:0 0 24px -10px rgba(232,201,138,.9);
   }
-  .nav-links{display:flex;align-items:center;gap:28px;font-size:14.5px;font-weight:500}
-  .nav-links a{color:rgba(255,255,255,.78);transition:color .25s}
-  .nav-links a:hover{color:#fff}
-  .nav.scrolled .nav-links a{color:var(--muted)}
-  .nav.scrolled .nav-links a:hover{color:var(--ink)}
-  .nav-cta{
-    padding:9px 18px;border-radius:999px;font-weight:600;font-size:14px;
-    background:#fff;color:var(--deep)!important;
-    box-shadow:0 10px 24px -12px rgba(2,132,199,.8);
-    transition:transform .25s,box-shadow .25s;
-  }
-  .nav-cta:hover{transform:translateY(-1px);box-shadow:0 14px 30px -12px rgba(2,132,199,.9)}
-  .nav.scrolled .nav-cta{background:linear-gradient(135deg,#0ea5e9,#0369a1);color:#fff!important}
+  .brand-mark img{width:100%;height:100%;object-fit:cover;display:block}
+  .nav-links{display:flex;align-items:center;gap:26px;font-size:14px;font-weight:500}
+  .nav-links a{position:relative;color:rgba(246,241,231,.66);transition:color .2s}
+  .nav-links a:not(.nav-cta)::after{content:"";position:absolute;left:0;right:0;bottom:-7px;height:1px;background:linear-gradient(90deg,#e8c98a,rgba(232,201,138,0));transform:scaleX(0);transform-origin:left;transition:transform .28s}
+  .nav-links a:not(.nav-cta):hover{color:#fff}
+  .nav-links a:not(.nav-cta):hover::after{transform:scaleX(1)}
+  .nav-cta{padding:9px 18px;border-radius:999px;font-weight:750;font-size:13.5px;background:linear-gradient(135deg,#e8c98a,#d4af6a 48%,#a8763a);color:#1a1305!important;box-shadow:0 10px 34px -14px rgba(232,201,138,.95),inset 0 1px 0 rgba(255,255,255,.5);transition:transform .2s,box-shadow .2s}
+  .nav-cta:hover{transform:translateY(-1px);box-shadow:0 16px 40px -14px rgba(232,201,138,1),inset 0 1px 0 rgba(255,255,255,.5)}
+  .lang{display:inline-flex;align-items:center;gap:2px;padding:3px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(208,176,116,.18)}
+  .lang button{padding:4px 10px;border-radius:999px;font-size:12.5px;font-weight:650;color:rgba(246,241,231,.62);transition:background .2s,color .2s}
+  .lang button[aria-pressed="true"]{background:linear-gradient(135deg,#e8c98a,#d4af6a);color:#1a1305;box-shadow:0 4px 16px -8px rgba(232,201,138,.9)}
 
-  /* ---------- Hero ---------- */
+  /* ---------------- hero ---------------- */
   .hero{
-    position:relative;overflow:hidden;
-    padding:150px 0 110px;
+    position:relative;overflow:hidden;padding:158px 0 118px;color:#fff;
     background:
-      radial-gradient(1200px 600px at 85% -10%,rgba(20,184,166,.28),transparent 60%),
-      radial-gradient(900px 500px at 10% 10%,rgba(56,189,248,.30),transparent 60%),
-      linear-gradient(165deg,#031526 0%,#062a45 45%,#073b5c 100%);
-    color:#fff;
+      radial-gradient(900px 540px at 84% -12%,rgba(232,201,138,.22),transparent 62%),
+      radial-gradient(760px 520px at 4% 4%,rgba(212,175,106,.16),transparent 60%),
+      radial-gradient(680px 420px at 58% 112%,rgba(243,227,189,.14),transparent 66%),
+      linear-gradient(180deg,#08070a 0%,#141008 58%,#08070a 100%);
   }
   .hero::after{
     content:"";position:absolute;inset:0;pointer-events:none;
-    background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);
+    background-image:linear-gradient(rgba(208,176,116,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(208,176,116,.06) 1px,transparent 1px);
     background-size:64px 64px;
-    mask-image:radial-gradient(ellipse 90% 70% at 50% 25%,#000 20%,transparent 75%);
+    mask-image:radial-gradient(ellipse 80% 70% at 50% 22%,#000 10%,transparent 76%);
+    -webkit-mask-image:radial-gradient(ellipse 80% 70% at 50% 22%,#000 10%,transparent 76%);
   }
-  .hero .wrap{position:relative;z-index:2;display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
-  .hero-badge{
-    display:inline-flex;align-items:center;gap:9px;
-    padding:7px 14px 7px 8px;border-radius:999px;
-    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);
-    font-size:13px;color:rgba(255,255,255,.85);
-    backdrop-filter:blur(8px);
+  .hero-net{
+    position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;opacity:.8;
+    mask-image:linear-gradient(180deg,#000 0%,#000 60%,transparent 100%);
+    -webkit-mask-image:linear-gradient(180deg,#000 0%,#000 60%,transparent 100%);
   }
-  .hero-badge b{background:rgba(56,189,248,.22);color:#7dd3fc;padding:2px 9px;border-radius:999px;font-size:12px;letter-spacing:.04em}
-  .hero h1{
-    font-size:clamp(36px,4.6vw,58px);
-    line-height:1.14;letter-spacing:-.015em;font-weight:800;
-    margin:22px 0 18px;
-  }
+  .hero .wrap{position:relative;z-index:2;display:grid;grid-template-columns:1.02fr .98fr;gap:58px;align-items:center}
+  .hero-badge{display:inline-flex;align-items:center;gap:10px;padding:6px 14px 6px 8px;border-radius:999px;background:rgba(240,220,180,.07);border:1px solid rgba(240,220,180,.24);font-size:12.5px;color:rgba(246,241,231,.85);backdrop-filter:blur(10px);letter-spacing:.02em}
+  .hero-badge b{background:linear-gradient(135deg,#e8c98a,#a8763a);color:#1a1305;padding:2px 9px;border-radius:999px;font-family:var(--mono);font-size:11px;font-weight:800;letter-spacing:.04em;box-shadow:0 0 20px -6px rgba(232,201,138,.95)}
+  .hero h1{font-size:clamp(38px,5vw,64px);line-height:1.08;font-weight:800;margin:24px 0 20px;letter-spacing:-.045em;text-wrap:balance}
   .hero h1 .grad{
-    background:linear-gradient(100deg,#7dd3fc 0%,#38bdf8 35%,#2dd4bf 100%);
-    -webkit-background-clip:text;background-clip:text;color:transparent;
+    background:linear-gradient(100deg,#f0dcb4 0%,#e8c98a 32%,#f3e3bd 62%,#c79a55 100%);
+    background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+    animation:shimmer 9s ease-in-out infinite;
   }
-  .hero p.lede{font-size:17.5px;color:rgba(226,242,252,.78);max-width:520px;margin:0 0 34px}
-  .hero-actions{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
-  .btn{
-    display:inline-flex;align-items:center;gap:9px;
-    padding:13px 24px;border-radius:999px;font-weight:650;font-size:15px;
-    transition:transform .25s,box-shadow .25s,background .25s;
-  }
-  .btn svg{width:17px;height:17px}
-  .btn-primary{
-    background:linear-gradient(135deg,#38bdf8,#0ea5e9 50%,#0284c7);
-    color:#fff;box-shadow:0 20px 40px -18px rgba(14,165,233,.95),inset 0 1px 0 rgba(255,255,255,.35);
-  }
-  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 26px 50px -18px rgba(14,165,233,1)}
-  .btn-ghost{
-    background:rgba(255,255,255,.07);color:rgba(255,255,255,.9);
-    border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(8px);
-  }
-  .btn-ghost:hover{background:rgba(255,255,255,.13);transform:translateY(-2px)}
-  .hero-meta{display:flex;gap:26px;margin-top:38px;flex-wrap:wrap}
-  .hero-meta div{font-size:13px;color:rgba(255,255,255,.55)}
-  .hero-meta b{display:block;font-size:22px;font-weight:750;color:#fff;letter-spacing:-.01em;line-height:1.3}
+  .hero .lede{font-size:16.5px;line-height:1.78;color:rgba(240,231,214,.74);max-width:520px;margin:0 0 32px}
+  .hero-actions{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:13px 22px;border-radius:999px;font-weight:700;font-size:14.5px;transition:transform .22s,box-shadow .22s,background .22s;position:relative;overflow:hidden}
+  .btn svg{width:17px;height:17px;flex:0 0 auto}
+  .btn-primary{background:linear-gradient(135deg,#e8c98a,#d4af6a 46%,#a8763a);color:#1a1305;box-shadow:0 20px 46px -18px rgba(232,201,138,.9),inset 0 1px 0 rgba(255,255,255,.45)}
+  .btn-primary::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 28%,rgba(255,255,255,.55) 48%,transparent 64%);transform:translateX(-130%);transition:transform .75s}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 26px 54px -18px rgba(232,201,138,1),inset 0 1px 0 rgba(255,255,255,.5)}
+  .btn-primary:hover::after{transform:translateX(130%)}
+  .btn-primary>*{position:relative;z-index:1}
+  .btn-ghost{background:rgba(255,255,255,.05);color:rgba(246,241,231,.92);border:1px solid rgba(208,176,116,.22);backdrop-filter:blur(10px)}
+  .btn-ghost:hover{background:rgba(232,201,138,.1);border-color:rgba(232,201,138,.4);transform:translateY(-2px)}
+  .trust{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:28px;font-size:12.5px;color:rgba(240,231,214,.56)}
+  .trust span{display:inline-flex;align-items:center;gap:6px}
+  .trust svg{width:14px;height:14px;color:#e8c98a;filter:drop-shadow(0 0 5px rgba(243,227,189,.8))}
 
-  /* phone mockup */
-  .stage{position:relative;display:flex;justify-content:center}
-  .glow{
-    position:absolute;width:420px;height:420px;border-radius:50%;
-    background:radial-gradient(circle,rgba(56,189,248,.42),transparent 65%);
-    filter:blur(20px);z-index:0;top:50%;left:50%;transform:translate(-50%,-50%);
-  }
-  .phone{
-    position:relative;z-index:1;width:min(300px,80%);
-    padding:11px;border-radius:42px;
-    background:linear-gradient(160deg,rgba(255,255,255,.22),rgba(255,255,255,.05));
-    border:1px solid rgba(255,255,255,.22);
-    box-shadow:0 40px 90px -30px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.3);
+  .stage{position:relative;perspective:1400px}
+  .glow{position:absolute;inset:-14% -10% auto;height:82%;background:radial-gradient(circle at 50% 45%,rgba(232,201,138,.34),transparent 62%);filter:blur(40px);z-index:0}
+  .orbit{position:absolute;left:50%;top:50%;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:0}
+  .orbit.o1{width:116%;aspect-ratio:1;border:1px dashed rgba(240,220,180,.18);animation:spin 46s linear infinite}
+  .orbit.o2{width:142%;aspect-ratio:1;border:1px solid rgba(199,154,85,.10);border-left-color:rgba(232,201,138,.5);border-right-color:rgba(232,201,138,.16);animation:spin 26s linear infinite reverse}
+  .orbit::after{content:"";position:absolute;top:0;left:50%;width:6px;height:6px;border-radius:50%;background:#e8c98a;box-shadow:0 0 16px 4px rgba(232,201,138,.8);transform:translate(-50%,-50%)}
+  @keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+  @keyframes shimmer{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+  .window{
+    position:relative;z-index:1;border-radius:18px;padding:10px;
+    background:linear-gradient(160deg,rgba(40,30,16,.92),rgba(10,8,6,.96));
+    border:1px solid rgba(240,220,180,.26);
+    box-shadow:0 60px 120px -50px rgba(0,0,0,1),0 0 70px -24px rgba(232,201,138,.45),inset 0 1px 0 rgba(255,255,255,.14);
     backdrop-filter:blur(14px);
+    transform:rotateY(-5deg) rotateX(2deg);
   }
-  .phone img{border-radius:32px;width:100%;background:#071c2f}
-  .phone-notch{position:absolute;top:20px;left:50%;transform:translateX(-50%);width:84px;height:7px;border-radius:99px;background:rgba(255,255,255,.35)}
-  .float-card{
-    position:absolute;z-index:2;padding:13px 16px;border-radius:16px;
-    background:rgba(255,255,255,.94);color:var(--ink);
-    box-shadow:0 24px 50px -20px rgba(0,0,0,.55);
-    font-size:13px;line-height:1.45;
-    animation:floaty 6s ease-in-out infinite;
+  .window::before{
+    content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;
+    background:linear-gradient(150deg,rgba(240,220,180,.6),transparent 38%,transparent 64%,rgba(199,154,85,.4));
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;
+    mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    mask-composite:exclude;
   }
-  .float-card b{display:block;font-size:16px;letter-spacing:-.01em}
-  .float-card span{color:var(--muted);font-size:12px}
-  .float-a{top:16%;left:-4%}
-  .float-b{bottom:16%;right:-2%;animation-delay:-3s}
-  .float-card .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:6px;box-shadow:0 0 0 4px rgba(20,184,166,.18)}
-  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-11px)}}
+  .float-card{position:absolute;z-index:2;padding:12px 15px;border-radius:14px;background:rgba(16,12,8,.86);color:var(--ink);border:1px solid rgba(240,220,180,.24);box-shadow:0 26px 50px -24px rgba(0,0,0,.95),0 0 34px -20px rgba(232,201,138,.8);font-size:12.5px;line-height:1.45;backdrop-filter:blur(14px);animation:floaty 7s ease-in-out infinite}
+  .float-card b{display:block;font-size:15.5px;letter-spacing:-.01em}
+  .float-card span{color:var(--muted);font-size:11.5px}
+  .float-a{top:-13%;left:-6%}
+  .float-b{bottom:-13%;right:-4%;animation-delay:-3.5s}
+  .float-card .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:6px;box-shadow:0 0 0 4px rgba(243,227,189,.14),0 0 12px rgba(243,227,189,.9)}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
 
-  /* ---------- Sections ---------- */
-  section{padding:96px 0}
-  .section-head{max-width:640px;margin-bottom:52px}
-  .section-head h2{font-size:clamp(27px,3.2vw,40px);line-height:1.22;letter-spacing:-.02em;margin:14px 0 14px;font-weight:800}
-  .section-head p{color:var(--muted);font-size:16.5px;margin:0}
+  /* ---------------- platform strip ---------------- */
+  .strip{padding:22px 0;background:rgba(255,255,255,.018);border-top:1px solid rgba(208,176,116,.1);border-bottom:1px solid rgba(208,176,116,.1);backdrop-filter:blur(10px)}
+  .strip .wrap{display:flex;align-items:center;justify-content:center;gap:14px 36px;flex-wrap:wrap;color:var(--muted);font-size:13.5px}
+  .strip .item{display:inline-flex;align-items:center;gap:8px;font-weight:650;color:#eadcc0;letter-spacing:.01em}
+  .strip .item svg{width:16px;height:16px;color:#edd3a2;filter:drop-shadow(0 0 6px rgba(232,201,138,.55))}
+  .strip .note{color:var(--faint);font-size:12.5px}
+
+  /* ---------------- sections ---------------- */
+  section{padding:110px 0;position:relative}
+  .sec-head{max-width:680px;margin-bottom:52px}
+  .sec-head.center{margin-inline:auto;text-align:center}
+  .sec-head h2{font-size:clamp(28px,3.2vw,42px);font-weight:800;margin:16px 0 14px;letter-spacing:-.04em}
+  .sec-head p{color:var(--muted);font-size:16px;margin:0}
+
+  /* values */
+  .values{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .value{position:relative;overflow:hidden;padding:30px 28px;border-radius:var(--radius);background:linear-gradient(165deg,rgba(255,255,255,.06),rgba(255,255,255,.018));border:1px solid var(--line);box-shadow:var(--shadow-sm);transition:transform .35s,border-color .35s,box-shadow .35s}
+  .value::after{content:"";position:absolute;inset:0;background:radial-gradient(260px circle at var(--mx,50%) var(--my,0%),rgba(232,201,138,.15),transparent 68%);opacity:0;transition:opacity .35s;pointer-events:none}
+  .value:hover{transform:translateY(-5px);border-color:rgba(232,201,138,.38);box-shadow:0 40px 80px -50px #000,0 0 46px -28px rgba(232,201,138,.85)}
+  .value:hover::after{opacity:1}
+  .value>*{position:relative;z-index:1}
+  .value b{display:block;font-size:17px;margin-bottom:9px;color:var(--ink)}
+  .value p{margin:0;color:var(--muted);font-size:14.2px}
+  .value .num{font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.2em;display:block;margin-bottom:16px;background:linear-gradient(90deg,#e8c98a,#c79a55);-webkit-background-clip:text;background-clip:text;color:transparent}
 
   /* features */
-  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
-  .card{
-    background:var(--surface);border-radius:var(--radius);
-    border:1px solid var(--line);padding:30px 26px;
-    box-shadow:var(--shadow-sm);
-    transition:transform .3s,box-shadow .3s,border-color .3s;
-    position:relative;overflow:hidden;
-  }
-  .card::after{
-    content:"";position:absolute;inset:auto auto -60% -20%;width:220px;height:220px;border-radius:50%;
-    background:radial-gradient(circle,rgba(56,189,248,.12),transparent 70%);
-    opacity:0;transition:opacity .35s;
-  }
-  .card:hover{transform:translateY(-5px);box-shadow:var(--shadow-md);border-color:rgba(14,165,233,.25)}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .card{position:relative;overflow:hidden;background:linear-gradient(165deg,rgba(255,255,255,.055),rgba(255,255,255,.015));border-radius:var(--radius);border:1px solid var(--line);padding:28px 26px;box-shadow:var(--shadow-sm);transition:transform .35s,box-shadow .35s,border-color .35s}
+  .card::after{content:"";position:absolute;inset:0;background:radial-gradient(240px circle at var(--mx,50%) var(--my,0%),rgba(232,201,138,.16),transparent 68%);opacity:0;transition:opacity .35s;pointer-events:none}
+  .card:hover{transform:translateY(-5px);box-shadow:0 40px 80px -50px #000,0 0 46px -28px rgba(232,201,138,.85);border-color:rgba(232,201,138,.35)}
   .card:hover::after{opacity:1}
-  .icon{
-    width:46px;height:46px;border-radius:14px;display:grid;place-items:center;margin-bottom:18px;
-    background:linear-gradient(140deg,rgba(56,189,248,.18),rgba(20,184,166,.14));
-    color:var(--brand-deep);border:1px solid rgba(14,165,233,.16);
-  }
-  .icon svg{width:22px;height:22px}
-  .card h3{font-size:17.5px;margin:0 0 8px;font-weight:700;letter-spacing:-.01em}
-  .card p{margin:0;color:var(--muted);font-size:14.5px}
-  .card ul{margin:12px 0 0;padding-left:18px;color:var(--muted);font-size:14px}
-  .card li{margin:3px 0}
+  .card>*{position:relative;z-index:1}
+  .icon{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;margin-bottom:18px;background:linear-gradient(150deg,rgba(232,201,138,.18),rgba(168,118,58,.14));color:#f0dcb4;border:1px solid rgba(232,201,138,.25);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 28px -16px rgba(232,201,138,.95)}
+  .icon svg{width:21px;height:21px}
+  .card h3{font-size:16.8px;font-weight:750;margin-bottom:8px;color:var(--ink)}
+  .card p{margin:0;color:var(--muted);font-size:14.2px;line-height:1.72}
 
-  /* screenshots */
-  .shots{
-    background:linear-gradient(180deg,#eef7ff 0%,#f7fcff 100%);
-    border-top:1px solid rgba(14,165,233,.10);
-    border-bottom:1px solid rgba(14,165,233,.10);
-  }
-  .shot-pair{display:grid;grid-template-columns:1fr 1fr;gap:26px}
-  .shot{
-    background:#fff;border-radius:var(--radius);padding:12px;
-    border:1px solid var(--line);box-shadow:var(--shadow-md);
-    transition:transform .35s;
-  }
-  .shot:hover{transform:translateY(-4px)}
-  .shot img{border-radius:14px;border:1px solid rgba(10,30,48,.06)}
-  .shot figcaption{padding:14px 10px 6px;font-size:14px;color:var(--muted)}
-  .shot figcaption b{display:block;color:var(--ink);font-size:15px;margin-bottom:2px}
+  /* screens */
+  .shots{background:radial-gradient(900px 420px at 50% 0%,rgba(232,201,138,.10),transparent 62%),linear-gradient(180deg,#0d0a07,#08070a);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .shot-grid{display:grid;grid-template-columns:1.12fr .88fr;gap:26px;align-items:start}
+  .shot{margin:0;background:linear-gradient(165deg,rgba(255,255,255,.05),rgba(255,255,255,.015));border-radius:22px;padding:12px;border:1px solid var(--line);box-shadow:var(--shadow-md);transition:transform .4s,border-color .4s}
+  .shot:hover{transform:translateY(-5px);border-color:rgba(232,201,138,.35)}
+  .shot figcaption{padding:16px 12px 6px;font-size:13.5px;color:var(--muted)}
+  .shot figcaption b{display:block;color:var(--ink);font-size:14.5px;margin-bottom:3px}
+  .phone-frame{position:relative;margin:0 auto;width:min(320px,100%);padding:10px;border-radius:40px;background:linear-gradient(160deg,#1c1408,#050406);box-shadow:0 40px 90px -40px #000,0 0 60px -30px rgba(232,201,138,.7);border:1px solid rgba(240,220,180,.3)}
+  .phone-notch{position:absolute;top:18px;left:50%;transform:translateX(-50%);width:78px;height:6px;border-radius:99px;background:rgba(255,255,255,.22);z-index:2}
+  .phone-cap{text-align:center;font-size:13px;color:var(--muted);margin-top:14px}
+  .phone-cap b{color:var(--ink)}
 
-  /* stats */
-  .stats{
-    background:var(--deep);color:#fff;position:relative;overflow:hidden;padding:76px 0;
-  }
-  .stats::before{
-    content:"";position:absolute;inset:0;
-    background:radial-gradient(700px 300px at 20% 0%,rgba(14,165,233,.28),transparent 65%),radial-gradient(700px 300px at 85% 100%,rgba(20,184,166,.24),transparent 65%);
-  }
-  .stats .wrap{position:relative;z-index:1;display:grid;grid-template-columns:repeat(4,1fr);gap:28px;text-align:center}
-  .stat b{display:block;font-size:clamp(30px,3.4vw,44px);font-weight:800;letter-spacing:-.02em;
-    background:linear-gradient(120deg,#7dd3fc,#38bdf8 45%,#2dd4bf);-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1.15}
-  .stat span{font-size:13.5px;color:rgba(226,242,252,.66)}
+  /* app interface mockups */
+  .app-mock{display:grid;grid-template-columns:120px 1fr;min-height:346px;border-radius:10px;overflow:hidden;background:#f7fbff;border:1px solid rgba(11,27,43,.08);color:#0b1b2b;font-size:11px;line-height:1.45;text-align:left}
+  .am-side{background:linear-gradient(180deg,#f2f9ff,#eaf5fd);border-right:1px solid rgba(11,27,43,.07);padding:14px 10px;display:flex;flex-direction:column;gap:10px}
+  .am-brand{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:800;color:#0b1b2b}
+  .am-logo{width:18px;height:18px;border-radius:6px;background:linear-gradient(145deg,#38bdf8,#0ea5e9);display:grid;place-items:center;color:#fff;flex:0 0 auto}
+  .am-logo svg{width:10px;height:10px}
+  .am-nav{display:flex;flex-direction:column;gap:2px}
+  .am-nav span{display:flex;align-items:center;gap:6px;padding:5px 7px;border-radius:7px;color:#5b7288;font-size:10px;font-weight:600;white-space:nowrap}
+  .am-nav span.on{background:#fff;color:#0b1b2b;box-shadow:0 2px 6px -4px rgba(8,47,73,.4)}
+  .am-nav svg{width:11px;height:11px;flex:0 0 auto;opacity:.72}
+  .am-nav b{font-weight:inherit}
+  html[lang="en"] .am-nav span{font-size:8.8px}
+  .am-side-foot{margin-top:auto;font-size:9px;color:#93a7b8;padding-left:7px}
+  .am-main{padding:16px 16px 14px;display:flex;flex-direction:column;gap:10px;background:#fbfdff;min-width:0}
+  .am-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  .am-head h3{margin:0;font-size:14px;letter-spacing:-.01em;font-weight:750}
+  .am-head p{margin:2px 0 0;color:#7b90a3;font-size:9.5px}
+  .am-pill{font-size:9px;font-weight:700;color:#0369a1;background:rgba(14,165,233,.1);border-radius:99px;padding:3px 7px;white-space:nowrap}
+  .am-progress{background:#fff;border:1px solid rgba(11,27,43,.07);border-radius:10px;padding:10px 12px;box-shadow:0 8px 18px -16px rgba(8,47,73,.5)}
+  .am-progress-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;color:#7b90a3;font-size:9.5px}
+  .am-progress-top b{font-size:22px;color:#0b1b2b;letter-spacing:-.03em;margin:0 2px}
+  .am-pct{font-size:11px;font-weight:800;color:#0284c7}
+  .am-bar{height:6px;border-radius:99px;background:#e6f1f9;margin:8px 0 6px;overflow:hidden}
+  .am-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#38bdf8,#0ea5e9)}
+  .am-goal{display:flex;justify-content:space-between;gap:8px;font-size:9px;color:#8ba3b5}
+  .am-list{background:#fff;border:1px solid rgba(11,27,43,.07);border-radius:10px;overflow:hidden}
+  .am-row{display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;gap:7px;padding:8px 10px;border-bottom:1px solid rgba(11,27,43,.05);font-size:9.5px}
+  .am-row:last-child{border-bottom:0}
+  .am-time{color:#8ba3b5;font-variant-numeric:tabular-nums}
+  .am-drop{width:18px;height:18px;border-radius:7px;background:rgba(14,165,233,.1);color:#0284c7;display:grid;place-items:center}
+  .am-drop svg{width:10px;height:10px}
+  .am-amt{font-weight:700;color:#0b1b2b}
+  .am-src{color:#93a7b8;font-size:8.5px}
+  .am-card{background:#fff;border:1px solid rgba(11,27,43,.07);border-radius:10px;overflow:hidden}
+  .am-set{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid rgba(11,27,43,.05)}
+  .am-set:last-child{border-bottom:0}
+  .am-set b{display:block;font-size:10.5px;font-weight:650;color:#0b1b2b}
+  .am-set span{display:block;font-size:8.8px;color:#8ba3b5;margin-top:1px;line-height:1.35}
+  .am-set .am-select{font-size:9px;font-weight:650;color:#0b1b2b;background:#f1f7fc;border:1px solid rgba(11,27,43,.08);border-radius:6px;padding:3px 8px;margin:0;white-space:nowrap}
+  .am-switch{width:26px;height:15px;border-radius:99px;background:#dfeaf2;position:relative;flex:0 0 auto;margin:0}
+  .am-switch i{position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(8,47,73,.25);transition:left .2s}
+  .am-switch.on{background:linear-gradient(90deg,#38bdf8,#0ea5e9)}
+  .am-switch.on i{left:13px}
 
-  /* platform */
-  .platform-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
-  .plat{
-    background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px;
-    display:flex;flex-direction:column;gap:6px;align-items:flex-start;
-    box-shadow:var(--shadow-sm);transition:transform .3s,box-shadow .3s;
-  }
-  .plat:hover{transform:translateY(-4px);box-shadow:var(--shadow-md)}
-  .plat .p-ico{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:rgba(14,165,233,.1);color:var(--brand-deep);margin-bottom:8px;font-size:18px}
-  .plat b{font-size:15.5px}
-  .plat span{font-size:13px;color:var(--muted)}
+  /* phone mock */
+  .pm-screen{position:relative;border-radius:32px;overflow:hidden;aspect-ratio:9 / 16.4;padding:26px 14px 12px;display:flex;flex-direction:column;color:#0b1b2b;isolation:isolate;
+    background:
+      radial-gradient(circle at 60% 92%,rgba(255,126,179,.72),transparent 12%),
+      radial-gradient(circle at 18% 14%,rgba(122,252,255,.66),transparent 17%),
+      radial-gradient(circle at 84% 24%,rgba(255,214,95,.66),transparent 14%),
+      radial-gradient(circle at 34% 62%,rgba(153,204,255,.7),transparent 20%),
+      radial-gradient(circle at 86% 58%,rgba(255,153,102,.6),transparent 16%),
+      radial-gradient(circle at 12% 84%,rgba(153,255,153,.6),transparent 17%),
+      radial-gradient(circle at 52% 38%,rgba(255,255,153,.5),transparent 12%),
+      linear-gradient(175deg,#eef9ff,#e8f2ff 55%,#f6f0ff)}
+  .pm-status{display:flex;justify-content:space-between;font-size:8px;color:rgba(71,85,105,.7);padding:0 4px}
+  .pm-center{flex:1;display:flex;flex-direction:column;justify-content:center;padding:16px 0}
+  .pm-card{background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.7);backdrop-filter:blur(10px);color:#0b1b2b;border-radius:18px;padding:16px 14px;box-shadow:0 24px 48px -24px rgba(30,64,120,.45);display:flex;flex-direction:column;gap:9px}
+  .pm-top{display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .pm-eyebrow{align-self:flex-start;font-size:8.5px;font-weight:800;letter-spacing:.06em;color:#334155;background:rgba(255,255,255,.78);padding:3px 8px;border-radius:99px}
+  .pm-count{font-size:8.5px;color:#475569;background:rgba(255,255,255,.78);padding:3px 8px;border-radius:99px;font-variant-numeric:tabular-nums}
+  .pm-card h4{margin:0;font-size:15px;font-weight:750;letter-spacing:-.02em;text-align:center;color:#1d4ed8}
+  .pm-card p{margin:0;font-size:9px;line-height:1.55;color:#475569;text-align:center}
+  .pm-meta{display:flex;justify-content:space-between;gap:6px;font-size:8.5px;color:#64748b;margin-bottom:5px}
+  .pm-progress{height:6px;border-radius:99px;background:rgba(148,163,184,.28);overflow:hidden}
+  .pm-progress i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#38bdf8,#0ea5e9)}
+  .pm-amounts{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .pm-amounts span{text-align:center;border:1px solid rgba(14,165,233,.14);background:rgba(219,239,255,.85);color:#1d4ed8;border-radius:9px;padding:8px 4px;font-size:10px;font-weight:700}
+  .pm-skip{text-align:center;font-size:9px;color:#475569;padding:4px}
+  .pm-foot{margin-top:auto;text-align:center;font-size:8.5px;color:rgba(71,85,105,.7);padding-bottom:4px}
+
+  /* steps */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;counter-reset:step}
+  .step{position:relative;overflow:hidden;padding:30px 26px;border-radius:var(--radius);background:linear-gradient(165deg,rgba(255,255,255,.05),rgba(255,255,255,.015));border:1px solid var(--line);box-shadow:var(--shadow-sm);transition:transform .35s,border-color .35s,box-shadow .35s}
+  .step::before{counter-increment:step;content:"0" counter(step);display:block;font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.2em;margin-bottom:14px;background:linear-gradient(90deg,#e8c98a,#c79a55);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .step:hover{transform:translateY(-5px);border-color:rgba(232,201,138,.35);box-shadow:0 40px 80px -50px #000,0 0 46px -28px rgba(232,201,138,.85)}
+  .step h3{font-size:16.5px;margin-bottom:8px;color:var(--ink)}
+  .step p{margin:0;color:var(--muted);font-size:14.2px}
+  .easy{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:20px}
+  .easy div{padding:17px 19px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid var(--line);font-size:13.6px;color:var(--muted);transition:border-color .3s,background .3s}
+  .easy div:hover{border-color:rgba(232,201,138,.32);background:rgba(232,201,138,.055)}
+  .easy b{color:var(--ink)}
+
+  /* compare */
+  .compare{background:radial-gradient(700px 340px at 12% 0%,rgba(232,201,138,.16),transparent 62%),radial-gradient(700px 340px at 90% 110%,rgba(168,118,58,.18),transparent 62%),#060506;color:#fff;position:relative;overflow:hidden;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .compare .wrap{position:relative;z-index:1}
+  .compare .eyebrow{color:#f0dcb4}
+  .compare h2{font-size:clamp(26px,3vw,38px);margin:16px 0 12px;font-weight:800;letter-spacing:-.04em}
+  .compare p.sub{color:rgba(240,231,214,.64);font-size:15.5px;max-width:620px;margin:0 0 34px}
+  .table-wrap{overflow-x:auto;border-radius:16px;border:1px solid rgba(208,176,116,.16);background:rgba(255,255,255,.025);backdrop-filter:blur(10px)}
+  table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
+  th,td{padding:14px 18px;text-align:left;border-bottom:1px solid rgba(208,176,116,.1)}
+  thead th{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:rgba(180,168,148,.62);font-weight:700;background:rgba(255,255,255,.03)}
+  tbody tr{transition:background .2s}
+  tbody tr:hover{background:rgba(232,201,138,.045)}
+  tbody tr:last-child td{border-bottom:0}
+  tbody td:first-child{color:rgba(255,255,255,.9);font-weight:600}
+  td.yes{color:#eed9a9;text-shadow:0 0 14px rgba(243,227,189,.8)}
+  td.no{color:rgba(180,168,148,.3)}
+  td.soon span{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:999px;background:rgba(240,220,180,.1);border:1px solid rgba(240,220,180,.32);color:#f0dcb4;font-size:11.5px;font-weight:700;letter-spacing:.03em;white-space:nowrap}
+  td.soon span::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.9;box-shadow:0 0 8px currentColor}
+  td.yes svg{width:16px;height:16px;display:inline-block;vertical-align:-3px;margin-right:4px}
+  .table-note{margin:14px 0 0;font-size:12.5px;color:rgba(180,168,148,.42)}
+  .table-legend{margin:14px 0 0;font-size:12.5px;color:rgba(180,168,148,.42)}
+
+  /* download */
+  .dl-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .dl-card{position:relative;overflow:hidden;background:linear-gradient(165deg,rgba(255,255,255,.055),rgba(255,255,255,.015));border:1px solid var(--line);border-radius:var(--radius);padding:26px;box-shadow:var(--shadow-sm);transition:box-shadow .35s,border-color .35s,transform .35s}
+  .dl-card:hover{transform:translateY(-4px);border-color:rgba(232,201,138,.3);box-shadow:0 40px 80px -50px #000,0 0 46px -30px rgba(232,201,138,.8)}
+  .dl-card.is-recommended{border-color:rgba(232,201,138,.42);background:linear-gradient(180deg,rgba(232,201,138,.075),rgba(255,255,255,.015) 52%);box-shadow:0 0 0 1px rgba(232,201,138,.2),0 0 60px -26px rgba(232,201,138,.7),0 40px 90px -60px #000}
+  .dl-card.is-recommended::before{content:"";position:absolute;left:16px;right:16px;top:-1px;height:2px;background:linear-gradient(90deg,transparent,#e8c98a,#f3e3bd,transparent);filter:blur(.3px)}
+  .dl-badge{position:absolute;top:20px;right:20px;display:none;padding:3px 10px;border-radius:999px;background:rgba(232,201,138,.1);color:#f0dcb4;font-size:11.5px;font-weight:700;letter-spacing:.04em}
+  .dl-card.is-recommended .dl-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;background:linear-gradient(135deg,#e8c98a,#a8763a);color:#1a1305;box-shadow:0 8px 22px -10px rgba(232,201,138,.95)}
+  .dl-card.is-recommended .dl-badge::before{content:"";width:5px;height:5px;border-radius:50%;background:#1a1305;opacity:.9}
+  .dl-card.is-recommended .dl-link{border-color:rgba(232,201,138,.18);background:rgba(232,201,138,.05)}
+  .dl-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .dl-ico{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:rgba(255,255,255,.055);color:#f0dcb4;flex:0 0 auto;border:1px solid rgba(208,176,116,.16)}
+  .dl-ico svg{width:19px;height:19px}
+  .dl-head b{font-size:16.5px;color:var(--ink)}
+  .dl-head div span{display:block;font-size:12.5px;color:var(--muted);font-weight:400}
+  .dl-links{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:8px}
+  .dl-link{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 14px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.025);font-size:13.6px;font-weight:600;color:#f2e9d8;transition:background .2s,border-color .2s,transform .2s}
+  .dl-link:hover{background:rgba(232,201,138,.09);border-color:rgba(232,201,138,.38);transform:translateX(2px)}
+  .dl-link .meta{font-weight:400;font-size:12px;color:var(--faint);white-space:nowrap;font-family:var(--mono)}
+  .dl-link svg{width:15px;height:15px;color:#edd3a2;flex:0 0 auto}
+  .dl-link .lbl{display:flex;align-items:center;gap:8px;min-width:0}
+  .winget{margin-top:14px;padding:11px 12px;border-radius:11px;background:rgba(8,6,4,.75);color:#f0dcb4;display:flex;align-items:center;gap:10px;font-size:12.5px;font-family:var(--mono);border:1px solid rgba(232,201,138,.18)}
+  .winget code{flex:1;overflow-wrap:anywhere;white-space:nowrap;overflow-x:auto}
+  .winget button{flex:0 0 auto;color:#e8c98a;font-size:12px;font-weight:700;padding:3px 6px;border-radius:6px}
+  .winget button:hover{background:rgba(232,201,138,.14)}
+  .dl-note{margin-top:22px;font-size:12.8px;color:var(--muted);text-align:center}
+  .dl-note a{color:#edd3a2;text-decoration:underline;text-underline-offset:3px}
+  .toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,14px);z-index:80;padding:10px 18px;border-radius:999px;background:rgba(16,12,8,.95);color:#f6f1e7;border:1px solid rgba(232,201,138,.35);box-shadow:0 20px 50px -20px #000,0 0 30px -16px rgba(232,201,138,.8);font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;backdrop-filter:blur(12px)}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
 
   /* faq */
-  .faq{max-width:820px;margin:0 auto}
-  details{
-    background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px 24px;
-    margin-bottom:12px;box-shadow:var(--shadow-sm);transition:border-color .25s;
-  }
-  details[open]{border-color:rgba(14,165,233,.3)}
-  summary{cursor:pointer;font-weight:650;font-size:15.5px;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px}
+  .faq{max-width:800px;margin:0 auto}
+  details{background:linear-gradient(165deg,rgba(255,255,255,.05),rgba(255,255,255,.015));border:1px solid var(--line);border-radius:15px;padding:19px 22px;margin-bottom:11px;box-shadow:var(--shadow-sm);transition:border-color .3s,background .3s}
+  details[open]{border-color:rgba(232,201,138,.35);background:linear-gradient(165deg,rgba(232,201,138,.06),rgba(255,255,255,.015))}
+  summary{cursor:pointer;font-weight:650;font-size:15px;color:var(--ink);list-style:none;display:flex;justify-content:space-between;align-items:center;gap:16px}
   summary::-webkit-details-marker{display:none}
-  summary::after{content:"+";font-size:20px;color:var(--brand);font-weight:400;transition:transform .25s;line-height:1}
+  summary::after{content:"+";font-size:19px;color:#e8c98a;font-weight:400;transition:transform .25s;line-height:1}
   details[open] summary::after{transform:rotate(45deg)}
-  details p{margin:12px 0 0;color:var(--muted);font-size:14.5px}
+  details p{margin:11px 0 0;color:var(--muted);font-size:14px;line-height:1.78}
 
-  /* cta */
-  .cta-band{
-    position:relative;overflow:hidden;border-radius:30px;padding:64px 48px;text-align:center;color:#fff;
-    background:linear-gradient(135deg,#0b4a6f 0%,#0e6f9e 50%,#0f8a8a 100%);
-    box-shadow:var(--shadow-lg);
-  }
-  .cta-band::before{
-    content:"";position:absolute;inset:-40% -10% auto;height:150%;
-    background:radial-gradient(circle at 30% 20%,rgba(255,255,255,.22),transparent 55%);
-    pointer-events:none;
-  }
-  .cta-band h2{position:relative;font-size:clamp(26px,3.2vw,38px);letter-spacing:-.02em;margin:0 0 12px;font-weight:800}
-  .cta-band p{position:relative;margin:0 auto 30px;max-width:520px;color:rgba(255,255,255,.8)}
-  .cta-band .btn-primary{background:#fff;color:#0b4a6f;box-shadow:0 24px 50px -20px rgba(0,0,0,.55)}
-  .cta-band .btn-primary:hover{box-shadow:0 30px 60px -20px rgba(0,0,0,.65)}
-
-  /* footer */
-  footer{padding:54px 0 40px;color:var(--muted);font-size:13.5px}
-  footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;
-    border-top:1px solid var(--line);padding-top:28px}
-  footer .f-brand{display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:700}
-  footer .f-brand .brand-mark{width:30px;height:30px;border-radius:10px;font-size:16px}
+  /* cta + footer */
+  .cta-band{position:relative;overflow:hidden;border-radius:28px;padding:64px 44px;text-align:center;color:#fff;border:1px solid rgba(240,220,180,.25);background:
+    radial-gradient(620px 300px at 18% 0%,rgba(232,201,138,.34),transparent 62%),
+    radial-gradient(620px 320px at 86% 120%,rgba(168,118,58,.4),transparent 62%),
+    linear-gradient(135deg,#1d1509 0%,#30220f 48%,#352610 100%);
+    box-shadow:0 50px 110px -60px #000,0 0 80px -40px rgba(232,201,138,.65)}
+  .cta-band::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.055) 1px,transparent 1px);background-size:52px 52px;mask-image:radial-gradient(ellipse 70% 80% at 50% 50%,#000,transparent 78%);-webkit-mask-image:radial-gradient(ellipse 70% 80% at 50% 50%,#000,transparent 78%);pointer-events:none}
+  .cta-band h2{position:relative;font-size:clamp(26px,3.2vw,38px);margin:0 0 12px;font-weight:800;letter-spacing:-.04em}
+  .cta-band p{position:relative;margin:0 auto 30px;max-width:520px;color:rgba(246,241,231,.78);font-size:15px}
+  .cta-band .btn-primary{position:relative;background:#fff;color:#1a1305;box-shadow:0 24px 50px -22px rgba(0,0,0,.8)}
+  footer{padding:56px 0 42px;color:var(--muted);font-size:13px;border-top:1px solid rgba(208,176,116,.1);background:linear-gradient(180deg,rgba(3,3,4,0),rgba(3,3,4,.85))}
+  footer .wrap{padding-top:32px;display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:28px;align-items:start}
+  footer .f-brand{display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:750;font-size:15px}
+  footer .f-brand .brand-mark{width:28px;height:28px;border-radius:8px;background:#fff}
+  footer .f-brand .brand-mark img{width:100%;height:100%;object-fit:cover}
+  footer .f-note{margin-top:10px;font-size:12.5px;color:var(--faint);line-height:1.75}
+  footer h4{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#a49a89;margin:0 0 13px;font-weight:700}
+  footer ul{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+  footer a{transition:color .2s}
+  footer a:hover{color:#edd3a2}
+  .f-bottom{grid-column:1/-1;margin-top:22px;padding-top:20px;border-top:1px solid rgba(208,176,116,.1);display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;color:#a49a89;font-size:12.3px}
 
   /* reveal */
-  .reveal{opacity:0;transform:translateY(26px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
   .reveal.in{opacity:1;transform:none}
   .reveal[data-delay="1"]{transition-delay:.08s}
   .reveal[data-delay="2"]{transition-delay:.16s}
   .reveal[data-delay="3"]{transition-delay:.24s}
 
-  @media (max-width:960px){
-    .hero{padding:130px 0 80px}
+  @media (max-width:980px){
+    .hero{padding:132px 0 82px}
     .hero .wrap{grid-template-columns:1fr;gap:52px;text-align:center}
-    .hero p.lede{margin-inline:auto}
-    .hero-actions,.hero-meta{justify-content:center}
-    .nav-links a:not(.nav-cta){display:none}
-    .grid-3{grid-template-columns:1fr 1fr}
-    .stats .wrap{grid-template-columns:1fr 1fr;row-gap:34px}
-    .platform-grid{grid-template-columns:1fr 1fr}
-    .shot-pair{grid-template-columns:1fr}
+    .hero .lede{margin-inline:auto}
+    .hero-actions,.trust{justify-content:center}
+    .window{transform:none;max-width:640px;margin:0 auto}
+    .orbit{display:none}
     .float-a{left:0}
     .float-b{right:0}
+    .nav-links a:not(.nav-cta){display:none}
+    .grid-3,.values,.steps,.easy{grid-template-columns:1fr 1fr}
+    .shot-grid{grid-template-columns:1fr}
+    .dl-grid{grid-template-columns:1fr}
+    footer .wrap{grid-template-columns:1fr 1fr}
   }
-  @media (max-width:620px){
+  @media (max-width:640px){
     .wrap{width:calc(100% - 32px)}
-    section{padding:70px 0}
-    .grid-3{grid-template-columns:1fr}
-    .stats .wrap{grid-template-columns:1fr 1fr;gap:22px}
-    .platform-grid{grid-template-columns:1fr 1fr}
-    .cta-band{padding:48px 24px;border-radius:24px}
-    .float-card{padding:10px 13px;font-size:12px;transform:scale(.92)}
+    section{padding:76px 0}
+    .grid-3,.values,.steps,.easy{grid-template-columns:1fr}
+    .cta-band{padding:46px 22px;border-radius:22px}
+    .float-card{display:none}
+    .nav-links{gap:12px}
+    .nav-links a:not(.nav-cta){display:none}
+    .lang button{padding:4px 8px;font-size:12px}
+    .window{padding:7px;border-radius:14px}
+    .app-mock{grid-template-columns:1fr;min-height:0}
+    .am-side{display:none}
+    .am-main{padding:14px;gap:9px}
+    .phone-frame{width:min(286px,100%)}
+    .hero-net{opacity:.45}
+    footer .wrap{grid-template-columns:1fr}
   }
   @media (prefers-reduced-motion:reduce){
     *{animation:none!important;transition:none!important}
     .reveal{opacity:1;transform:none}
+    html{scroll-behavior:auto}
+    .hero-net{display:none}
   }
 </style>
 </head>
 <body>
+<div class="fx" aria-hidden="true">
+  <div class="fx-aurora a1"></div>
+  <div class="fx-aurora a2"></div>
+  <div class="fx-grid"></div>
+  <div class="fx-noise"></div>
+</div>
+<div class="scroll-line" id="scrollLine" aria-hidden="true"></div>
+<a class="skip" href="#main" data-i18n="a11y.skip">跳到主要内容</a>
 
 <header class="nav" id="nav">
   <div class="wrap">
-    <a class="brand" href="#top">
-      <span class="brand-mark">💧</span>
+    <a class="brand" href="#top" aria-label="Shui">
+      <span class="brand-mark">
+        <img src="./assets/icon-512.png" alt="" width="34" height="34" />
+      </span>
       <span>Shui</span>
     </a>
-    <nav class="nav-links">
-      <a href="#features">功能</a>
-      <a href="#screens">界面</a>
-      <a href="#platforms">支持平台</a>
-      <a href="#faq">常见问题</a>
-      <a class="nav-cta" href="#get">开始使用</a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="#features" data-i18n="nav.features">功能</a>
+      <a href="#screens" data-i18n="nav.screens">界面</a>
+      <a href="#platforms" data-i18n="nav.platforms">跨平台</a>
+      <a href="#download" data-i18n="nav.download">下载</a>
+      <a href="#faq" data-i18n="nav.faq">常见问题</a>
+      <a class="nav-cta" href="#download" data-i18n="nav.cta">免费下载</a>
+      <div class="lang" role="group" aria-label="Language">
+        <button type="button" data-lang="zh" aria-pressed="true">中文</button>
+        <button type="button" data-lang="en" aria-pressed="false">EN</button>
+      </div>
     </nav>
   </div>
 </header>
 
-<main id="top">
-
-  <!-- Hero -->
-  <section class="hero">
-    <div class="wrap">
-      <div>
-        <span class="hero-badge"><b>v0.5.0</b> 跨平台 · 专注喝水提醒</span>
-        <h1>把喝水，<br />变成一件<span class="grad">自然发生</span>的事。</h1>
-        <p class="lede">
-          Shui 是一款为久坐办公人群打造的喝水提醒助手。优雅的全屏提醒、灵活的时间管理、完整的饮水记录与统计分析，让好习惯不需要靠意志力。
-        </p>
-        <div class="hero-actions">
-          <a class="btn btn-primary" href="#get">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg>
-            获取 Shui
-          </a>
-          <a class="btn btn-ghost" href="#features">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
-            了解功能
-          </a>
-        </div>
-        <div class="hero-meta">
-          <div><b>4</b>平台支持</div>
-          <div><b>7 / 30</b>天趋势分析</div>
-          <div><b>0</b>干扰 · 息屏自动暂停</div>
-        </div>
-      </div>
-
-      <div class="stage">
-        <div class="glow"></div>
-        <div class="float-card float-a">
-          <b>今日 1,200 ml</b>
-          <span><i class="dot"></i>已达目标 80%</span>
-        </div>
-        <div class="phone">
-          <div class="phone-notch"></div>
-          <img src="assets/screenshot-0.png" alt="Shui 主界面" width="510" height="479" />
-        </div>
-        <div class="float-card float-b">
-          <b>下次提醒 09:45</b>
-          <span>工作日智能提醒</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Features -->
-  <section id="features">
-    <div class="wrap">
-      <div class="section-head reveal">
-        <span class="eyebrow">Features</span>
-        <h2>该提醒的时候提醒，该安静的时候安静</h2>
-        <p>从目标设定到记录复盘，Shui 把喝水的每个环节都做得刚刚好。</p>
-      </div>
-
-      <div class="grid-3">
-        <article class="card reveal">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.7 6 9.5A6.5 6.5 0 0 0 18 9.5Z"/><path d="M9 13.5a3 3 0 0 0 3 3"/></svg></div>
-          <h3>每日饮水目标</h3>
-          <p>按你的体重与作息设定目标，进度随手可见，达成时用一声轻响给你正反馈。</p>
-        </article>
-
-        <article class="card reveal" data-delay="1">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2.5"/><path d="M8 21h8"/><path d="M12 18v3"/></svg></div>
-          <h3>全屏休息提醒</h3>
-          <p>优雅且不可忽视的全屏提示，帮你真正离开椅子；开会时自动避让，不打扰重要时刻。</p>
-        </article>
-
-        <article class="card reveal" data-delay="2">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></div>
-          <h3>智能时间管理</h3>
-          <p>自定义提醒间隔与生效时间段，自动识别工作日，午休和下班后不再被打扰。</p>
-        </article>
-
-        <article class="card reveal">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-2.5 8-2.5 8h17S18 15 18 8"/><path d="M10.3 20a2 2 0 0 0 3.4 0"/></svg></div>
-          <h3>多样化提醒方式</h3>
-          <p>全屏通知、系统原生通知、托盘实时倒计时，总有一种适合你当前的工作状态。</p>
-        </article>
-
-        <article class="card reveal" data-delay="1">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-6"/><path d="M22 19H2"/></svg></div>
-          <h3>统计与分析</h3>
-          <p>近 7 天或 30 天趋势、日均饮水量、达标天数、饮水时间分布，一眼看清习惯的变化。</p>
-        </article>
-
-        <article class="card reveal" data-delay="2">
-          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M4 20h16"/></svg></div>
-          <h3>记录 · 备份 · 导入</h3>
-          <p>一键记录 50 / 100 / 200 / 300 ml，JSON 备份与导入只在缺失时补全，数据始终留在本地。</p>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <!-- Screenshots -->
-  <section class="shots" id="screens">
-    <div class="wrap">
-      <div class="section-head reveal">
-        <span class="eyebrow">Interface</span>
-        <h2>克制的界面，刚好的存在感</h2>
-        <p>浅色、深色、跟随系统三套主题，设置与提醒都保持同一套视觉语言。</p>
-      </div>
-      <div class="shot-pair">
-        <figure class="shot reveal" style="margin:0">
-          <img src="assets/screenshot-2.png" alt="Shui 设置界面" width="680" height="460" />
-          <figcaption><b>精细化设置</b>提醒间隔、时间范围、应用白名单与开机自启，一处调整全部生效。</figcaption>
-        </figure>
-        <figure class="shot reveal" data-delay="1" style="margin:0">
-          <img src="assets/screenshot-3.png" alt="Shui 全屏提醒" width="666" height="460" />
-          <figcaption><b>全屏提醒</b>确认、跳过或等它超时，每一次提醒都有完整的结果记录。</figcaption>
-        </figure>
-      </div>
-    </div>
-  </section>
-
-  <!-- Stats -->
-  <section class="stats">
-    <div class="wrap">
-      <div class="stat"><b>7 / 30</b><span>天饮水趋势视图</span></div>
-      <div class="stat"><b>4 类</b><span>提醒记录结果</span></div>
-      <div class="stat"><b>3 套</b><span>外观主题</span></div>
-      <div class="stat"><b>100%</b><span>数据保存在本地</span></div>
-    </div>
-  </section>
-
-  <!-- Platforms -->
-  <section id="platforms">
-    <div class="wrap">
-      <div class="section-head reveal">
-        <span class="eyebrow">Platforms</span>
-        <h2>在你的每一台设备上</h2>
-        <p>同一套提醒逻辑，覆盖桌面与移动端，习惯不因换设备而中断。</p>
-      </div>
-      <div class="platform-grid">
-        <div class="plat reveal"><div class="p-ico">🍎</div><b>macOS</b><span>含静默开机自启</span></div>
-        <div class="plat reveal" data-delay="1"><div class="p-ico">🪟</div><b>Windows</b><span>托盘倒计时</span></div>
-        <div class="plat reveal" data-delay="2"><div class="p-ico">🐧</div><b>Linux</b><span>原生通知支持</span></div>
-        <div class="plat reveal" data-delay="3"><div class="p-ico">🤖</div><b>Android</b><span>移动端提醒</span></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- FAQ -->
-  <section id="faq" style="padding-top:20px">
-    <div class="wrap">
-      <div class="section-head reveal" style="margin-inline:auto;text-align:center">
-        <span class="eyebrow">FAQ</span>
-        <h2>常见问题</h2>
-      </div>
-      <div class="faq">
-        <details class="reveal">
-          <summary>提醒会不会打断开会或演示？</summary>
-          <p>应用白名单默认包含腾讯会议、Zoom、Google Meet 与 Microsoft Teams，检测到这些应用在前台时会自动延后提醒。你也可以自行添加需要专注的应用。</p>
-        </details>
-        <details class="reveal" data-delay="1">
-          <summary>离开电脑时还会一直提醒吗？</summary>
-          <p>息屏、锁屏或系统休眠时会自动暂停计时，回到电脑前再继续，不会产生成串的补发提醒。</p>
-        </details>
-        <details class="reveal" data-delay="2">
-          <summary>饮水数据会上传到云端吗？</summary>
-          <p>不会。饮水记录、设置与统计数据都保存在本地，可通过 JSON 备份文件自行导出与导入。</p>
-        </details>
-        <details class="reveal" data-delay="3">
-          <summary>可以只在工作日提醒吗？</summary>
-          <p>可以。提醒规则支持自定义时间范围与工作日自动识别，周末与节假日默认保持安静。</p>
-        </details>
-      </div>
-    </div>
-  </section>
-
-  <!-- CTA -->
-  <section id="get" style="padding-top:10px">
-    <div class="wrap">
-      <div class="cta-band reveal">
-        <h2>今天，从第一杯水开始</h2>
-        <p>不用改变作息，只需要让 Shui 在合适的时间轻轻提醒你一次。</p>
-        <a class="btn btn-primary" href="#features">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
-          查看全部功能
+<main id="main">
+<section class="hero" id="top">
+  <canvas class="hero-net" id="heroNet" aria-hidden="true"></canvas>
+  <div class="wrap">
+    <div>
+      <span class="hero-badge"><b data-version>v0.5.2</b> <span data-i18n="hero.badge">跨平台 · 专注喝水提醒</span></span>
+      <h1 data-i18n-html="hero.title">把喝水，变成一件<br /><span class="grad">自然发生</span>的事。</h1>
+      <p class="lede" data-i18n="hero.lede">Shui 常驻在你的菜单栏或系统托盘，按你的作息在合适的时间轻轻提醒一次。开会自动安静，息屏自动暂停，手机端也能一键记录。</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="#download" id="heroDownload">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg>
+          <span data-hero-label>下载 Shui</span>
+        </a>
+        <a class="btn btn-ghost" href="#features">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>
+          <span data-i18n="hero.more">了解功能</span>
         </a>
       </div>
+      <div class="trust">
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg><i style="font-style:normal" data-i18n="trust.ads">无广告</i></span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg><i style="font-style:normal" data-i18n="trust.sub">无订阅</i></span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg><i style="font-style:normal" data-i18n="trust.account">无账号</i></span>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 13 4 4L19 7"/></svg><i style="font-style:normal" data-i18n="trust.local">数据只存本地</i></span>
+      </div>
     </div>
-  </section>
 
+    <div class="stage">
+      <div class="orbit o1" aria-hidden="true"></div>
+      <div class="orbit o2" aria-hidden="true"></div>
+      <div class="glow"></div>
+      <div class="float-card float-a">
+        <b data-i18n="float.today">今日 900 ml</b>
+        <span><i class="dot"></i><span data-i18n="float.goal">目标 1500 ml · 已完成 60%</span></span>
+      </div>
+      <div class="window">
+        <div class="app-mock" role="img" aria-label="Shui 桌面端饮水记录界面" data-i18n-attr="aria-label:mock.history.alt">
+          <aside class="am-side">
+            <div class="am-brand">
+              <span class="am-logo"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6c3.7 4.4 6.6 8 6.6 11.4a6.6 6.6 0 0 1-13.2 0C5.4 10.6 8.3 7 12 2.6Z"/></svg></span>Shui
+            </div>
+            <nav class="am-nav">
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/></svg><b data-i18n="mock.nav.general">通用</b></span>
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="7"/><path d="M12 10v3l2 1.4M5 4 3.6 5.4M19 4l1.4 1.4"/></svg><b data-i18n="mock.nav.reminder">提醒</b></span>
+              <span class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.4c2.9 3.5 5.2 6.3 5.2 9a5.2 5.2 0 1 1-10.4 0c0-2.7 2.3-5.5 5.2-9Z"/></svg><b data-i18n="mock.nav.history">饮水记录</b></span>
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><rect x="2.6" y="6.4" width="18.8" height="11.2" rx="2.2"/><path d="M7 10.4h.01M10.4 10.4h.01M13.8 10.4h.01M17.2 10.4h.01M8 14.2h8"/></svg><b data-i18n="mock.nav.shortcut">快捷键</b></span>
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><ellipse cx="12" cy="6.2" rx="6.6" ry="2.6"/><path d="M5.4 6.2v11.6c0 1.4 3 2.6 6.6 2.6s6.6-1.2 6.6-2.6V6.2M5.4 12c0 1.4 3 2.6 6.6 2.6s6.6-1.2 6.6-2.6"/></svg><b data-i18n="mock.nav.data">备份与导入</b></span>
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 19.5V9.5M9.3 19.5V5M14.7 19.5v-6.4M20 19.5V7.6"/></svg><b data-i18n="mock.nav.statistics">统计</b></span>
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.4"/><path d="M12 11v5.4M12 7.6h.01"/></svg><b data-i18n="mock.nav.about">关于</b></span>
+            </nav>
+            <div class="am-side-foot">v0.5.2</div>
+          </aside>
+          <div class="am-main">
+            <div class="am-head">
+              <div>
+                <h3 data-i18n="mock.history.title">饮水记录</h3>
+                <p data-i18n="mock.history.sub">11 月 21 日 · 周五</p>
+              </div>
+              <span class="am-pill" data-i18n="mock.history.streak">连续 7 天</span>
+            </div>
+            <div class="am-progress">
+              <div class="am-progress-top">
+                <span><b>900</b>ml / 1500ml</span>
+                <span class="am-pct">60%</span>
+              </div>
+              <div class="am-bar"><i style="width:60%"></i></div>
+              <div class="am-goal">
+                <span data-i18n="mock.history.progress">今日进度</span>
+                <span data-i18n="mock.history.remain">还差 600 ml</span>
+              </div>
+            </div>
+            <div class="am-list">
+              <div class="am-row">
+                <span class="am-time">11:45</span>
+                <span class="am-drop"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6c3.7 4.4 6.6 8 6.6 11.4a6.6 6.6 0 0 1-13.2 0C5.4 10.6 8.3 7 12 2.6Z"/></svg></span>
+                <span class="am-amt">400 ml</span>
+                <span class="am-src" data-i18n="mock.history.r3">系统通知</span>
+              </div>
+              <div class="am-row">
+                <span class="am-time">10:30</span>
+                <span class="am-drop"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6c3.7 4.4 6.6 8 6.6 11.4a6.6 6.6 0 0 1-13.2 0C5.4 10.6 8.3 7 12 2.6Z"/></svg></span>
+                <span class="am-amt">200 ml</span>
+                <span class="am-src" data-i18n="mock.history.r2">托盘菜单</span>
+              </div>
+              <div class="am-row">
+                <span class="am-time">09:12</span>
+                <span class="am-drop"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6c3.7 4.4 6.6 8 6.6 11.4a6.6 6.6 0 0 1-13.2 0C5.4 10.6 8.3 7 12 2.6Z"/></svg></span>
+                <span class="am-amt">300 ml</span>
+                <span class="am-src" data-i18n="mock.history.r1">全屏提醒</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="float-card float-b">
+        <b data-i18n="float.next">下次提醒 09:45</b>
+        <span data-i18n="float.rule">工作日 · 每 45 分钟</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="strip">
+  <div class="wrap">
+    <span class="item"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 1.4c0 1.1-.4 2.2-1.2 3-.8.8-1.9 1.3-3 1.2-.1-1.1.4-2.2 1.2-3 .8-.8 1.9-1.3 3-1.2Zm4.1 15.7c-.5 1.1-.7 1.6-1.4 2.7-.9 1.4-2.2 3.2-3.7 3.2-1.4 0-1.8-.9-3.7-.9h-.1c-1.9 0-2.3.9-3.7.9-1.6 0-2.8-1.6-3.7-3C1.3 16 1 11.4 2.6 8.9c1.2-1.8 3-2.8 4.7-2.8 1.8 0 2.9 1 4.3 1 1.4 0 2.3-1 4.3-1 1.5 0 3.2.8 4.3 2.3-3.8 2.1-3.2 7.5-.7 8.7Z"/></svg>macOS</span>
+    <span class="item"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.6 10.5 4.6v6.9H3V5.6Zm8.5-1.1L21 3v8.5h-9.5V4.5ZM3 12.5h7.5v6.9L3 18.4v-5.9Zm8.5 0H21V21l-9.5-1.3v-7.2Z"/></svg>Windows</span>
+    <span class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="m7 9 3 3-3 3"/><path d="M13 15h4"/></svg>Linux</span>
+    <span class="item"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 9h10a1 1 0 0 1 1 1v6a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3v-6a1 1 0 0 1 1-1Zm2.2-3.3 1.1 1.9M14.8 5.7l-1.1 1.9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/><circle cx="9.6" cy="13" r=".9"/><circle cx="14.4" cy="13" r=".9"/></svg>Android</span>
+    <span class="note" data-i18n="strip.note">同一套记录结构与统计口径，导出文件可在任意一端导入</span>
+  </div>
+</div>
+
+<section id="why">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow" data-i18n="why.eyebrow">为什么是 Shui</span>
+      <h2 data-i18n="why.title">该提醒的时候提醒，该安静的时候安静</h2>
+      <p data-i18n="why.lede">喝水提醒不该是打断，而应该像水一样自然。三件事决定了它是否值得留在你的电脑里。</p>
+    </div>
+    <div class="values">
+      <div class="value reveal"><span class="num">01</span><b data-i18n="why.a.title">开会就安静</b><p data-i18n="why.a.desc">检测前台应用，腾讯会议、Zoom、Microsoft Teams、Google Meet 运行时自动延后提醒，也可以把任意应用加入白名单。</p></div>
+      <div class="value reveal" data-delay="1"><span class="num">02</span><b data-i18n="why.b.title">离开就暂停</b><p data-i18n="why.b.desc">息屏、锁屏、系统休眠自动停止计时，回到电脑前继续，不会在你离开后补发一串提醒。</p></div>
+      <div class="value reveal" data-delay="2"><span class="num">03</span><b data-i18n="why.c.title">数据自己做主</b><p data-i18n="why.c.desc">没有账号系统，饮水记录只写在本机。随时导出 JSON 备份或 CSV 统计，换设备也能带走。</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="features" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow" data-i18n="feat.eyebrow">功能</span>
+      <h2 data-i18n="feat.title">从目标到复盘，每个环节都刚好</h2>
+      <p data-i18n="feat.lede">功能不多，但没有一个是凑数的。</p>
+    </div>
+    <div class="grid-3">
+      <article class="card reveal">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg></div>
+        <h3 data-i18n="f1.title">每日目标与进度</h3>
+        <p data-i18n="f1.desc">设定每日饮水量，进度实时可见。达标时给一次轻反馈，不用打开统计也能知道今天怎么样了。</p>
+      </article>
+      <article class="card reveal" data-delay="1">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></div>
+        <h3 data-i18n="f2.title">灵活的提醒节奏</h3>
+        <p data-i18n="f2.desc">间隔、生效时间段、重复日分开设置。只在工作日提醒，午休和下班后保持安静。</p>
+      </article>
+      <article class="card reveal" data-delay="2">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2.5"/><path d="M8 21h8"/><path d="M12 17v4"/></svg></div>
+        <h3 data-i18n="f3.title">三种提醒方式</h3>
+        <p data-i18n="f3.desc">全屏提醒页、系统原生通知、菜单栏倒计时（macOS / Linux）。深度工作时用最轻的方式，久坐提醒时用最醒目的方式。</p>
+      </article>
+      <article class="card reveal">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7 6 9.5A6.5 6.5 0 0 0 18 9.5Z"/><path d="M9 13.5a3 3 0 0 0 3 3"/></svg></div>
+        <h3 data-i18n="f4.title">一键记录</h3>
+        <p data-i18n="f4.desc">50 / 100 / 200 / 300 ml 快捷水量。安卓端直接从通知栏记录，锁屏状态下也不用打开应用。</p>
+      </article>
+      <article class="card reveal" data-delay="1">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9"/><path d="M10 19V5"/><path d="M16 19v-6"/><path d="M22 19H2"/></svg></div>
+        <h3 data-i18n="f5.title">趋势与统计</h3>
+        <p data-i18n="f5.desc">7 天 / 30 天趋势、日均饮水量、达标天数与时段分布，一眼看清习惯是在变好还是变差。</p>
+      </article>
+      <article class="card reveal" data-delay="2">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v10"/><path d="m8 9 4 4 4-4"/><rect x="4" y="15" width="16" height="5" rx="1.6"/></svg></div>
+        <h3 data-i18n="f6.title">本地数据与备份</h3>
+        <p data-i18n="f6.desc">JSON 备份可随时导出与导入，导入只在缺失日期补全，不会覆盖已有记录；统计可导出 CSV。</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="shots" id="screens">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow" data-i18n="shot.eyebrow">界面</span>
+      <h2 data-i18n="shot.title">克制的界面，刚好的存在感</h2>
+      <p data-i18n="shot.lede">浅色、深色、跟随系统三套主题，设置与提醒保持同一套视觉语言。</p>
+    </div>
+    <div class="shot-grid">
+      <figure class="shot reveal">
+        <div class="app-mock" role="img" aria-label="Shui 桌面端通用设置" data-i18n-attr="aria-label:mock.general.alt">
+          <aside class="am-side">
+            <div class="am-brand">
+              <span class="am-logo"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.6c3.7 4.4 6.6 8 6.6 11.4a6.6 6.6 0 0 1-13.2 0C5.4 10.6 8.3 7 12 2.6Z"/></svg></span>Shui
+            </div>
+            <nav class="am-nav">
+              <span class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/></svg><b data-i18n="mock.nav.general">通用</b></span>
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="7"/><path d="M12 10v3l2 1.4M5 4 3.6 5.4M19 4l1.4 1.4"/></svg><b data-i18n="mock.nav.reminder">提醒</b></span>
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.4c2.9 3.5 5.2 6.3 5.2 9a5.2 5.2 0 1 1-10.4 0c0-2.7 2.3-5.5 5.2-9Z"/></svg><b data-i18n="mock.nav.history">饮水记录</b></span>
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><rect x="2.6" y="6.4" width="18.8" height="11.2" rx="2.2"/><path d="M7 10.4h.01M10.4 10.4h.01M13.8 10.4h.01M17.2 10.4h.01M8 14.2h8"/></svg><b data-i18n="mock.nav.shortcut">快捷键</b></span>
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><ellipse cx="12" cy="6.2" rx="6.6" ry="2.6"/><path d="M5.4 6.2v11.6c0 1.4 3 2.6 6.6 2.6s6.6-1.2 6.6-2.6V6.2M5.4 12c0 1.4 3 2.6 6.6 2.6s6.6-1.2 6.6-2.6"/></svg><b data-i18n="mock.nav.data">备份与导入</b></span>
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 19.5V9.5M9.3 19.5V5M14.7 19.5v-6.4M20 19.5V7.6"/></svg><b data-i18n="mock.nav.statistics">统计</b></span>
+              <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.4"/><path d="M12 11v5.4M12 7.6h.01"/></svg><b data-i18n="mock.nav.about">关于</b></span>
+            </nav>
+            <div class="am-side-foot">v0.5.2</div>
+          </aside>
+          <div class="am-main">
+            <div class="am-head">
+              <div>
+                <h3 data-i18n="mock.general.title">通用</h3>
+                <p data-i18n="mock.general.sub">基础行为与应用偏好</p>
+              </div>
+            </div>
+            <div class="am-card">
+              <div class="am-set">
+                <div><b data-i18n="mock.set.auto">开机自启动</b><span data-i18n="mock.set.autoDesc">登录后在后台安静运行</span></div>
+                <div class="am-switch on"><i></i></div>
+              </div>
+              <div class="am-set">
+                <div><b data-i18n="mock.set.countdown">倒计时</b><span data-i18n="mock.set.countdownDesc">在菜单栏显示下次提醒时间</span></div>
+                <div class="am-switch"><i></i></div>
+              </div>
+              <div class="am-set">
+                <div><b data-i18n="mock.set.full">全屏提醒</b><span data-i18n="mock.set.fullDesc">提醒时全屏显示喝水页面</span></div>
+                <div class="am-switch on"><i></i></div>
+              </div>
+              <div class="am-set">
+                <div><b data-i18n="mock.set.sound">提醒音效</b><span data-i18n="mock.set.soundDesc">提醒出现时播放轻提示音</span></div>
+                <div class="am-switch on"><i></i></div>
+              </div>
+              <div class="am-set">
+                <div><b data-i18n="mock.set.lang">界面语言</b><span data-i18n="mock.set.langDesc">选择界面语言，或跟随系统</span></div>
+                <span class="am-select" data-i18n="mock.set.langValue">跟随系统</span>
+              </div>
+              <div class="am-set">
+                <div><b data-i18n="mock.set.theme">外观主题</b><span data-i18n="mock.set.themeDesc">浅色、深色或跟随系统</span></div>
+                <span class="am-select" data-i18n="mock.set.themeValue">浅色</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><b data-i18n="shot.a.title">精细化设置</b><span data-i18n="shot.a.desc">开机自启、倒计时与全屏提醒，一处开关即刻生效。</span></figcaption>
+      </figure>
+      <div class="reveal" data-delay="1">
+        <div class="phone-frame">
+          <div class="phone-notch"></div>
+          <div class="pm-screen" role="img" aria-label="Shui 安卓全屏提醒页" data-i18n-attr="aria-label:mock.phone.alt">
+            <div class="pm-status"><span>9:41</span><span>5G &#9679;&#9679;&#9679;</span></div>
+            <div class="pm-center">
+              <div class="pm-card">
+                <div class="pm-top">
+                  <span class="pm-eyebrow" data-i18n="mock.phone.badge">该喝水啦</span>
+                  <span class="pm-count" data-i18n="mock.phone.closeIn">12s 后关闭</span>
+                </div>
+                <h4 data-i18n="mock.phone.heading">喝了么</h4>
+                <p data-i18n="mock.phone.tip">少量多次，每次不超过 200ml，呵护心肾健康</p>
+                <div>
+                  <div class="pm-meta">
+                    <span data-i18n="mock.phone.drank">今日已喝 900 ml</span>
+                    <span data-i18n="mock.phone.goal">目标 1500 ml</span>
+                  </div>
+                  <div class="pm-progress"><i style="width:60%"></i></div>
+                </div>
+                <div class="pm-amounts">
+                  <span>50 ml</span>
+                  <span>100 ml</span>
+                  <span>200 ml</span>
+                  <span>300 ml</span>
+                </div>
+                <div class="pm-skip" data-i18n="mock.phone.skip">跳过 →</div>
+              </div>
+            </div>
+            <div class="pm-foot" data-i18n="mock.phone.hint">也可以直接在通知栏记录</div>
+          </div>
+        </div>
+        <p class="phone-cap"><b data-i18n="shot.b.title">全屏提醒页</b><br /><span data-i18n="shot.b.desc">手机上直接选择水量，或跳过这一次。</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow" data-i18n="how.eyebrow">上手</span>
+      <h2 data-i18n="how.title">三分钟设置完，之后交给它</h2>
+      <p data-i18n="how.lede">第一次打开会有引导，按真实界面一步步完成目标、节奏和时间段设置。</p>
+    </div>
+    <div class="steps">
+      <div class="step reveal"><h3 data-i18n="how.s1.title">下载安装</h3><p data-i18n="how.s1.desc">从 GitHub Releases 下载，Windows 也可以用 winget 一条命令装好；macOS 拖入 Applications 即可。</p></div>
+      <div class="step reveal" data-delay="1"><h3 data-i18n="how.s2.title">设置目标与节奏</h3><p data-i18n="how.s2.desc">首次打开自动进入引导：每日目标、提醒间隔、重复日、开始与结束时间，五步完成。</p></div>
+      <div class="step reveal" data-delay="2"><h3 data-i18n="how.s3.title">让它自己跑</h3><p data-i18n="how.s3.desc">常驻菜单栏或托盘，需要时用快捷键记一杯，记录与统计自动汇总，不用刻意维护。</p></div>
+    </div>
+    <div class="easy">
+      <div><b data-i18n="how.e1.title">托盘菜单</b><br /><span data-i18n="how.e1.desc">记录喝水、立即休息、暂停计时，都在右键菜单里。</span></div>
+      <div><b data-i18n="how.e2.title">全局快捷键</b><br /><span data-i18n="how.e2.desc">不切换窗口就能记一杯，不打断正在做的事。</span></div>
+      <div><b data-i18n="how.e3.title">通知栏记录</b><br /><span data-i18n="how.e3.desc">安卓端在通知里直接点水量，通知被收起也能操作。</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="compare" id="platforms">
+  <div class="wrap">
+    <div class="reveal">
+      <span class="eyebrow" data-i18n="cmp.eyebrow">跨平台</span>
+      <h2 data-i18n="cmp.title">一台设备提醒，四端记录</h2>
+      <p class="sub" data-i18n="cmp.lede">桌面端负责不打扰的提醒与记录，移动端负责随身记录。同一套数据结构与统计口径，导出的备份文件可以在任意一端导入。</p>
+    </div>
+    <div class="table-wrap reveal" data-delay="1">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col" data-i18n="cmp.cap">能力</th>
+            <th scope="col">macOS</th>
+            <th scope="col">Windows</th>
+            <th scope="col">Linux</th>
+            <th scope="col">Android</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td data-i18n="cmp.r1">全屏提醒页</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td data-i18n="cmp.r2">系统通知</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td data-i18n="cmp.r3">菜单栏倒计时</td><td class="yes">✓</td><td class="no">—</td><td class="yes">✓</td><td class="no">—</td></tr>
+          <tr><td data-i18n="cmp.r4">全局快捷键</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+          <tr><td data-i18n="cmp.r5">会议 / 应用白名单暂停</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+          <tr><td data-i18n="cmp.r6">息屏 / 锁屏自动暂停</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="no">—</td></tr>
+          <tr><td data-i18n="cmp.r7">通知栏一键记水</td><td class="no">—</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+          <tr><td data-i18n="cmp.r8">JSON 备份 · CSV 导出</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td data-i18n="cmp.r9">跨端自动同步</td><td class="soon"><span data-i18n="cmp.soon">规划中</span></td><td class="soon"><span data-i18n="cmp.soon">规划中</span></td><td class="soon"><span data-i18n="cmp.soon">规划中</span></td><td class="soon"><span data-i18n="cmp.soon">规划中</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-legend" data-i18n="cmp.legend">✓ 已支持 · — 该端暂不支持 · 「规划中」表示未来版本会支持</p>
+    <p class="table-note" data-i18n="cmp.note">Windows 端通过托盘菜单与系统通知完成提醒与记录，不提供菜单栏文字倒计时。</p>
+  </div>
+</section>
+
+<section id="download">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <span class="eyebrow" data-i18n="dl.eyebrow">下载</span>
+      <h2 data-i18n="dl.title">选择你的平台</h2>
+      <p data-i18n="dl.lede">安装包托管在 GitHub Releases，下面的直链会自动指向最新版本。Windows 也可以用 winget 安装。</p>
+    </div>
+
+    <div class="dl-grid">
+      <div class="dl-card reveal" data-os="win">
+        <span class="dl-badge" data-i18n="dl.recommend">推荐</span>
+        <div class="dl-head">
+          <span class="dl-ico"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.6 10.5 4.6v6.9H3V5.6Zm8.5-1.1L21 3v8.5h-9.5V4.5ZM3 12.5h7.5v6.9L3 18.4v-5.9Zm8.5 0H21V21l-9.5-1.3v-7.2Z"/></svg></span>
+          <div><b>Windows</b><span data-i18n="dl.win.sub">Windows 10 / 11 · 64 位推荐</span></div>
+        </div>
+        <ul class="dl-links">
+          <li><a class="dl-link" data-asset="win-x64" href="https://github.com/rock-zhang/Shui/releases/latest"><span class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg><span data-i18n="dl.win.x64">x64 安装包（.exe）</span></span><span class="meta" data-size="win-x64"></span></a></li>
+          <li><a class="dl-link" data-asset="win-arm64" href="https://github.com/rock-zhang/Shui/releases/latest"><span class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg><span data-i18n="dl.win.arm">ARM64 安装包（骁龙笔记本）</span></span><span class="meta" data-size="win-arm64"></span></a></li>
+          <li><a class="dl-link" data-asset="win-x86" href="https://github.com/rock-zhang/Shui/releases/latest"><span class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg><span data-i18n="dl.win.x86">32 位安装包（.exe）</span></span><span class="meta" data-size="win-x86"></span></a></li>
+        </ul>
+        <div class="winget">
+          <code>winget install rock-zhang.Shui</code>
+          <button type="button" data-copy="winget install rock-zhang.Shui" data-i18n="dl.copy">复制</button>
+        </div>
+      </div>
+
+      <div class="dl-card reveal" data-delay="1" data-os="mac">
+        <span class="dl-badge" data-i18n="dl.recommend">推荐</span>
+        <div class="dl-head">
+          <span class="dl-ico"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 1.4c0 1.1-.4 2.2-1.2 3-.8.8-1.9 1.3-3 1.2-.1-1.1.4-2.2 1.2-3 .8-.8 1.9-1.3 3-1.2Zm4.1 15.7c-.5 1.1-.7 1.6-1.4 2.7-.9 1.4-2.2 3.2-3.7 3.2-1.4 0-1.8-.9-3.7-.9h-.1c-1.9 0-2.3.9-3.7.9-1.6 0-2.8-1.6-3.7-3C1.3 16 1 11.4 2.6 8.9c1.2-1.8 3-2.8 4.7-2.8 1.8 0 2.9 1 4.3 1 1.4 0 2.3-1 4.3-1 1.5 0 3.2.8 4.3 2.3-3.8 2.1-3.2 7.5-.7 8.7Z"/></svg></span>
+          <div><b>macOS</b><span data-i18n="dl.mac.sub">macOS 11 及以上</span></div>
+        </div>
+        <ul class="dl-links">
+          <li><a class="dl-link" data-asset="mac-arm" href="https://github.com/rock-zhang/Shui/releases/latest"><span class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg><span data-i18n="dl.mac.arm">Apple Silicon（M 系列）</span></span><span class="meta" data-size="mac-arm"></span></a></li>
+          <li><a class="dl-link" data-asset="mac-intel" href="https://github.com/rock-zhang/Shui/releases/latest"><span class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg><span data-i18n="dl.mac.intel">Intel 芯片</span></span><span class="meta" data-size="mac-intel"></span></a></li>
+        </ul>
+        <p style="margin:14px 0 0;font-size:12.5px;color:var(--muted)" data-i18n="dl.mac.tip">打开 DMG 后把 Shui 拖进「应用程序」即可完成安装。</p>
+      </div>
+
+      <div class="dl-card reveal" data-os="linux">
+        <span class="dl-badge" data-i18n="dl.recommend">推荐</span>
+        <div class="dl-head">
+          <span class="dl-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="m7 9 3 3-3 3"/><path d="M13 15h4"/></svg></span>
+          <div><b>Linux</b><span data-i18n="dl.linux.sub">deb / AppImage / rpm</span></div>
+        </div>
+        <ul class="dl-links">
+          <li><a class="dl-link" data-asset="deb-x64" href="https://github.com/rock-zhang/Shui/releases/latest"><span class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg><span data-i18n="dl.linux.deb64">deb · x86_64</span></span><span class="meta" data-size="deb-x64"></span></a></li>
+          <li><a class="dl-link" data-asset="deb-arm64" href="https://github.com/rock-zhang/Shui/releases/latest"><span class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg><span data-i18n="dl.linux.debArm">deb · arm64</span></span><span class="meta" data-size="deb-arm64"></span></a></li>
+          <li><a class="dl-link" data-asset="appimage" href="https://github.com/rock-zhang/Shui/releases/latest"><span class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg><span data-i18n="dl.linux.appimage">AppImage · x86_64</span></span><span class="meta" data-size="appimage"></span></a></li>
+          <li><a class="dl-link" data-asset="rpm" href="https://github.com/rock-zhang/Shui/releases/latest"><span class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg><span data-i18n="dl.linux.rpm">rpm · x86_64</span></span><span class="meta" data-size="rpm"></span></a></li>
+        </ul>
+      </div>
+
+      <div class="dl-card reveal" data-delay="1" data-os="android">
+        <span class="dl-badge" data-i18n="dl.recommend">推荐</span>
+        <div class="dl-head">
+          <span class="dl-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9h10a1 1 0 0 1 1 1v6a3 3 0 0 1-3 3H9a3 3 0 0 1-3-3v-6a1 1 0 0 1 1-1Z"/><path d="m8.2 5.7 1.1 1.9M15.8 5.7l-1.1 1.9"/><circle cx="9.6" cy="13" r=".9" fill="currentColor" stroke="none"/><circle cx="14.4" cy="13" r=".9" fill="currentColor" stroke="none"/></svg></span>
+          <div><b>Android</b><span data-i18n="dl.android.sub">Android 8.0 及以上</span></div>
+        </div>
+        <ul class="dl-links">
+          <li><a class="dl-link" data-asset="apk" href="https://github.com/rock-zhang/Shui/releases/latest"><span class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg><span data-i18n="dl.android.apk">通用 APK（直接安装）</span></span><span class="meta" data-size="apk"></span></a></li>
+        </ul>
+        <p style="margin:14px 0 0;font-size:12.5px;color:var(--muted)" data-i18n="dl.android.tip">安装时需要在系统中允许「安装未知应用」；首次使用还需允许自启动、把电池策略设为「不限制」，否则提醒可能延迟。</p>
+      </div>
+    </div>
+
+    <p class="dl-note"><span data-i18n="dl.note">所有安装包均来自 GitHub Releases，可查看</span> <a href="https://github.com/rock-zhang/Shui/releases" target="_blank" rel="noopener" data-i18n="dl.allReleases">全部版本与更新日志</a><span data-i18n="dl.noteEnd">。</span></p>
+  </div>
+</section>
+
+<section id="faq" style="padding-top:0">
+  <div class="wrap">
+    <div class="sec-head center reveal">
+      <span class="eyebrow" data-i18n="faq.eyebrow">常见问题</span>
+      <h2 data-i18n="faq.title">一些你可能想知道的事</h2>
+    </div>
+    <div class="faq">
+      <details class="reveal"><summary data-i18n="faq.q1">提醒会不会打断开会或演示？</summary><p data-i18n="faq.a1">不会。默认白名单包含腾讯会议、Zoom、Microsoft Teams 与 Google Meet，检测到这些应用在前台时自动延后提醒；你也可以添加任意需要专注的应用。</p></details>
+      <details class="reveal" data-delay="1"><summary data-i18n="faq.q2">离开电脑时还会一直提醒吗？</summary><p data-i18n="faq.a2">息屏、锁屏或系统休眠时会自动暂停计时，回到电脑前继续，不会补发成串的提醒。</p></details>
+      <details class="reveal" data-delay="2"><summary data-i18n="faq.q3">饮水数据会上传到云端吗？</summary><p data-i18n="faq.a3">不会。饮水记录、设置与统计都保存在本机，没有账号系统。你可以随时导出 JSON 备份到自己的硬盘或网盘。</p></details>
+      <details class="reveal" data-delay="3"><summary data-i18n="faq.q4">手机和电脑的数据会自动同步吗？</summary><p data-i18n="faq.a4">目前不自动同步。两端使用同一套数据结构，可以把一端的 JSON 备份导入另一端；跨端自动同步在规划中，进度以更新日志为准。</p></details>
+      <details class="reveal"><summary data-i18n="faq.q5">Windows 提示「未知发布者」正常吗？</summary><p data-i18n="faq.a5">安装包目前尚未做代码签名，SmartScreen 会提示未知发布者。点击「更多信息 → 仍要运行」即可完成安装；代码签名与 Microsoft Store 版本在计划中。</p></details>
+      <details class="reveal" data-delay="1"><summary data-i18n="faq.q6">macOS 提示「Shui」已损坏，无法打开怎么办？</summary><p data-i18n="faq.a6">这是 macOS 对未公证应用的隔离限制，并非文件损坏。把 Shui 拖进「应用程序」后，在终端运行 sudo xattr -r -d com.apple.quarantine /Applications/Shui.app 即可解除；也可以在「系统设置 → 隐私与安全性」里选择「仍要打开」。</p></details>
+      <details class="reveal" data-delay="2"><summary data-i18n="faq.q7">安卓端提醒不准时怎么办？</summary><p data-i18n="faq.a7">系统省电策略可能拦截后台提醒。请在系统设置中允许 Shui「自启动」，把电池 / 后台策略设为「不限制」或加入白名单；部分国产 ROM 还需在最近任务里锁定应用。设置一次即可，之后提醒会准时触发。</p></details>
+      <details class="reveal" data-delay="3"><summary data-i18n="faq.q8">收费吗？需要注册账号吗？</summary><p data-i18n="faq.a8">完全免费，没有广告、没有订阅、也不需要注册账号。项目开源在 GitHub，欢迎提 issue 或参与改进。</p></details>
+    </div>
+  </div>
+</section>
+
+<section id="get" style="padding-top:0">
+  <div class="wrap">
+    <div class="cta-band reveal">
+      <h2 data-i18n="cta.title">今天，先喝一杯</h2>
+      <p data-i18n="cta.desc">下载后三分钟设置完，之后交给它。你只需要在提醒出现时，抬手喝一口。</p>
+      <a class="btn btn-primary" href="#download">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg>
+        <span data-i18n="cta.btn">选择你的平台下载</span>
+      </a>
+    </div>
+  </div>
+</section>
 </main>
 
 <footer>
   <div class="wrap">
-    <div class="f-brand"><span class="brand-mark">💧</span> Shui · 喝水提醒助手</div>
-    <div>跨平台桌面应用 · 数据保存在本地 · v0.5.0</div>
+    <div>
+      <div class="f-brand">
+        <span class="brand-mark"><img src="./assets/icon-512.png" alt="" width="28" height="28" /></span>
+        Shui
+      </div>
+      <p class="f-note" data-i18n-html="footer.note">跨平台喝水提醒 · 数据保存在本地<br />免费、无广告、无订阅、无账号</p>
+    </div>
+    <div>
+      <h4 data-i18n="footer.product">产品</h4>
+      <ul>
+        <li><a href="#features" data-i18n="nav.features">功能</a></li>
+        <li><a href="#platforms" data-i18n="nav.platforms">跨平台</a></li>
+        <li><a href="#download" data-i18n="nav.download">下载</a></li>
+        <li><a href="#faq" data-i18n="nav.faq">常见问题</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4 data-i18n="footer.resources">资源</h4>
+      <ul>
+        <li><a href="https://github.com/rock-zhang/Shui" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/rock-zhang/Shui/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://shui-6d906.web.app/privacy-policy.html" target="_blank" rel="noopener" data-i18n="footer.privacy">隐私政策</a></li>
+        <li><a href="mailto:hey47_zhang@163.com" data-i18n="footer.feedback">反馈与联系</a></li>
+      </ul>
+    </div>
+    <div class="f-bottom">
+      <span>© <span id="year">2026</span> Shui</span>
+      <span><span data-i18n="footer.version">当前版本</span> <b data-version>v0.5.2</b> · <span data-i18n="footer.local">数据只存本地</span></span>
+    </div>
   </div>
 </footer>
 
-<script>
-  const nav = document.getElementById('nav');
-  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 24);
-  onScroll();
-  window.addEventListener('scroll', onScroll, { passive: true });
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach((e) => {
-      if (e.isIntersecting) {
-        e.target.classList.add('in');
-        io.unobserve(e.target);
+<script>
+(function () {
+  'use strict';
+
+  var REPO = 'rock-zhang/Shui';
+  var RELEASES = 'https://github.com/' + REPO + '/releases';
+  var API = 'https://api.github.com/repos/' + REPO + '/releases/latest';
+
+  var I18N = {
+    zh: {
+      'meta.title': 'Shui · 喝水提醒 — 让喝水自然发生',
+      'meta.desc': 'Shui 是一款跨平台喝水提醒应用：桌面端常驻菜单栏与托盘，手机端一键记录。开会自动安静，息屏自动暂停，数据只保存在本地。免费、无广告、无订阅、无账号。',
+      'a11y.skip': '跳到主要内容',
+      'nav.features': '功能', 'nav.screens': '界面', 'nav.platforms': '跨平台', 'nav.download': '下载', 'nav.faq': '常见问题', 'nav.cta': '免费下载',
+      'hero.badge': '跨平台 · 专注喝水提醒',
+      'hero.title': '把喝水，变成一件<br /><span class="grad">自然发生</span>的事。',
+      'hero.lede': 'Shui 常驻在你的菜单栏或系统托盘，按你的作息在合适的时间轻轻提醒一次。开会自动安静，息屏自动暂停，手机端也能一键记录。',
+      'hero.downloadTpl': '下载 {os} 版',
+      'hero.download': '下载 Shui',
+      'hero.more': '了解功能',
+      'trust.ads': '无广告', 'trust.sub': '无订阅', 'trust.account': '无账号', 'trust.local': '数据只存本地',
+      'float.today': '今日 900 ml', 'float.goal': '目标 1500 ml · 已完成 60%',
+      'float.next': '下次提醒 09:45', 'float.rule': '工作日 · 每 45 分钟',
+      'mock.history.alt': 'Shui 桌面端饮水记录界面', 'mock.general.alt': 'Shui 桌面端通用设置界面', 'mock.phone.alt': 'Shui 安卓全屏提醒页',
+      'mock.nav.general': '通用', 'mock.nav.reminder': '提醒', 'mock.nav.history': '饮水记录', 'mock.nav.shortcut': '快捷键', 'mock.nav.data': '备份与导入', 'mock.nav.statistics': '统计', 'mock.nav.about': '关于',
+      'mock.history.title': '饮水记录', 'mock.history.sub': '11 月 21 日 · 周五', 'mock.history.streak': '连续 7 天',
+      'mock.history.progress': '今日进度', 'mock.history.remain': '还差 600 ml',
+      'mock.history.r1': '全屏提醒', 'mock.history.r2': '托盘菜单', 'mock.history.r3': '系统通知',
+      'mock.general.title': '通用', 'mock.general.sub': '基础行为与应用偏好',
+      'mock.set.auto': '开机自启动', 'mock.set.autoDesc': '登录后在后台安静运行',
+      'mock.set.countdown': '倒计时', 'mock.set.countdownDesc': '在菜单栏显示下次提醒时间',
+      'mock.set.full': '全屏提醒', 'mock.set.fullDesc': '提醒时全屏显示喝水页面',
+      'mock.set.sound': '提醒音效', 'mock.set.soundDesc': '提醒出现时播放轻提示音',
+      'mock.set.lang': '界面语言', 'mock.set.langDesc': '选择界面语言，或跟随系统', 'mock.set.langValue': '跟随系统',
+      'mock.set.theme': '外观主题', 'mock.set.themeDesc': '浅色、深色或跟随系统', 'mock.set.themeValue': '浅色',
+      'mock.phone.badge': '该喝水啦', 'mock.phone.closeIn': '12s 后关闭', 'mock.phone.heading': '喝了么',
+      'mock.phone.tip': '少量多次，每次不超过 200ml，呵护心肾健康',
+      'mock.phone.drank': '今日已喝 900 ml', 'mock.phone.goal': '目标 1500 ml',
+      'mock.phone.skip': '跳过 →', 'mock.phone.hint': '也可以直接在通知栏记录',
+      'strip.note': '同一套记录结构与统计口径，导出文件可在任意一端导入',
+      'why.eyebrow': '为什么是 Shui',
+      'why.title': '该提醒的时候提醒，该安静的时候安静',
+      'why.lede': '喝水提醒不该是打断，而应该像水一样自然。三件事决定了它是否值得留在你的电脑里。',
+      'why.a.title': '开会就安静',
+      'why.a.desc': '检测前台应用，腾讯会议、Zoom、Microsoft Teams、Google Meet 运行时自动延后提醒，也可以把任意应用加入白名单。',
+      'why.b.title': '离开就暂停',
+      'why.b.desc': '息屏、锁屏、系统休眠自动停止计时，回到电脑前继续，不会在你离开后补发一串提醒。',
+      'why.c.title': '数据自己做主',
+      'why.c.desc': '没有账号系统，饮水记录只写在本机。随时导出 JSON 备份或 CSV 统计，换设备也能带走。',
+      'feat.eyebrow': '功能',
+      'feat.title': '从目标到复盘，每个环节都刚好',
+      'feat.lede': '功能不多，但没有一个是凑数的。',
+      'f1.title': '每日目标与进度', 'f1.desc': '设定每日饮水量，进度实时可见。达标时给一次轻反馈，不用打开统计也能知道今天怎么样了。',
+      'f2.title': '灵活的提醒节奏', 'f2.desc': '间隔、生效时间段、重复日分开设置。只在工作日提醒，午休和下班后保持安静。',
+      'f3.title': '三种提醒方式', 'f3.desc': '全屏提醒页、系统原生通知、菜单栏倒计时（macOS / Linux）。深度工作时用最轻的方式，久坐提醒时用最醒目的方式。',
+      'f4.title': '一键记录', 'f4.desc': '50 / 100 / 200 / 300 ml 快捷水量。安卓端直接从通知栏记录，锁屏状态下也不用打开应用。',
+      'f5.title': '趋势与统计', 'f5.desc': '7 天 / 30 天趋势、日均饮水量、达标天数与时段分布，一眼看清习惯是在变好还是变差。',
+      'f6.title': '本地数据与备份', 'f6.desc': 'JSON 备份可随时导出与导入，导入只在缺失日期补全，不会覆盖已有记录；统计可导出 CSV。',
+      'shot.eyebrow': '界面',
+      'shot.title': '克制的界面，刚好的存在感',
+      'shot.lede': '浅色、深色、跟随系统三套主题，设置与提醒保持同一套视觉语言。',
+      'shot.a.title': '精细化设置', 'shot.a.desc': '开机自启、倒计时与全屏提醒，一处开关即刻生效。',
+      'shot.b.title': '全屏提醒页', 'shot.b.desc': '手机上直接选择水量，或跳过这一次。',
+      'how.eyebrow': '上手',
+      'how.title': '三分钟设置完，之后交给它',
+      'how.lede': '第一次打开会有引导，按真实界面一步步完成目标、节奏和时间段设置。',
+      'how.s1.title': '下载安装', 'how.s1.desc': '从 GitHub Releases 下载，Windows 也可以用 winget 一条命令装好；macOS 拖入 Applications 即可。',
+      'how.s2.title': '设置目标与节奏', 'how.s2.desc': '首次打开自动进入引导：每日目标、提醒间隔、重复日、开始与结束时间，五步完成。',
+      'how.s3.title': '让它自己跑', 'how.s3.desc': '常驻菜单栏或托盘，需要时用快捷键记一杯，记录与统计自动汇总，不用刻意维护。',
+      'how.e1.title': '托盘菜单', 'how.e1.desc': '记录喝水、立即休息、暂停计时，都在右键菜单里。',
+      'how.e2.title': '全局快捷键', 'how.e2.desc': '不切换窗口就能记一杯，不打断正在做的事。',
+      'how.e3.title': '通知栏记录', 'how.e3.desc': '安卓端在通知里直接点水量，通知被收起也能操作。',
+      'cmp.eyebrow': '跨平台',
+      'cmp.title': '一台设备提醒，四端记录',
+      'cmp.lede': '桌面端负责不打扰的提醒与记录，移动端负责随身记录。同一套数据结构与统计口径，导出的备份文件可以在任意一端导入。',
+      'cmp.cap': '能力',
+      'cmp.r1': '全屏提醒页', 'cmp.r2': '系统通知', 'cmp.r3': '菜单栏倒计时', 'cmp.r4': '全局快捷键',
+      'cmp.r5': '会议 / 应用白名单暂停', 'cmp.r6': '息屏 / 锁屏自动暂停', 'cmp.r7': '通知栏一键记水', 'cmp.r8': 'JSON 备份 · CSV 导出',
+      'cmp.r9': '跨端自动同步', 'cmp.soon': '规划中',
+      'cmp.legend': '✓ 已支持 · — 该端暂不支持 · 「规划中」表示未来版本会支持',
+      'cmp.note': 'Windows 端通过托盘菜单与系统通知完成提醒与记录，不提供菜单栏文字倒计时。',
+      'dl.eyebrow': '下载',
+      'dl.title': '选择你的平台',
+      'dl.lede': '安装包托管在 GitHub Releases，下面的直链会自动指向最新版本。Windows 也可以用 winget 安装。',
+      'dl.recommend': '推荐',
+      'dl.win.sub': 'Windows 10 / 11 · 64 位推荐',
+      'dl.win.x64': 'x64 安装包（.exe）', 'dl.win.arm': 'ARM64 安装包（骁龙笔记本）', 'dl.win.x86': '32 位安装包（.exe）',
+      'dl.mac.sub': 'macOS 11 及以上', 'dl.mac.arm': 'Apple Silicon（M 系列）', 'dl.mac.intel': 'Intel 芯片', 'dl.mac.tip': '打开 DMG 后把 Shui 拖进「应用程序」即可完成安装。',
+      'dl.linux.sub': 'deb / AppImage / rpm', 'dl.linux.deb64': 'deb · x86_64', 'dl.linux.debArm': 'deb · arm64', 'dl.linux.appimage': 'AppImage · x86_64', 'dl.linux.rpm': 'rpm · x86_64',
+      'dl.android.sub': 'Android 8.0 及以上', 'dl.android.apk': '通用 APK（直接安装）',
+      'dl.android.tip': '安装时需要在系统中允许「安装未知应用」；首次使用还需允许自启动、把电池策略设为「不限制」，否则提醒可能延迟。',
+      'dl.copy': '复制', 'dl.copied': '命令已复制', 'dl.note': '所有安装包均来自 GitHub Releases，可查看', 'dl.allReleases': '全部版本与更新日志', 'dl.noteEnd': '。',
+      'faq.eyebrow': '常见问题', 'faq.title': '一些你可能想知道的事',
+      'faq.q1': '提醒会不会打断开会或演示？',
+      'faq.a1': '不会。默认白名单包含腾讯会议、Zoom、Microsoft Teams 与 Google Meet，检测到这些应用在前台时自动延后提醒；你也可以添加任意需要专注的应用。',
+      'faq.q2': '离开电脑时还会一直提醒吗？',
+      'faq.a2': '息屏、锁屏或系统休眠时会自动暂停计时，回到电脑前继续，不会补发成串的提醒。',
+      'faq.q3': '饮水数据会上传到云端吗？',
+      'faq.a3': '不会。饮水记录、设置与统计都保存在本机，没有账号系统。你可以随时导出 JSON 备份到自己的硬盘或网盘。',
+      'faq.q4': '手机和电脑的数据会自动同步吗？',
+      'faq.a4': '目前不自动同步。两端使用同一套数据结构，可以把一端的 JSON 备份导入另一端；跨端自动同步在规划中，进度以更新日志为准。',
+      'faq.q5': 'Windows 提示「未知发布者」正常吗？',
+      'faq.a5': '安装包目前尚未做代码签名，SmartScreen 会提示未知发布者。点击「更多信息 → 仍要运行」即可完成安装；代码签名与 Microsoft Store 版本在计划中。',
+      'faq.q6': 'macOS 提示「Shui」已损坏，无法打开怎么办？',
+      'faq.a6': '这是 macOS 对未公证应用的隔离限制，并非文件损坏。把 Shui 拖进「应用程序」后，在终端运行 sudo xattr -r -d com.apple.quarantine /Applications/Shui.app 即可解除；也可以在「系统设置 → 隐私与安全性」里选择「仍要打开」。',
+      'faq.q7': '安卓端提醒不准时怎么办？',
+      'faq.a7': '系统省电策略可能拦截后台提醒。请在系统设置中允许 Shui「自启动」，把电池 / 后台策略设为「不限制」或加入白名单；部分国产 ROM 还需在最近任务里锁定应用。设置一次即可，之后提醒会准时触发。',
+      'faq.q8': '收费吗？需要注册账号吗？',
+      'faq.a8': '完全免费，没有广告、没有订阅、也不需要注册账号。项目开源在 GitHub，欢迎提 issue 或参与改进。',
+      'cta.title': '今天，先喝一杯',
+      'cta.desc': '下载后三分钟设置完，之后交给它。你只需要在提醒出现时，抬手喝一口。',
+      'cta.btn': '选择你的平台下载',
+      'footer.note': '跨平台喝水提醒 · 数据保存在本地<br />免费、无广告、无订阅、无账号',
+      'footer.product': '产品', 'footer.resources': '资源', 'footer.privacy': '隐私政策', 'footer.feedback': '反馈与联系',
+      'footer.version': '当前版本', 'footer.local': '数据只存本地'
+    },
+    en: {
+      'meta.title': 'Shui — Water Reminder for macOS, Windows, Linux & Android',
+      'meta.desc': 'Shui is a cross-platform water reminder. It stays in your menu bar or system tray, pauses during meetings and screen lock, and logs drinks from your phone. Free, no ads, no subscription, no account, data stored locally.',
+      'a11y.skip': 'Skip to main content',
+      'nav.features': 'Features', 'nav.screens': 'Interface', 'nav.platforms': 'Platforms', 'nav.download': 'Download', 'nav.faq': 'FAQ', 'nav.cta': 'Download free',
+      'hero.badge': 'Cross-platform · Water reminders',
+      'hero.title': 'Hydration that<br /><span class="grad">runs itself</span>.',
+      'hero.lede': 'Shui lives in your menu bar or system tray and nudges you at the right moment. It stays quiet during meetings, pauses when your screen locks, and logs drinks from your phone in one tap.',
+      'hero.downloadTpl': 'Download for {os}',
+      'hero.download': 'Download Shui',
+      'hero.more': 'See features',
+      'trust.ads': 'No ads', 'trust.sub': 'No subscription', 'trust.account': 'No account', 'trust.local': 'Data stays local',
+      'float.today': 'Today 900 ml', 'float.goal': 'Goal 1,500 ml · 60% done',
+      'float.next': 'Next reminder 09:45', 'float.rule': 'Weekdays · every 45 min',
+      'mock.history.alt': 'Shui drink history on desktop', 'mock.general.alt': 'Shui general settings on desktop', 'mock.phone.alt': 'Shui full-screen reminder on Android',
+      'mock.nav.general': 'General', 'mock.nav.reminder': 'Reminders', 'mock.nav.history': 'History', 'mock.nav.shortcut': 'Shortcuts', 'mock.nav.data': 'Backup & import', 'mock.nav.statistics': 'Statistics', 'mock.nav.about': 'About',
+      'mock.history.title': 'Drink history', 'mock.history.sub': 'Fri, Nov 21', 'mock.history.streak': '7-day streak',
+      'mock.history.progress': 'Today progress', 'mock.history.remain': '600 ml to go',
+      'mock.history.r1': 'Full-screen', 'mock.history.r2': 'Tray menu', 'mock.history.r3': 'Notification',
+      'mock.general.title': 'General', 'mock.general.sub': 'Basic behavior and preferences',
+      'mock.set.auto': 'Launch at login', 'mock.set.autoDesc': 'Start quietly in the background',
+      'mock.set.countdown': 'Menu bar countdown', 'mock.set.countdownDesc': 'Show the next reminder time',
+      'mock.set.full': 'Full-screen reminder', 'mock.set.fullDesc': 'Show a full-screen drinking page',
+      'mock.set.sound': 'Reminder sound', 'mock.set.soundDesc': 'Play a soft chime with reminders',
+      'mock.set.lang': 'Interface language', 'mock.set.langDesc': 'Choose a language or follow the system', 'mock.set.langValue': 'System default',
+      'mock.set.theme': 'Appearance', 'mock.set.themeDesc': 'Light, dark or follow the system', 'mock.set.themeValue': 'Light',
+      'mock.phone.badge': 'Time for water', 'mock.phone.closeIn': 'Closing in 12s', 'mock.phone.heading': 'Had a drink?',
+      'mock.phone.tip': 'Small sips, keep each under 200 ml',
+      'mock.phone.drank': '900 ml today', 'mock.phone.goal': 'Goal 1,500 ml',
+      'mock.phone.skip': 'Skip →', 'mock.phone.hint': 'You can also log from the notification',
+      'strip.note': 'Same record structure and stats on every platform — export on one, import on another',
+      'why.eyebrow': 'Why Shui',
+      'why.title': 'Speaks up when it should, stays quiet when it must',
+      'why.lede': 'A water reminder should not feel like an interruption. Three things decide whether it earns a place on your computer.',
+      'why.a.title': 'Quiet in meetings',
+      'why.a.desc': 'Shui watches the foreground app. Zoom, Microsoft Teams, Google Meet and Tencent Meeting postpone reminders automatically, and you can whitelist any app you like.',
+      'why.b.title': 'Pauses when you leave',
+      'why.b.desc': 'Screen lock, display sleep and system suspend stop the timer. It resumes when you come back instead of firing a burst of missed reminders.',
+      'why.c.title': 'Your data, your disk',
+      'why.c.desc': 'There is no account system. Drink records are written locally, and you can export a JSON backup or CSV stats at any time.',
+      'feat.eyebrow': 'Features',
+      'feat.title': 'From goal to review, every step is deliberate',
+      'feat.lede': 'Not many features — but none of them are filler.',
+      'f1.title': 'Daily goal and progress', 'f1.desc': 'Set your daily intake and see progress at a glance. A light confirmation when you hit the goal, without opening the stats page.',
+      'f2.title': 'Flexible rhythm', 'f2.desc': 'Interval, active hours and repeat days are configured separately. Weekdays only, silent over lunch and after work.',
+      'f3.title': 'Three reminder styles', 'f3.desc': 'Full-screen reminder, native system notification, or menu bar countdown (macOS / Linux). Pick the lightest touch for deep work and the loudest for long sitting.',
+      'f4.title': 'One-tap logging', 'f4.desc': '50 / 100 / 200 / 300 ml quick amounts. On Android you can log straight from the notification, even with the screen locked.',
+      'f5.title': 'Trends and stats', 'f5.desc': '7-day and 30-day trends, daily average, days on target and hourly distribution — see whether the habit is improving.',
+      'f6.title': 'Local data and backup', 'f6.desc': 'Export and import JSON backups anytime. Import only fills missing dates and never overwrites existing records; stats export to CSV.',
+      'shot.eyebrow': 'Interface',
+      'shot.title': 'A restrained interface with just enough presence',
+      'shot.lede': 'Light, dark and system themes share one visual language across settings and reminders.',
+      'shot.a.title': 'Fine-grained settings', 'shot.a.desc': 'Launch at login, countdown and full-screen reminders — one switch, immediate effect.',
+      'shot.b.title': 'Full-screen reminder', 'shot.b.desc': 'Pick an amount on your phone, or skip this one.',
+      'how.eyebrow': 'Getting started',
+      'how.title': 'Three minutes to set up, then let it run',
+      'how.lede': 'The first launch walks you through the real interface: goal, interval, repeat days and active hours.',
+      'how.s1.title': 'Install', 'how.s1.desc': 'Download from GitHub Releases, or install with a single winget command on Windows. On macOS, drag it into Applications.',
+      'how.s2.title': 'Set goal and rhythm', 'how.s2.desc': 'Guided setup covers your daily goal, reminder interval, repeat days and start/end times in five steps.',
+      'how.s3.title': 'Let it run', 'how.s3.desc': 'It stays in the menu bar or tray. Log a drink with a shortcut when needed; records and stats update themselves.',
+      'how.e1.title': 'Tray menu', 'how.e1.desc': 'Log a drink, take a break or pause the timer from the right-click menu.',
+      'how.e2.title': 'Global shortcut', 'how.e2.desc': 'Log a drink without switching windows or breaking focus.',
+      'how.e3.title': 'Notification action', 'how.e3.desc': 'On Android, tap an amount right in the notification — even when it is collapsed.',
+      'cmp.eyebrow': 'Cross-platform',
+      'cmp.title': 'Remind on one device, log on all four',
+      'cmp.lede': 'Desktop handles quiet reminders and logging; mobile handles logging on the go. One data structure and one stats model — a backup exported on one platform imports on another.',
+      'cmp.cap': 'Capability',
+      'cmp.r1': 'Full-screen reminder', 'cmp.r2': 'System notifications', 'cmp.r3': 'Menu bar countdown', 'cmp.r4': 'Global shortcut',
+      'cmp.r5': 'Meeting / app whitelist pause', 'cmp.r6': 'Screen lock auto-pause', 'cmp.r7': 'Log from notification', 'cmp.r8': 'JSON backup · CSV export',
+      'cmp.r9': 'Cross-device sync', 'cmp.soon': 'Planned',
+      'cmp.legend': '✓ Supported · — Not supported on this platform · “Planned” means it is coming in a future release',
+      'cmp.note': 'On Windows, reminders and logging happen through the tray menu and system notifications; there is no menu bar text countdown.',
+      'dl.eyebrow': 'Download',
+      'dl.title': 'Choose your platform',
+      'dl.lede': 'Installers are hosted on GitHub Releases, and every direct link below points at the latest build. Windows users can also install with winget.',
+      'dl.recommend': 'Recommended',
+      'dl.win.sub': 'Windows 10 / 11 · 64-bit recommended',
+      'dl.win.x64': 'x64 installer (.exe)', 'dl.win.arm': 'ARM64 installer (Snapdragon laptops)', 'dl.win.x86': '32-bit installer (.exe)',
+      'dl.mac.sub': 'macOS 11 or later', 'dl.mac.arm': 'Apple Silicon (M series)', 'dl.mac.intel': 'Intel', 'dl.mac.tip': 'Open the DMG and drag Shui into Applications to finish.',
+      'dl.linux.sub': 'deb / AppImage / rpm', 'dl.linux.deb64': 'deb · x86_64', 'dl.linux.debArm': 'deb · arm64', 'dl.linux.appimage': 'AppImage · x86_64', 'dl.linux.rpm': 'rpm · x86_64',
+      'dl.android.sub': 'Android 8.0 or later', 'dl.android.apk': 'Universal APK (direct install)',
+      'dl.android.tip': 'Allow "Install unknown apps" during installation. On first launch, also allow auto-start and set battery usage to "Unrestricted", or reminders may be delayed.',
+      'dl.copy': 'Copy', 'dl.copied': 'Command copied', 'dl.note': 'All installers come from GitHub Releases — see', 'dl.allReleases': 'all versions and release notes', 'dl.noteEnd': '.',
+      'faq.eyebrow': 'FAQ', 'faq.title': 'A few things you may want to know',
+      'faq.q1': 'Will reminders interrupt meetings or presentations?',
+      'faq.a1': 'No. The default whitelist includes Tencent Meeting, Zoom, Microsoft Teams and Google Meet; reminders are postponed while they are in the foreground. You can add any app you need to focus in.',
+      'faq.q2': 'Does it keep reminding me when I am away?',
+      'faq.a2': 'Screen lock, display sleep or system suspend pauses the timer. It resumes when you return, without a burst of catch-up reminders.',
+      'faq.q3': 'Is my drinking data uploaded anywhere?',
+      'faq.a3': 'No. Records, settings and stats stay on your machine, and there is no account system. You can export a JSON backup to your own disk or cloud storage at any time.',
+      'faq.q4': 'Do my phone and computer sync automatically?',
+      'faq.a4': 'Not yet. Both platforms share the same data structure, so you can import a JSON backup on the other side. Cross-device sync is planned; progress is tracked in the release notes.',
+      'faq.q5': 'Windows shows "Unknown publisher" — is that expected?',
+      'faq.a5': 'The installer is not code-signed yet, so SmartScreen shows an unknown publisher warning. Click "More info → Run anyway" to install. Code signing and a Microsoft Store build are planned.',
+      'faq.q6': 'macOS says "Shui" is damaged and cannot be opened. What should I do?',
+      'faq.a6': 'This is Gatekeeper quarantine on an app that is not code-signed or notarized — the file itself is intact. Drag Shui into Applications, then run sudo xattr -r -d com.apple.quarantine /Applications/Shui.app in Terminal. You can also choose "Open Anyway" in System Settings → Privacy & Security.',
+      'faq.q7': 'Android reminders arrive late. What should I do?',
+      'faq.a7': 'Battery optimisation may block background alarms. In system settings, allow Shui to auto-start, set battery / background usage to "Unrestricted" or add it to the whitelist. On some Chinese ROMs you also need to lock the app in the recents screen. You only need to do this once, and reminders will fire on time.',
+      'faq.q8': 'Is it free? Do I need an account?',
+      'faq.a8': 'It is completely free — no ads, no subscription, no account. The project is open source on GitHub; issues and contributions are welcome.',
+      'cta.title': 'Start with one glass today',
+      'cta.desc': 'Three minutes to set up, then it runs itself. All you do is take a sip when the reminder appears.',
+      'cta.btn': 'Choose your platform',
+      'footer.note': 'Cross-platform water reminders · Data stored locally<br />Free, no ads, no subscription, no account',
+      'footer.product': 'Product', 'footer.resources': 'Resources', 'footer.privacy': 'Privacy policy', 'footer.feedback': 'Feedback',
+      'footer.version': 'Version', 'footer.local': 'Data stored locally'
+    }
+  };
+
+  var OS_NAMES = {
+    zh: { win: 'Windows', mac: 'macOS', linux: 'Linux', android: 'Android' },
+    en: { win: 'Windows', mac: 'macOS', linux: 'Linux', android: 'Android' }
+  };
+
+  var currentLang = 'zh';
+  var currentOs = 'win';
+
+  function dict() { return I18N[currentLang]; }
+  function t(key) { return dict()[key] || key; }
+
+  function applyLang(lang) {
+    currentLang = (lang === 'en') ? 'en' : 'zh';
+    var d = dict();
+    document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
+    var nodes = document.querySelectorAll('[data-i18n]');
+    for (var i = 0; i < nodes.length; i++) {
+      var key = nodes[i].getAttribute('data-i18n');
+      if (d[key] != null) nodes[i].textContent = d[key];
+    }
+    var htmlNodes = document.querySelectorAll('[data-i18n-html]');
+    for (var j = 0; j < htmlNodes.length; j++) {
+      var hkey = htmlNodes[j].getAttribute('data-i18n-html');
+      if (d[hkey] != null) htmlNodes[j].innerHTML = d[hkey];
+    }
+    var attrNodes = document.querySelectorAll('[data-i18n-attr]');
+    for (var k = 0; k < attrNodes.length; k++) {
+      var pairs = attrNodes[k].getAttribute('data-i18n-attr').split('|');
+      for (var p = 0; p < pairs.length; p++) {
+        var bits = pairs[p].split(':');
+        if (bits.length === 2 && d[bits[1]] != null) attrNodes[k].setAttribute(bits[0], d[bits[1]]);
+      }
+    }
+    document.title = d['meta.title'];
+    var desc = document.querySelector('meta[name="description"]');
+    if (desc) desc.setAttribute('content', d['meta.desc']);
+    var langButtons = document.querySelectorAll('.lang button');
+    for (var b = 0; b < langButtons.length; b++) {
+      langButtons[b].setAttribute('aria-pressed', String(langButtons[b].getAttribute('data-lang') === currentLang));
+    }
+    updateHeroLabel();
+    document.documentElement.classList.remove('i18n-pending');
+    try { localStorage.setItem('shui-site-lang', currentLang); } catch (e) {}
+  }
+
+  function updateHeroLabel() {
+    var label = document.querySelector('[data-hero-label]');
+    if (!label) return;
+    label.textContent = t('hero.downloadTpl').replace('{os}', OS_NAMES[currentLang][currentOs]);
+  }
+
+  function detectOs() {
+    var ua = navigator.userAgent || '';
+    if (/Android/i.test(ua)) return 'android';
+    if (/Windows/i.test(ua)) return 'win';
+    if (/Mac OS X|Macintosh/i.test(ua)) return 'mac';
+    if (/Linux|X11/i.test(ua)) return 'linux';
+    return 'win';
+  }
+
+  function markPlatform() {
+    currentOs = detectOs();
+    var cards = document.querySelectorAll('.dl-card');
+    for (var i = 0; i < cards.length; i++) {
+      cards[i].classList.toggle('is-recommended', cards[i].getAttribute('data-os') === currentOs);
+    }
+    updateHeroLabel();
+  }
+
+  function fmtSize(bytes) {
+    if (!bytes) return '';
+    var mb = bytes / 1048576;
+    return (mb >= 100 ? Math.round(mb) : mb.toFixed(1)) + ' MB';
+  }
+
+  var MATCHERS = {
+    'mac-arm': /aarch64\.dmg$/i,
+    'mac-intel': /_x64\.dmg$/i,
+    'win-x64': /_x64-setup\.exe$/i,
+    'win-arm64': /_arm64-setup\.exe$/i,
+    'win-x86': /_x86-setup\.exe$/i,
+    'deb-x64': /_amd64\.deb$/i,
+    'deb-arm64': /_arm64\.deb$/i,
+    'appimage': /\.AppImage$/i,
+    'rpm': /x86_64\.rpm$/i,
+    'apk': /universal-release\.apk$/i
+  };
+
+  // 发布新版本时同步这里的 tag 与文件名；GitHub API 可用时会被线上最新版覆盖。
+  var FALLBACK = {
+    tag: 'v0.5.2',
+    assets: {
+      'win-x64': 'Shui_0.5.2_x64-setup.exe',
+      'win-arm64': 'Shui_0.5.2_arm64-setup.exe',
+      'win-x86': 'Shui_0.5.2_x86-setup.exe',
+      'mac-arm': 'Shui_0.5.2_aarch64.dmg',
+      'mac-intel': 'Shui_0.5.2_x64.dmg',
+      'deb-x64': 'Shui_0.5.2_amd64.deb',
+      'deb-arm64': 'Shui_0.5.2_arm64.deb',
+      'appimage': 'Shui_0.5.2_amd64.AppImage',
+      'rpm': 'Shui-0.5.2-1.x86_64.rpm',
+      'apk': 'app-universal-release.apk'
+    }
+  };
+
+  function fillFallback() {
+    var versions = document.querySelectorAll('[data-version]');
+    for (var v = 0; v < versions.length; v++) versions[v].textContent = FALLBACK.tag;
+    Object.keys(FALLBACK.assets).forEach(function (key) {
+      var link = document.querySelector('[data-asset="' + key + '"]');
+      if (link) {
+        link.href = 'https://github.com/' + REPO + '/releases/download/' + FALLBACK.tag + '/' + FALLBACK.assets[key];
       }
     });
-  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
-  document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
-</script>
+  }
 
+  function fillRelease(release) {
+    if (!release || !release.assets) return;
+    var tag = release.tag_name || '';
+    if (tag) {
+      var versions = document.querySelectorAll('[data-version]');
+      for (var v = 0; v < versions.length; v++) versions[v].textContent = tag;
+    }
+    var assets = release.assets;
+    Object.keys(MATCHERS).forEach(function (key) {
+      var re = MATCHERS[key];
+      var hit = null;
+      for (var i = 0; i < assets.length; i++) {
+        if (re.test(assets[i].name) && !/\.sig$/i.test(assets[i].name)) { hit = assets[i]; break; }
+      }
+      if (!hit) return;
+      var link = document.querySelector('[data-asset="' + key + '"]');
+      if (link) link.href = hit.browser_download_url;
+      var size = document.querySelector('[data-size="' + key + '"]');
+      if (size) size.textContent = fmtSize(hit.size);
+    });
+  }
+
+  function loadRelease() {
+    var cached = null;
+    try {
+      var raw = sessionStorage.getItem('shui-release');
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && parsed.time && Date.now() - parsed.time < 3600000) cached = parsed.data;
+      }
+    } catch (e) {}
+    if (cached) { fillRelease(cached); return; }
+    if (!window.fetch) return;
+    fetch(API, { headers: { Accept: 'application/vnd.github+json' } })
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (data) {
+        if (!data) return;
+        fillRelease(data);
+        try { sessionStorage.setItem('shui-release', JSON.stringify({ time: Date.now(), data: data })); } catch (e) {}
+      })
+      .catch(function () {});
+  }
+
+  function toast(message) {
+    var el = document.getElementById('toast');
+    if (!el) return;
+    el.textContent = message;
+    el.classList.add('show');
+    clearTimeout(el._timer);
+    el._timer = setTimeout(function () { el.classList.remove('show'); }, 1800);
+  }
+
+  function legacyCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  function bindCopy() {
+    var buttons = document.querySelectorAll('[data-copy]');
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].addEventListener('click', function () {
+        var text = this.getAttribute('data-copy');
+        var self = this;
+        function done() {
+          toast(t('dl.copied'));
+          var original = self.getAttribute('data-i18n');
+          self.textContent = t('dl.copy');
+          if (original) self.setAttribute('data-i18n', original);
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done).catch(function () { if (legacyCopy(text)) done(); });
+        } else if (legacyCopy(text)) {
+          done();
+        }
+      });
+    }
+  }
+
+  function bindLang() {
+    var buttons = document.querySelectorAll('.lang button');
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].addEventListener('click', function () {
+        var lang = this.getAttribute('data-lang');
+        applyLang(lang);
+        try {
+          var url = new URL(window.location.href);
+          url.searchParams.set('lang', lang);
+          history.replaceState(null, '', url.toString());
+        } catch (e) {}
+      });
+    }
+  }
+
+  function initialLang() {
+    var fromQuery = null;
+    try { fromQuery = new URLSearchParams(window.location.search).get('lang'); } catch (e) {}
+    if (fromQuery === 'zh' || fromQuery === 'en') return fromQuery;
+    var stored = null;
+    try { stored = localStorage.getItem('shui-site-lang'); } catch (e) {}
+    if (stored === 'zh' || stored === 'en') return stored;
+    var nav = (navigator.language || '').toLowerCase();
+    return nav.indexOf('zh') === 0 ? 'zh' : 'en';
+  }
+
+  // nav shadow + scroll progress
+  var nav = document.getElementById('nav');
+  var scrollLine = document.getElementById('scrollLine');
+  function onScroll() {
+    if (nav) {
+      if (window.scrollY > 20) nav.classList.add('scrolled');
+      else nav.classList.remove('scrolled');
+    }
+    if (scrollLine) {
+      var max = document.documentElement.scrollHeight - window.innerHeight;
+      var ratio = max > 0 ? window.scrollY / max : 0;
+      scrollLine.style.width = (ratio * 100).toFixed(2) + '%';
+    }
+  }
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll);
+
+  // reveal on scroll
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in');
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+  } else {
+    document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('in'); });
+  }
+
+  // hover glow follows the pointer
+  (function () {
+    var glowEls = document.querySelectorAll('.card,.value,.step,.dl-card');
+    for (var i = 0; i < glowEls.length; i++) {
+      glowEls[i].addEventListener('pointermove', function (e) {
+        var rect = this.getBoundingClientRect();
+        this.style.setProperty('--mx', (e.clientX - rect.left) + 'px');
+        this.style.setProperty('--my', (e.clientY - rect.top) + 'px');
+      });
+    }
+  })();
+
+  // hero particle network
+  (function () {
+    var canvas = document.getElementById('heroNet');
+    if (!canvas || !canvas.getContext) return;
+    var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) { canvas.style.display = 'none'; return; }
+    var ctx = canvas.getContext('2d');
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var width = 0, height = 0, points = [];
+    var linkDist = 132;
+    function resize() {
+      var rect = canvas.getBoundingClientRect();
+      width = Math.max(1, Math.round(rect.width));
+      height = Math.max(1, Math.round(rect.height));
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      var count = Math.max(22, Math.min(64, Math.round(width / 24)));
+      points = [];
+      for (var i = 0; i < count; i++) {
+        points.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          vx: (Math.random() - 0.5) * 0.22,
+          vy: (Math.random() - 0.5) * 0.22,
+          r: Math.random() * 1.3 + 0.6
+        });
+      }
+    }
+    function frame() {
+      ctx.clearRect(0, 0, width, height);
+      for (var i = 0; i < points.length; i++) {
+        var p = points[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < -10 || p.x > width + 10) p.vx *= -1;
+        if (p.y < -10 || p.y > height + 10) p.vy *= -1;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(125,211,252,.55)';
+        ctx.fill();
+        for (var j = i + 1; j < points.length; j++) {
+          var q = points[j];
+          var dx = p.x - q.x, dy = p.y - q.y;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < linkDist) {
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(q.x, q.y);
+            ctx.strokeStyle = 'rgba(56,189,248,' + (0.18 * (1 - dist / linkDist)).toFixed(3) + ')';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+        }
+      }
+      requestAnimationFrame(frame);
+    }
+    resize();
+    frame();
+    window.addEventListener('resize', resize);
+  })();
+
+  var yearEl = document.getElementById('year');
+  if (yearEl) yearEl.textContent = String(new Date().getFullYear());
+
+  bindLang();
+  bindCopy();
+  markPlatform();
+  applyLang(initialLang());
+  fillFallback();
+  loadRelease();
+  // 兜底：脚本异常时不要让页面一直空白
+  setTimeout(function () { document.documentElement.classList.remove('i18n-pending'); }, 1200);
+})();
+</script>
 </body>
 </html>

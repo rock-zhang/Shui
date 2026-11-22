@@ -17,6 +17,7 @@ import {
   CupSoda,
   Droplet,
   Droplets,
+  Flame,
   GlassWater,
   Plus,
   Undo2,
@@ -33,6 +34,7 @@ import { usePlatform } from "@/hooks/use-platform";
 import { useBackToClose } from "@/hooks/use-back-to-close";
 import { track, trackDrinkRecorded } from "@/lib/analytics";
 import { getLocalDateKey } from "@/lib/drink-history";
+import { ackStreak } from "@/lib/streak";
 import type { DrinkEntry, DrinkReceipt } from "@/lib/drink-day";
 import {
   emitNextReminder,
@@ -266,7 +268,8 @@ function NextReminderLine({
 
 export function TodayTab() {
   const { t, locale } = useI18n();
-  const { today, goal, error } = useDrinkData(7);
+  const { today, goal, error, streak } = useDrinkData(7);
+  const lastStreak = useRef<number | null>(null);
   const { alert, hydrated, patchAlert } = useMobileConfig();
   const quickAmounts = alert.quickAmounts;
   const [confirmUndo, setConfirmUndo] = useState<string | null>(null);
@@ -315,6 +318,19 @@ export function TodayTab() {
     },
     []
   );
+
+  // 连续达标里程碑只庆祝一次：Rust 返回未 ack 的 milestone 时弹提示并写回。
+  // 断连（current 归 0）时重置记录，重新连到 7 天可以再次庆祝。
+  useEffect(() => {
+    if (!streak) return;
+    if (streak.current === 0) {
+      if (lastStreak.current !== 0) void ackStreak(0);
+    } else if (streak.milestone > 0) {
+      toast.success(t("streak.milestone", { days: streak.milestone }));
+      void ackStreak(streak.milestone);
+    }
+    lastStreak.current = streak.current;
+  }, [streak, t]);
 
   /** 让被点的那张卡片就地播放水位上涨 + ✓，连续记录时靠 token 重播动画。 */
   function celebrate(amount: number) {
@@ -503,7 +519,13 @@ export function TodayTab() {
     <>
       <NotificationNudge />
 
-      <MobileSection className="pt-5">
+      <MobileSection className="relative pt-5">
+        {streak && streak.current > 0 && (
+          <span className="absolute right-4 top-4 z-10 flex items-center gap-1.5 rounded-full border border-orange-200/70 bg-card/95 px-3 py-1.5 text-xs font-medium text-orange-600 shadow-md backdrop-blur-sm dark:border-orange-900/60 dark:text-orange-300">
+            <Flame className="h-3.5 w-3.5" aria-hidden="true" />
+            {t("streak.pill", { days: streak.current })}
+          </span>
+        )}
         <ProgressRing total={today.total} goal={goal || today.goal} />
         <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
           {t("mobile.today.tip")}

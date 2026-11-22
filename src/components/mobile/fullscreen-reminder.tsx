@@ -15,7 +15,12 @@ import {
   type DrinkReceipt,
 } from "@/lib/drink-day";
 import { getLocalDateKey } from "@/lib/drink-history";
-import { emitNextReminder, notifyGoalReached } from "@/lib/mobile";
+import {
+  DEFAULT_QUICK_AMOUNTS,
+  emitNextReminder,
+  normalizeQuickAmounts,
+  notifyGoalReached,
+} from "@/lib/mobile";
 import { amountBucket, progressBucket, track, trackDrinkRecorded } from "@/lib/analytics";
 import type { ReminderTrigger } from "./mobile-app";
 
@@ -49,7 +54,7 @@ const TEXT_KEYS: MessageKey[] = [
   "mobile.fullscreen.tip7",
 ];
 
-const OPTIONS = [50, 100, 200, 300];
+const OPTIONS_FALLBACK = DEFAULT_QUICK_AMOUNTS;
 /** 全屏提醒自动关闭的秒数。 */
 const COUNTDOWN_SECONDS = 30;
 type Outcome = "confirmed" | "skipped" | "timedOut";
@@ -71,6 +76,7 @@ export function FullscreenReminder({
   const { t } = useI18n();
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
   const [water, setWater] = useState({ gold: 0, drink: 0 });
+  const [options, setOptions] = useState<number[]>([...OPTIONS_FALLBACK]);
   const [saving, setSaving] = useState(false);
   const [closing, setClosing] = useState(false);
   const [error, setError] = useState<MessageKey | null>(null);
@@ -163,7 +169,10 @@ export function FullscreenReminder({
           load(STORE_NAME.config, { autoSave: false }),
           load(STORE_NAME.drink_history, { autoSave: false }),
         ]);
-        const alert = await configStore.get<{ gold?: string | number }>("alert");
+        const alert = await configStore.get<{
+          gold?: string | number;
+          quickAmounts?: unknown;
+        }>("alert");
         const goal = Number(alert?.gold) || 0;
         const value = await historyStore.get<DrinkHistoryValue>(
           getLocalDateKey(new Date())
@@ -171,6 +180,8 @@ export function FullscreenReminder({
         if (!cancelled) {
           const total = normalizeDrinkDay(value, goal).total;
           setWater({ gold: goal, drink: total });
+          // 与桌面/设置页共用 alert.quickAmounts，允许重复档位。
+          setOptions(normalizeQuickAmounts(alert?.quickAmounts));
           track("fullscreen_reminder_shown", {
             trigger,
             progress_bucket: progressBucket(total, goal),
@@ -260,9 +271,9 @@ export function FullscreenReminder({
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          {OPTIONS.map((amount) => (
+          {options.map((amount, index) => (
             <button
-              key={amount}
+              key={index}
               type="button"
               disabled={saving}
               onClick={() => record(amount)}

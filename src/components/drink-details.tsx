@@ -49,7 +49,7 @@ export function DrinkDetails({ entries, goal, onChanged }: {
     <p className="mb-3 text-xs text-muted-foreground">{t("common.details.description")}</p>
     {notice && <p role="status" className="mb-2 text-sm">{t(notice.key, notice.params)}</p>}
     {days.length === 0 && <p className="text-sm text-muted-foreground">{t("common.details.empty")}</p>}
-    <div className="max-h-80 space-y-3 overflow-y-auto">
+    <div className="space-y-3">
       {days.map(day => {
         const untracked = Math.max(0, day.total - day.entries.reduce((sum, entry) => sum + entry.amount, 0));
         return <details key={day.date}>

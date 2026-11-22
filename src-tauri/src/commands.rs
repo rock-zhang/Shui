@@ -8,6 +8,8 @@ use std::sync::atomic::Ordering;
 // Remove this line since we don't need it
 // use tauri::api::version::Version;
 use tauri::{Emitter, Manager};
+#[cfg(not(target_os = "android"))]
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use timer::IS_RUNNING;
 use tokio::time::{sleep, Duration};
 
@@ -16,6 +18,42 @@ use tokio::sync::mpsc;
 
 // 只保留 channel 相关的静态变量
 static REMINDER_PAGE_COUNTDOWN_SENDER: Mutex<Option<mpsc::Sender<()>>> = Mutex::new(None);
+
+/// 把 Esc 的注册放在 Rust 侧：即使提醒页 JS 崩溃或白屏，快捷键依然可用。
+/// 回调里不在当前线程直接关窗（可能死锁 UI 线程），转异步任务执行。
+#[cfg(not(target_os = "android"))]
+fn register_escape_shortcut(app: &tauri::AppHandle) {
+    if app.global_shortcut().is_registered("Esc") {
+        return;
+    }
+    let _ = app
+        .global_shortcut()
+        .on_shortcut("Esc", |app, _shortcut, event| {
+            if event.state() != ShortcutState::Pressed {
+                return;
+            }
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                if reminder_session::close(&app, None, Outcome::Skipped) {
+                    reset_timer();
+                    crate::desktop_analytics::log_event(
+                        &app,
+                        "reminder_outcome",
+                        serde_json::json!({ "outcome": "skipped", "trigger": "desktop" }),
+                    );
+                    crate::desktop_analytics::log_event(
+                        &app,
+                        "fullscreen_skip",
+                        serde_json::json!({ "trigger": "desktop" }),
+                    );
+                } else {
+                    // 会话已经结束（例如页面异常时倒计时兜底先关过一次）但 Esc 仍
+                    // 注册着：这里顺手注销，避免全局快捷键被永久占用。
+                    let _ = app.global_shortcut().unregister("Esc");
+                }
+            });
+        });
+}
 
 #[cfg(not(target_os = "android"))]
 fn countdown_async(app_handle: tauri::AppHandle) {
@@ -74,6 +112,7 @@ pub fn call_reminder(app_handle: tauri::AppHandle) -> bool {
     // 到点停表，但不记为「手动暂停」：提醒结束后 reset_timer 会重新放行。
     timer::suspend_for_reminder();
     window::show_reminder_windows(&app_handle);
+    register_escape_shortcut(&app_handle);
 
     countdown_async(app_handle);
 
@@ -92,6 +131,7 @@ pub async fn call_reminder(app_handle: tauri::AppHandle) -> bool {
     timer::suspend_for_reminder();
     // 直接传递引用，避免不必要的 clone
     window::show_reminder_windows(&app_handle);
+    register_escape_shortcut(&app_handle);
 
     countdown_async(app_handle);
 
@@ -116,6 +156,13 @@ pub async fn hide_reminder_windows(app_handle: tauri::AppHandle, outcome: Option
 
 #[tauri::command]
 pub fn hide_reminder_window(app_handle: tauri::AppHandle, label: &str) {
+    // 单窗口隐藏不经过 reminder_session::close，必须在这里注销全局 Esc，
+    // 否则多屏切换 / 热插拔隐藏窗口后，Esc 会在系统范围内一直被占用。
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = app_handle.global_shortcut().unregister("Esc");
+        let _ = app_handle.emit("reminder_already_hidden", ());
+    }
     window::hide_reminder_window(&app_handle, &label);
 }
 
